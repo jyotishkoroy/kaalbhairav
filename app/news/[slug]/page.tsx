@@ -27,7 +27,7 @@ export default async function NewsPostPage({
     notFound()
   }
 
-  const shareUrl = `https://kaalbhairav.org/news/${post.slug}`
+  const shareUrl = `https://tarayai.com/news/${post.slug}`
   const shareText = encodeURIComponent(`${post.title}\n\n${shareUrl}`)
 
   return (
