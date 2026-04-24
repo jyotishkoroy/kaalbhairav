@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { RotatingYantra } from '@/components/brand/yantra'
 import Link from 'next/link'
 
 export const revalidate = 600
@@ -18,9 +19,10 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <section className="min-h-[80vh] flex items-center justify-center px-6 text-center">
-        <div className="max-w-2xl space-y-8">
-          <h1 className="text-7xl md:text-8xl font-serif">TarayAI</h1>
+      <section className="relative min-h-[80vh] flex items-center justify-center px-6 text-center overflow-hidden">
+        <RotatingYantra />
+        <div className="relative z-10 max-w-2xl space-y-8">
+          <h1 className="text-7xl md:text-8xl font-serif">Tarayai</h1>
           <p className="text-xl text-white/70 leading-relaxed">
             A grounded space for spiritual reflection, authentic stories, and the quiet questions.
           </p>
@@ -29,14 +31,14 @@ export default async function HomePage() {
             {user ? (
               <>
                 <Link href="/astro" className="px-8 py-3 bg-orange-600 rounded-full hover:bg-orange-500">
-  Ask the Guru
-</Link>
-<Link href="/still" className="px-8 py-3 border border-orange-500/40 rounded-full hover:bg-orange-500/10">
-  Open Still
-</Link>
-<Link href="/news" className="px-8 py-3 border border-white/20 rounded-full hover:bg-white/5">
-  Read News
-</Link>
+                  Ask the Guru
+                </Link>
+                <Link href="/still" className="px-8 py-3 border border-orange-500/40 rounded-full hover:bg-orange-500/10">
+                  Open Still
+                </Link>
+                <Link href="/news" className="px-8 py-3 border border-white/20 rounded-full hover:bg-white/5">
+                  Read News
+                </Link>
               </>
             ) : (
               <Link href="/sign-in" className="px-8 py-3 bg-white text-black rounded-full hover:bg-white/90">
@@ -82,6 +84,7 @@ export default async function HomePage() {
         <div className="space-x-6">
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
+          <Link href="/settings">Settings</Link>
           <a href="mailto:takedown@tarayai.com">Takedown</a>
         </div>
         <p className="mt-4">Jai Maa Tara</p>
