@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Privacy Policy - Kaalbhairav',
+  title: 'Privacy Policy - Tarayai',
 }
 
 export default function PrivacyPage() {
@@ -65,8 +65,8 @@ export default function PrivacyPage() {
             <p>
               Under India&apos;s DPDP Act 2023, you may request access,
               correction, or deletion of your personal data. Email{' '}
-              <a href="mailto:privacy@kaalbhairav.org" className="text-orange-400 underline">
-                privacy@kaalbhairav.org
+              <a href="mailto:privacy@tarayai.com" className="text-orange-400 underline">
+                privacy@tarayai.com
               </a>{' '}
               for privacy requests.
             </p>
