@@ -1,30 +1,32 @@
-'use client'
+import { createClient } from '@/lib/supabase/server'
+import SignInButton from './sign-in-button'
 
-import { createClient } from '@/lib/supabase/client'
+export default async function SignInPage() {
+  const supabase = await createClient()
 
-export default function SignInPage() {
-  const handleSignIn = async () => {
-    const supabase = createClient()
+  const { data: config } = await supabase
+    .from('site_config')
+    .select('value')
+    .eq('key', 'signups_enabled')
+    .single()
 
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-  }
+  const signupsEnabled = config?.value !== false
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-white">
+    <div className="min-h-screen flex items-center justify-center bg-black text-white px-6">
       <div className="text-center space-y-8">
         <h1 className="text-5xl font-serif">tarayai</h1>
-        <p className="text-white/70">Begin your journey</p>
-        <button
-          onClick={handleSignIn}
-          className="bg-white text-black px-8 py-3 rounded-full hover:bg-white/90"
-        >
-          Continue with Google
-        </button>
+
+        {signupsEnabled ? (
+          <>
+            <p className="text-white/70">Begin your journey</p>
+            <SignInButton />
+          </>
+        ) : (
+          <p className="text-white/60 max-w-md">
+            New signups are temporarily paused. Please check back shortly.
+          </p>
+        )}
       </div>
     </div>
   )

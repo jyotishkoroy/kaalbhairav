@@ -31,6 +31,9 @@ export default async function AdminLayout({
             <Link href="/admin/news/new" className="hover:text-white">
               New Post
             </Link>
+            <Link href="/admin/controls" className="hover:text-white">
+              Controls
+            </Link>
           </nav>
         </div>
       </header>

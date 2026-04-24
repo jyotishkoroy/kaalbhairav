@@ -50,6 +50,22 @@ export async function POST(request: NextRequest) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  const { data: llmConfig } = await supabase
+  .from('site_config')
+  .select('value')
+  .eq('key', 'llm_enabled')
+  .single()
+
+if (llmConfig?.value === false) {
+  return Response.json(
+    {
+      error: 'disabled',
+      message: 'The Guru is taking a brief pause. Please return shortly.',
+    },
+    { status: 503 }
+  )
+}
+
   const rateLimiter = createRateLimiter()
   let remaining: number | null = null
 
