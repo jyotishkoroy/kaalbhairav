@@ -1,9 +1,12 @@
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
-export const alt = 'TarayAI — spiritual reflection'
+export const alt = 'tarayai — spiritual reflection'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.tarayai.com'
+const logoUrl = new URL('/tarayai-logo.png', siteUrl).toString()
 
 export default async function OGImage() {
   return new ImageResponse(
@@ -13,23 +16,40 @@ export default async function OGImage() {
           width: '100%',
           height: '100%',
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
-          background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #3d1a00 100%)',
-          color: 'white',
-          fontFamily: 'serif',
-          padding: '80px',
-          textAlign: 'center',
+          justifyContent: 'center',
+          background: '#ffffff',
         }}
       >
-        <div style={{ fontSize: 110, fontWeight: 700, marginBottom: 24 }}>
-          TarayAI
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <img
+            src={logoUrl}
+            width={260}
+            height={220}
+            alt="tarayai"
+            style={{
+              objectFit: 'contain',
+              marginBottom: '18px',
+            }}
+          />
+          <div
+            style={{
+              fontSize: 96,
+              color: '#b49a6a',
+              fontFamily: 'serif',
+              lineHeight: 1,
+            }}
+          >
+            tarayai
+          </div>
         </div>
-        <div style={{ fontSize: 36, color: 'rgba(255,255,255,0.72)', maxWidth: 900 }}>
-          A grounded space for reflection, authentic stories, and the quiet questions.
-        </div>
-        <div style={{ fontSize: 48, marginTop: 40 }}>🔱</div>
       </div>
     ),
     { ...size }
