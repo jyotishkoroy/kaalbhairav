@@ -2,11 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/rss-ingest",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/daily-insight",
-      "schedule": "30 23 * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
