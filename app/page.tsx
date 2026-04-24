@@ -29,11 +29,14 @@ export default async function HomePage() {
             {user ? (
               <>
                 <Link href="/astro" className="px-8 py-3 bg-orange-600 rounded-full hover:bg-orange-500">
-                  Ask the Guru
-                </Link>
-                <Link href="/news" className="px-8 py-3 border border-white/20 rounded-full hover:bg-white/5">
-                  Read News
-                </Link>
+  Ask the Guru
+</Link>
+<Link href="/still" className="px-8 py-3 border border-orange-500/40 rounded-full hover:bg-orange-500/10">
+  Open Still
+</Link>
+<Link href="/news" className="px-8 py-3 border border-white/20 rounded-full hover:bg-white/5">
+  Read News
+</Link>
               </>
             ) : (
               <Link href="/sign-in" className="px-8 py-3 bg-white text-black rounded-full hover:bg-white/90">
