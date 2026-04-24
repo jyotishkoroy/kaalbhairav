@@ -11,11 +11,11 @@ export default async function NewsPostPage({
   const supabase = await createClient()
 
   const { data: post } = await supabase
-    .from('news_posts')
-    .select('*')
-    .eq('slug', slug)
-    .eq('status', 'published')
-    .single()
+  .from('news_posts')
+  .select('id, slug, title, summary, body, category, source_name, source_url, published_at')
+  .eq('slug', slug)
+  .eq('status', 'published')
+  .single()
 
   if (!post) {
     notFound()
@@ -45,11 +45,16 @@ export default async function NewsPostPage({
         </div>
 
         <div className="prose prose-invert max-w-none">
-          <p>
-            This is the full article page. Later, we will replace this placeholder
-            with full article body content from the database.
-          </p>
-        </div>
+  {post.body ? (
+    <div className="whitespace-pre-wrap text-white/80 leading-7">
+      {post.body}
+    </div>
+  ) : (
+    <p className="text-white/60">
+      No article body has been added yet.
+    </p>
+  )}
+</div>
       </article>
     </main>
   )
