@@ -90,6 +90,12 @@ export default async function AllNewsPostsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3 justify-end shrink-0">
+                <Link
+  href={`/admin/news/${post.id}/edit`}
+  className="border border-white/20 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-white/10"
+>
+  Edit
+</Link>
                 {post.status !== 'published' && (
                   <form action={publishPost}>
                     <input type="hidden" name="postId" value={post.id} />

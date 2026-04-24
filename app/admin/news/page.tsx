@@ -51,20 +51,20 @@ export default async function AdminNewsPage() {
   </p>
 
   <div className="flex gap-3">
-  <Link
-    href="/admin/news/all"
-    className="border border-white/20 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-white/10"
-  >
-    All Posts
-  </Link>
+    <Link
+      href="/admin/news/all"
+      className="border border-white/20 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-white/10"
+    >
+      All Posts
+    </Link>
 
-  <Link
-    href="/admin/news/new"
-    className="bg-white text-black px-5 py-2 rounded-full text-sm font-medium hover:bg-white/90"
-  >
-    New Post
-  </Link>
-</div>
+    <Link
+      href="/admin/news/new"
+      className="bg-white text-black px-5 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+    >
+      New Post
+    </Link>
+  </div>
 </div>
       </div>
 
