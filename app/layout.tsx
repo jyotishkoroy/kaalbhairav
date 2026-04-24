@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Kaalbhairav',
+  title: 'tarayai',
   description: 'Spiritual news and tools for Kaal Bhairav devotees.',
 }
 

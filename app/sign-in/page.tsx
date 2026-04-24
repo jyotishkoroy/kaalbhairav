@@ -17,7 +17,7 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white">
       <div className="text-center space-y-8">
-        <h1 className="text-5xl font-serif">Kaalbhairav</h1>
+        <h1 className="text-5xl font-serif">tarayai</h1>
         <p className="text-white/70">Begin your journey</p>
         <button
           onClick={handleSignIn}

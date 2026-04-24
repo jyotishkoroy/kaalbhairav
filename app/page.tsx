@@ -22,7 +22,7 @@ export default async function HomePage() {
       <section className="relative min-h-[80vh] flex items-center justify-center px-6 text-center overflow-hidden">
         <RotatingYantra />
         <div className="relative z-10 max-w-2xl space-y-8">
-          <h1 className="text-7xl md:text-8xl font-serif">Tarayai</h1>
+          <h1 className="text-7xl md:text-8xl font-serif">tarayai</h1>
           <p className="text-xl text-white/70 leading-relaxed">
             A grounded space for spiritual reflection, authentic stories, and the quiet questions.
           </p>

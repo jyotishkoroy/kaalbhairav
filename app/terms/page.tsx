@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Terms of Service - Kaalbhairav',
+  title: 'Terms of Service - tarayai',
 }
 
 export default function TermsPage() {
