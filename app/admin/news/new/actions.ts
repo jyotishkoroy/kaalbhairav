@@ -46,7 +46,7 @@ export async function createPost(formData: FormData) {
   const body = String(formData.get('body') || '').trim()
   const category = String(formData.get('category') || 'general').trim()
   const sourceName = String(formData.get('source_name') || 'Manual Admin Post').trim()
-  const sourceUrl = String(formData.get('source_url') || '').trim()
+  const sourceUrl = String(formData.get('source_url') || 'https://tarayai.com').trim()
 
   if (!title || !slug || !summary) {
     throw new Error('Title, slug, and summary are required.')
@@ -61,7 +61,7 @@ export async function createPost(formData: FormData) {
       body: body || null,
       category,
       source_name: sourceName,
-      source_url: sourceUrl || null,
+      source_url: sourceUrl || 'https://tarayai.com',
       status: 'draft',
       published_at: null,
     })
