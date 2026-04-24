@@ -1,0 +1,111 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { approvePost, rejectPost } from './actions'
+
+export default async function AdminNewsPage() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/sign-in')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    redirect('/')
+  }
+
+  const { data: posts, error } = await supabase
+    .from('news_posts')
+    .select('id, slug, title, summary, category, source_name, status, created_at')
+    .in('status', ['draft', 'pending'])
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error(error)
+  }
+
+  return (
+    <main className="min-h-screen bg-black text-white px-6 py-12 max-w-5xl mx-auto">
+      <div className="mb-10">
+        <Link href="/news" className="text-sm text-white/50 hover:text-white">
+          ← Back to News
+        </Link>
+
+        <h1 className="text-5xl font-serif mt-6 mb-3">
+          Admin News
+        </h1>
+
+        <p className="text-white/60">
+          Review draft news posts before publishing them.
+        </p>
+      </div>
+
+      {!posts?.length && (
+        <div className="border border-white/10 rounded-xl p-8 text-white/50">
+          No draft or pending posts right now.
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {posts?.map((post) => (
+          <div
+            key={post.id}
+            className="border border-white/10 rounded-xl p-6 bg-white/[0.03]"
+          >
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <div className="text-xs text-orange-400 uppercase tracking-wide mb-2">
+                  {post.category} · {post.status}
+                </div>
+
+                <h2 className="text-2xl font-serif mb-2">
+                  {post.title}
+                </h2>
+
+                <p className="text-white/70 mb-3">
+                  {post.summary}
+                </p>
+
+                <div className="text-xs text-white/40">
+                  Source: {post.source_name || 'Unknown'}
+                </div>
+              </div>
+
+              <div className="flex gap-3 shrink-0">
+                <form action={approvePost}>
+                  <input type="hidden" name="postId" value={post.id} />
+                  <button
+                    type="submit"
+                    className="bg-green-500 text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-green-400"
+                  >
+                    Approve
+                  </button>
+                </form>
+
+                <form action={rejectPost}>
+                  <input type="hidden" name="postId" value={post.id} />
+                  <button
+                    type="submit"
+                    className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-red-400"
+                  >
+                    Reject
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
