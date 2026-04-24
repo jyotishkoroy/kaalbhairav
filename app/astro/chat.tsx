@@ -148,14 +148,13 @@ export default function AstroChat({ placeName }: { placeName: string | null }) {
               }`}
             >
               <p className="whitespace-pre-wrap">
-                {message.content || (streaming ? '...' : '')}
+                {message.content || (streaming ? <ThinkingDots /> : '')}
               </p>
             </div>
           </div>
         ))}
         <div ref={endRef} />
       </div>
-
       <div className="border-t border-white/10 pt-4 flex gap-3">
         <input
           value={input}
@@ -179,5 +178,15 @@ export default function AstroChat({ placeName }: { placeName: string | null }) {
         </button>
       </div>
     </div>
+  )
+}
+
+function ThinkingDots() {
+  return (
+    <span className="inline-flex gap-1">
+      <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:0ms]" />
+      <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:150ms]" />
+      <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:300ms]" />
+    </span>
   )
 }
