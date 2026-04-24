@@ -65,12 +65,6 @@ export async function saveBirthChart(formData: FormData) {
   }
 
   const coords = await geocode(parsed.data.place_name)
-  const chartJson = {
-    status: 'pending_engine',
-    place_name: parsed.data.place_name,
-    has_birth_time: Boolean(parsed.data.birth_time),
-    geocoded: Boolean(coords),
-  }
 
   const { error } = await supabase.rpc('upsert_birth_chart_encrypted', {
     p_user_id: user.id,
@@ -86,6 +80,16 @@ export async function saveBirthChart(formData: FormData) {
     return { error: error.message }
   }
 
+  try {
+  const { getChart } = await import('@/lib/astro-engine')
+  const chartJson = await getChart({
+    birth_date: parsed.data.birth_date,
+    birth_time: parsed.data.birth_time ?? null,
+    latitude: coords?.lat ?? '0',
+    longitude: coords?.lon ?? '0',
+    place_name: parsed.data.place_name,
+  })
+
   await supabase
     .from('birth_charts')
     .update({
@@ -93,6 +97,9 @@ export async function saveBirthChart(formData: FormData) {
       computed_at: new Date().toISOString(),
     })
     .eq('user_id', user.id)
+} catch (chartError) {
+  console.error('Chart computation failed:', chartError)
+}
 
   return { success: true }
 }
