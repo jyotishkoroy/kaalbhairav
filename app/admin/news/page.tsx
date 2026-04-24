@@ -45,9 +45,18 @@ export default async function AdminNewsPage() {
           Admin News
         </h1>
 
-        <p className="text-white/60">
-          Review draft news posts before publishing them.
-        </p>
+        <div className="flex items-center justify-between gap-4">
+  <p className="text-white/60">
+    Review draft news posts before publishing them.
+  </p>
+
+  <Link
+    href="/admin/news/new"
+    className="bg-white text-black px-5 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+  >
+    New Post
+  </Link>
+</div>
       </div>
 
       {!posts?.length && (
