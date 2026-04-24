@@ -24,7 +24,7 @@ export default async function EditNewsPostPage({ params }: EditNewsPostPageProps
   }
 
   return (
-    <main className="min-h-screen bg-black text-white px-6 py-12 max-w-3xl mx-auto">
+    <main className="min-h-screen px-6 py-12 max-w-3xl mx-auto">
       <div className="mb-10">
         <Link href="/admin/news/all" className="text-sm text-white/50 hover:text-white">
           ← Back to All Posts
