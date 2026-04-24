@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { approvePost, rejectPost } from './actions'
+import { deletePost, publishPost, unpublishPost } from './actions'
 
-export default async function AdminNewsPage() {
+export default async function AllNewsPostsPage() {
   const supabase = await createClient()
 
   const {
@@ -26,8 +26,7 @@ export default async function AdminNewsPage() {
 
   const { data: posts, error } = await supabase
     .from('news_posts')
-    .select('id, slug, title, summary, category, source_name, status, created_at')
-    .in('status', ['draft', 'pending'])
+    .select('id, slug, title, summary, category, source_name, status, published_at, created_at')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -37,40 +36,22 @@ export default async function AdminNewsPage() {
   return (
     <main className="min-h-screen bg-black text-white px-6 py-12 max-w-5xl mx-auto">
       <div className="mb-10">
-        <Link href="/news" className="text-sm text-white/50 hover:text-white">
-          ← Back to News
+        <Link href="/admin/news" className="text-sm text-white/50 hover:text-white">
+          ← Back to Admin News
         </Link>
 
         <h1 className="text-5xl font-serif mt-6 mb-3">
-          Admin News
+          All News Posts
         </h1>
 
-        <div className="flex items-center justify-between gap-4">
-  <p className="text-white/60">
-    Review draft news posts before publishing them.
-  </p>
-
-  <div className="flex gap-3">
-  <Link
-    href="/admin/news/all"
-    className="border border-white/20 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-white/10"
-  >
-    All Posts
-  </Link>
-
-  <Link
-    href="/admin/news/new"
-    className="bg-white text-black px-5 py-2 rounded-full text-sm font-medium hover:bg-white/90"
-  >
-    New Post
-  </Link>
-</div>
-</div>
+        <p className="text-white/60">
+          Manage draft, published, and rejected news posts.
+        </p>
       </div>
 
       {!posts?.length && (
         <div className="border border-white/10 rounded-xl p-8 text-white/50">
-          No draft or pending posts right now.
+          No posts found.
         </div>
       )}
 
@@ -97,26 +78,49 @@ export default async function AdminNewsPage() {
                 <div className="text-xs text-white/40">
                   Source: {post.source_name || 'Unknown'}
                 </div>
+
+                {post.status === 'published' && (
+                  <Link
+                    href={`/news/${post.slug}`}
+                    className="inline-block text-xs text-white/50 hover:text-white mt-3"
+                  >
+                    View public post →
+                  </Link>
+                )}
               </div>
 
-              <div className="flex gap-3 shrink-0">
-                <form action={approvePost}>
-                  <input type="hidden" name="postId" value={post.id} />
-                  <button
-                    type="submit"
-                    className="bg-green-500 text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-green-400"
-                  >
-                    Approve
-                  </button>
-                </form>
+              <div className="flex flex-wrap gap-3 justify-end shrink-0">
+                {post.status !== 'published' && (
+                  <form action={publishPost}>
+                    <input type="hidden" name="postId" value={post.id} />
+                    <button
+                      type="submit"
+                      className="bg-green-500 text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-green-400"
+                    >
+                      Publish
+                    </button>
+                  </form>
+                )}
 
-                <form action={rejectPost}>
+                {post.status === 'published' && (
+                  <form action={unpublishPost}>
+                    <input type="hidden" name="postId" value={post.id} />
+                    <button
+                      type="submit"
+                      className="bg-yellow-400 text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-yellow-300"
+                    >
+                      Unpublish
+                    </button>
+                  </form>
+                )}
+
+                <form action={deletePost}>
                   <input type="hidden" name="postId" value={post.id} />
                   <button
                     type="submit"
                     className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-red-400"
                   >
-                    Reject
+                    Delete
                   </button>
                 </form>
               </div>
