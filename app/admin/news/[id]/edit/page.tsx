@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { requireAdmin } from '@/lib/admin'
 import { updatePost } from './actions'
 
 type EditNewsPostPageProps = {
@@ -11,25 +11,7 @@ type EditNewsPostPageProps = {
 
 export default async function EditNewsPostPage({ params }: EditNewsPostPageProps) {
   const { id } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/sign-in')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/')
-  }
+  const { supabase } = await requireAdmin()
 
   const { data: post, error } = await supabase
     .from('news_posts')
@@ -48,9 +30,7 @@ export default async function EditNewsPostPage({ params }: EditNewsPostPageProps
           ← Back to All Posts
         </Link>
 
-        <h1 className="text-5xl font-serif mt-6 mb-3">
-          Edit News Post
-        </h1>
+        <h1 className="text-5xl font-serif mt-6 mb-3">Edit News Post</h1>
 
         <p className="text-white/60">
           Update title, slug, summary, body, source, and status.

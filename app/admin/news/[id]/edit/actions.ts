@@ -1,32 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-
-async function requireAdmin() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/sign-in')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/')
-  }
-
-  return supabase
-}
+import { requireAdmin } from '@/lib/admin'
 
 function cleanSlug(value: string) {
   return value
@@ -37,7 +13,7 @@ function cleanSlug(value: string) {
 }
 
 export async function updatePost(formData: FormData) {
-  const supabase = await requireAdmin()
+  const { supabase } = await requireAdmin()
 
   const postId = String(formData.get('postId') || '').trim()
   const title = String(formData.get('title') || '').trim()
@@ -54,7 +30,16 @@ export async function updatePost(formData: FormData) {
     throw new Error('Post id, title, slug, and summary are required.')
   }
 
-  const publishedAt = status === 'published' ? new Date().toISOString() : null
+  const { data: existingPost } = await supabase
+    .from('news_posts')
+    .select('slug, published_at')
+    .eq('id', postId)
+    .single()
+
+  const publishedAt =
+    status === 'published'
+      ? existingPost?.published_at || new Date().toISOString()
+      : null
 
   const { error } = await supabase
     .from('news_posts')
@@ -79,6 +64,9 @@ export async function updatePost(formData: FormData) {
   revalidatePath('/admin/news/all')
   revalidatePath('/news')
   revalidatePath(`/news/${slug}`)
+  if (existingPost?.slug && existingPost.slug !== slug) {
+    revalidatePath(`/news/${existingPost.slug}`)
+  }
 
   redirect('/admin/news/all')
 }

@@ -11,11 +11,11 @@ export default async function NewsPostPage({
   const supabase = await createClient()
 
   const { data: post } = await supabase
-  .from('news_posts')
-  .select('id, slug, title, summary, body, category, source_name, source_url, published_at')
-  .eq('slug', slug)
-  .eq('status', 'published')
-  .single()
+    .from('news_posts')
+    .select('id, slug, title, summary, body, category, source_name, source_url, published_at')
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .single()
 
   if (!post) {
     notFound()
@@ -32,29 +32,23 @@ export default async function NewsPostPage({
           {post.category}
         </div>
 
-        <h1 className="text-5xl font-serif mb-6">
-          {post.title}
-        </h1>
+        <h1 className="text-5xl font-serif mb-6">{post.title}</h1>
 
-        <p className="text-xl text-white/70 mb-8">
-          {post.summary}
-        </p>
+        <p className="text-xl text-white/70 mb-8">{post.summary}</p>
 
         <div className="text-sm text-white/40 mb-12">
           Source: {post.source_name}
         </div>
 
         <div className="prose prose-invert max-w-none">
-  {post.body ? (
-    <div className="whitespace-pre-wrap text-white/80 leading-7">
-      {post.body}
-    </div>
-  ) : (
-    <p className="text-white/60">
-      No article body has been added yet.
-    </p>
-  )}
-</div>
+          {post.body ? (
+            <div className="whitespace-pre-wrap text-white/80 leading-7">
+              {post.body}
+            </div>
+          ) : (
+            <p className="text-white/60">No article body has been added yet.</p>
+          )}
+        </div>
       </article>
     </main>
   )

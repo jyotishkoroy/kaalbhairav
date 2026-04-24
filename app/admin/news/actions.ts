@@ -1,40 +1,21 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
-
-async function requireAdmin() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/sign-in')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/')
-  }
-
-  return supabase
-}
+import { requireAdmin } from '@/lib/admin'
 
 export async function approvePost(formData: FormData) {
-  const supabase = await requireAdmin()
+  const { supabase } = await requireAdmin()
   const postId = formData.get('postId') as string
 
   if (!postId) {
     throw new Error('Missing post id')
   }
+
+  const { data: post } = await supabase
+    .from('news_posts')
+    .select('slug')
+    .eq('id', postId)
+    .single()
 
   const { error } = await supabase
     .from('news_posts')
@@ -49,11 +30,15 @@ export async function approvePost(formData: FormData) {
   }
 
   revalidatePath('/admin/news')
+  revalidatePath('/admin/news/all')
   revalidatePath('/news')
+  if (post?.slug) {
+    revalidatePath(`/news/${post.slug}`)
+  }
 }
 
 export async function rejectPost(formData: FormData) {
-  const supabase = await requireAdmin()
+  const { supabase } = await requireAdmin()
   const postId = formData.get('postId') as string
 
   if (!postId) {
@@ -72,4 +57,5 @@ export async function rejectPost(formData: FormData) {
   }
 
   revalidatePath('/admin/news')
+  revalidatePath('/admin/news/all')
 }

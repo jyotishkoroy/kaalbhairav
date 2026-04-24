@@ -1,28 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { requireAdmin } from '@/lib/admin'
 import { deletePost, publishPost, unpublishPost } from './actions'
 
 export default async function AllNewsPostsPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/sign-in')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/')
-  }
+  const { supabase } = await requireAdmin()
 
   const { data: posts, error } = await supabase
     .from('news_posts')
@@ -40,9 +21,7 @@ export default async function AllNewsPostsPage() {
           ← Back to Admin News
         </Link>
 
-        <h1 className="text-5xl font-serif mt-6 mb-3">
-          All News Posts
-        </h1>
+        <h1 className="text-5xl font-serif mt-6 mb-3">All News Posts</h1>
 
         <p className="text-white/60">
           Manage draft, published, and rejected news posts.
@@ -67,13 +46,9 @@ export default async function AllNewsPostsPage() {
                   {post.category} · {post.status}
                 </div>
 
-                <h2 className="text-2xl font-serif mb-2">
-                  {post.title}
-                </h2>
+                <h2 className="text-2xl font-serif mb-2">{post.title}</h2>
 
-                <p className="text-white/70 mb-3">
-                  {post.summary}
-                </p>
+                <p className="text-white/70 mb-3">{post.summary}</p>
 
                 <div className="text-xs text-white/40">
                   Source: {post.source_name || 'Unknown'}
@@ -91,11 +66,11 @@ export default async function AllNewsPostsPage() {
 
               <div className="flex flex-wrap gap-3 justify-end shrink-0">
                 <Link
-  href={`/admin/news/${post.id}/edit`}
-  className="border border-white/20 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-white/10"
->
-  Edit
-</Link>
+                  href={`/admin/news/${post.id}/edit`}
+                  className="border border-white/20 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-white/10"
+                >
+                  Edit
+                </Link>
                 {post.status !== 'published' && (
                   <form action={publishPost}>
                     <input type="hidden" name="postId" value={post.id} />

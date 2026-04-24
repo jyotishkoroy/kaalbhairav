@@ -1,32 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-
-async function requireAdmin() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/sign-in')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/')
-  }
-
-  return supabase
-}
+import { requireAdmin } from '@/lib/admin'
 
 function cleanSlug(value: string) {
   return value
@@ -37,7 +13,7 @@ function cleanSlug(value: string) {
 }
 
 export async function createPost(formData: FormData) {
-  const supabase = await requireAdmin()
+  const { supabase } = await requireAdmin()
 
   const title = String(formData.get('title') || '').trim()
   const rawSlug = String(formData.get('slug') || '').trim()
@@ -71,5 +47,6 @@ export async function createPost(formData: FormData) {
   }
 
   revalidatePath('/admin/news')
+  revalidatePath('/admin/news/all')
   redirect('/admin/news')
 }
