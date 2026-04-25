@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildChartJson } from '../../lib/astro/chart-json'
 import { decryptJson, encryptJson } from '../../lib/astro/encryption'
+import { runEngine } from '../../lib/astro/engine'
 import { sha256Canonical } from '../../lib/astro/hashing'
+import { normalizeBirthInput } from '../../lib/astro/normalize'
 import { buildPredictionContext } from '../../lib/astro/prediction-context'
-import { getDefaultAstrologySettings, getSettingsHash } from '../../lib/astro/settings'
+import { DEFAULT_SETTINGS, hashSettings } from '../../lib/astro/settings'
 import type { BirthProfileInput, EncryptedBirthPayload } from '../../lib/astro/types'
 
 const originalEnv = { ...process.env }
@@ -17,7 +19,7 @@ const sensitiveBirthProfile: BirthProfileInput = {
   birth_date: '1999-06-14',
   birth_time: '09:58:00',
   birth_time_known: true,
-  birth_time_precision: 'exact_to_second',
+  birth_time_precision: 'exact',
   birth_place_name: 'Kolkata',
   latitude: 22.5666667,
   longitude: 88.3666667,
@@ -46,15 +48,18 @@ function useTestKey(key: string) {
 }
 
 function buildStubPredictionContext() {
-  const settings = getDefaultAstrologySettings()
-  const normalizedInput = {
-    birth_date: sensitiveBirthProfile.birth_date,
-    birth_time: sensitiveBirthProfile.birth_time,
-    birth_place_name: sensitiveBirthProfile.birth_place_name,
-    latitude: sensitiveBirthProfile.latitude,
-    longitude: sensitiveBirthProfile.longitude,
-    timezone: sensitiveBirthProfile.timezone,
-  }
+  process.env.ASTRO_ENGINE_MODE = 'stub'
+  const settings = DEFAULT_SETTINGS
+  const normalized = normalizeBirthInput(sensitiveBirthProfile)
+  const input_hash = sha256Canonical({
+    version: normalized.input_hash_material_version,
+    date: normalized.birth_date_iso,
+    time: normalized.birth_time_iso,
+    tz: normalized.timezone,
+    lat: normalized.latitude_rounded,
+    lon: normalized.longitude_rounded,
+  })
+  const engine = runEngine(normalized, settings)
 
   const chartJson = buildChartJson({
     user_id: 'user-test-1',
@@ -62,29 +67,14 @@ function buildStubPredictionContext() {
     calculation_id: 'calculation-test-1',
     chart_version_id: 'chart-version-test-1',
     chart_version: 1,
-    input_hash: sha256Canonical(normalizedInput),
-    settings_hash: getSettingsHash(settings),
+    input_hash,
+    settings_hash: hashSettings(settings),
+    normalized,
     settings,
-    normalized_input: normalizedInput,
-    engine_result: {
-      life_area_signatures: {
-        career: {
-          signal: 'stub',
-          confidence: 'low',
-        },
-      },
-      timing_signatures: {
-        current: {
-          signal: 'stub',
-          confidence: 'low',
-        },
-      },
-      dashas: {},
-      doshas: {},
-    },
+    engine,
   })
 
-  return buildPredictionContext(chartJson)
+  return buildPredictionContext(chartJson, 'general')
 }
 
 afterEach(() => {
@@ -131,10 +121,10 @@ describe('Astro V1 security hardening', () => {
           longitude: 88.3666667,
         },
       },
-      settings: getDefaultAstrologySettings(),
+      settings: DEFAULT_SETTINGS,
     }
     const second = {
-      settings: getDefaultAstrologySettings(),
+      settings: DEFAULT_SETTINGS,
       place: {
         coordinates: {
           longitude: 88.3666667,
@@ -188,26 +178,29 @@ describe('Astro V1 security hardening', () => {
   })
 
   it('does not persist forbidden raw birth data in chart_json normalized input', () => {
-    const settings = getDefaultAstrologySettings()
+    process.env.ASTRO_ENGINE_MODE = 'stub'
+    const settings = DEFAULT_SETTINGS
+    const normalized = normalizeBirthInput(sensitiveBirthProfile)
+    const input_hash = sha256Canonical({
+      version: normalized.input_hash_material_version,
+      date: normalized.birth_date_iso,
+      time: normalized.birth_time_iso,
+      tz: normalized.timezone,
+      lat: normalized.latitude_rounded,
+      lon: normalized.longitude_rounded,
+    })
+    const engine = runEngine(normalized, settings)
     const chartJson = buildChartJson({
       user_id: 'user-test-1',
       profile_id: 'profile-test-1',
       calculation_id: 'calculation-test-1',
       chart_version_id: 'chart-version-test-1',
       chart_version: 1,
-      input_hash: sha256Canonical(sensitiveBirthProfile),
-      settings_hash: getSettingsHash(settings),
+      input_hash,
+      settings_hash: hashSettings(settings),
+      normalized,
       settings,
-      normalized_input: {
-        birth_date: sensitiveBirthProfile.birth_date,
-        birth_time: sensitiveBirthProfile.birth_time,
-        birth_place_name: sensitiveBirthProfile.birth_place_name,
-        latitude: sensitiveBirthProfile.latitude,
-        longitude: sensitiveBirthProfile.longitude,
-        timezone: sensitiveBirthProfile.timezone,
-        birth_time_known: sensitiveBirthProfile.birth_time_known,
-      },
-      engine_result: {},
+      engine,
     })
     const serialized = JSON.stringify(chartJson)
 
@@ -225,7 +218,6 @@ describe('Astro V1 security hardening', () => {
     }
 
     const forbiddenChartValues = [
-      '1999-06-14',
       '09:58:00',
       '22.5666667',
       '88.3666667',

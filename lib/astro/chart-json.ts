@@ -1,6 +1,9 @@
-import type { AstrologySettings, ChartJson } from './types'
+import type { ChartJson, AstrologySettings, ConfidenceScore } from './types'
+import type { NormalizedBirthInput } from './normalize'
+import type { EngineResult } from './engine'
+import { ENGINE_VERSION, EPHEMERIS_VERSION, SCHEMA_VERSION } from './engine/version'
 
-type BuildChartJsonInput = {
+export function buildChartJson(args: {
   user_id: string
   profile_id: string
   calculation_id: string
@@ -8,76 +11,60 @@ type BuildChartJsonInput = {
   chart_version: number
   input_hash: string
   settings_hash: string
+  normalized: NormalizedBirthInput
   settings: AstrologySettings
-  normalized_input: Record<string, unknown>
-  engine_result: Record<string, unknown>
-}
+  engine: EngineResult
+}): ChartJson {
+  const overallConfidence: ConfidenceScore =
+    args.engine.calculation_status === 'stub'
+      ? { value: 30, label: 'low', reasons: ['V1 engine is in stub mode'] }
+      : { value: 75, label: 'medium', reasons: ['V1 calculations complete'] }
 
-const RAW_BIRTH_INPUT_KEYS = new Set([
-  'birth_date',
-  'birth_time',
-  'birth_place',
-  'birth_place_name',
-  'latitude',
-  'longitude',
-  'encrypted_birth_data',
-])
-
-function redactRawBirthInput(input: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(input).filter(([key]) => !RAW_BIRTH_INPUT_KEYS.has(key)),
-  )
-}
-
-export function buildChartJson(input: BuildChartJsonInput): ChartJson {
   return {
     metadata: {
-      user_id: input.user_id,
-      profile_id: input.profile_id,
-      calculation_id: input.calculation_id,
-      chart_version_id: input.chart_version_id,
-      input_hash: input.input_hash,
-      settings_hash: input.settings_hash,
-      engine_version: 'v1.0.0',
-      ephemeris_version: 'stub',
-      schema_version: '1.0.0',
-      chart_version: input.chart_version,
+      user_id: args.user_id,
+      profile_id: args.profile_id,
+      calculation_id: args.calculation_id,
+      chart_version_id: args.chart_version_id,
+      input_hash: args.input_hash,
+      settings_hash: args.settings_hash,
+      engine_version: ENGINE_VERSION,
+      ephemeris_version: EPHEMERIS_VERSION,
+      schema_version: SCHEMA_VERSION,
+      chart_version: args.chart_version,
       computed_at: new Date().toISOString(),
-      calculation_status: 'stub',
+      calculation_status: args.engine.calculation_status,
     },
-    normalized_input: redactRawBirthInput(input.normalized_input),
-    calculation_settings: input.settings,
-    astronomical_data: (input.engine_result.astronomical_data as Record<string, unknown>) ?? {},
-    panchang: (input.engine_result.panchang as Record<string, unknown>) ?? {},
-    avkahada: {},
-    planets: (input.engine_result.planets as Record<string, unknown>) ?? {},
-    lagna: (input.engine_result.lagna as Record<string, unknown>) ?? {},
-    houses: (input.engine_result.houses as Record<string, unknown>) ?? {},
-    d1_chart: (input.engine_result.d1_chart as Record<string, unknown>) ?? {},
-    divisional_charts: (input.engine_result.divisional_charts as Record<string, unknown>) ?? {},
-    dashas: (input.engine_result.dashas as Record<string, unknown>) ?? {},
-    doshas: (input.engine_result.doshas as Record<string, unknown>) ?? {},
-    transits: (input.engine_result.transits as Record<string, unknown>) ?? {},
-    aspects: (input.engine_result.aspects as Record<string, unknown>) ?? {},
-    ashtakavarga: (input.engine_result.ashtakavarga as Record<string, unknown>) ?? {},
-    jaimini: (input.engine_result.jaimini as Record<string, unknown>) ?? {},
-    life_area_signatures: (input.engine_result.life_area_signatures as Record<string, unknown>) ?? {},
-    timing_signatures: (input.engine_result.timing_signatures as Record<string, unknown>) ?? {},
+    normalized_input: {
+      birth_date_iso: args.normalized.birth_date_iso,
+      birth_time_known: args.normalized.birth_time_known,
+      birth_time_precision: args.normalized.birth_time_precision,
+      timezone: args.normalized.timezone,
+      timezone_status: args.normalized.timezone_status,
+      coordinate_confidence: args.normalized.coordinate_confidence,
+    },
+    calculation_settings: args.settings,
+    astronomical_data: args.engine.astronomical_data,
+    panchang: args.engine.panchang,
+    avkahada: args.engine.avkahada,
+    planets: args.engine.planets,
+    lagna: args.engine.lagna,
+    houses: args.engine.houses,
+    d1_chart: args.engine.d1_chart,
+    divisional_charts: args.engine.divisional_charts,
+    dashas: args.engine.dashas,
+    doshas: args.engine.doshas,
+    transits: args.engine.transits,
+    aspects: args.engine.aspects,
+    ashtakavarga: args.engine.ashtakavarga,
+    jaimini: args.engine.jaimini,
+    life_area_signatures: args.engine.life_area_signatures,
+    timing_signatures: args.engine.timing_signatures,
     prediction_ready_summaries: {},
     confidence_and_warnings: {
-      confidence: {
-        overall: {
-          value: 40,
-          label: 'low',
-          reasons: ['V1 engine is stubbed.'],
-        },
-      },
-      warnings: [],
+      confidence: { overall: overallConfidence },
+      warnings: args.engine.warnings,
     },
-    audit: {
-      sources: ['backend_stub_v1'],
-      engine_modules: ['stub'],
-      notes: ['No real ephemeris calculation has been performed in V1.'],
-    },
+    audit: args.engine.audit,
   }
 }
