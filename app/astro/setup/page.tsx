@@ -2,9 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+
+import { BirthProfileForm } from '@/app/astro/components/BirthProfileForm'
 import { saveBirthChart } from './actions'
 
 export default function AstroSetupPage() {
+  const astroV1Enabled = process.env.NEXT_PUBLIC_ASTRO_V1_UI_ENABLED === 'true'
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -22,6 +25,28 @@ export default function AstroSetupPage() {
     }
 
     setLoading(false)
+  }
+
+  if (astroV1Enabled) {
+    return (
+      <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-950">
+        <div className="mx-auto max-w-xl space-y-6">
+          <div>
+            <p className="text-sm font-medium text-zinc-500">/astro V1 setup</p>
+            <h1 className="mt-2 text-3xl font-semibold">Create birth profile</h1>
+            <p className="mt-3 text-zinc-600">
+              Your raw birth details are encrypted before storage. V1 creates a safe stub chart and prediction context only.
+            </p>
+          </div>
+
+          <BirthProfileForm />
+
+          <p className="text-xs leading-relaxed text-zinc-500">
+            This is offered as reflection and symbolism, not prediction or guarantee. For health, financial, or legal concerns, consult qualified professionals.
+          </p>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -76,8 +101,7 @@ export default function AstroSetupPage() {
       </form>
 
       <p className="text-xs text-white/40 mt-8 leading-relaxed">
-        This is offered as reflection and symbolism, not prediction or guarantee.
-        For health, financial, or legal concerns, consult qualified professionals.
+        This is offered as reflection and symbolism, not prediction or guarantee. For health, financial, or legal concerns, consult qualified professionals.
       </p>
     </main>
   )
