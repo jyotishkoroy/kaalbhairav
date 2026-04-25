@@ -1,0 +1,143 @@
+export type UUID = string
+export type ISODate = string
+export type ISODateTime = string
+
+export type BirthTimePrecision =
+  | 'exact_to_second'
+  | 'exact_to_minute'
+  | 'approx_5_min'
+  | 'approx_15_min'
+  | 'approx_1_hour'
+  | 'unknown'
+
+export type Gender =
+  | 'male'
+  | 'female'
+  | 'non_binary'
+  | 'unknown'
+  | 'not_provided'
+
+export type WarningSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical' | 'fatal'
+
+export type AstroWarning = {
+  warning_code: string
+  severity: WarningSeverity
+  affected_calculations: string[]
+  explanation: string
+  suggested_action?: string
+  confidence_impact?: number
+}
+
+export type ConfidenceScore = {
+  value: number
+  label: 'high' | 'medium' | 'low' | 'not_enough_context'
+  reasons: string[]
+}
+
+export type BirthProfileInput = {
+  display_name: string
+  birth_date: ISODate
+  birth_time?: string | null
+  birth_time_known: boolean
+  birth_time_precision: BirthTimePrecision
+  birth_place_name: string
+  latitude: number
+  longitude: number
+  timezone: string
+  gender?: Gender
+  calendar_system?: 'gregorian'
+  data_consent_version: string
+}
+
+export type EncryptedBirthPayload = BirthProfileInput & {
+  submitted_at: ISODateTime
+}
+
+export type AstrologySettings = {
+  astrology_system: 'parashari'
+  zodiac_type: 'sidereal'
+  ayanamsa: 'lahiri'
+  house_system: 'whole_sign'
+  node_type: 'mean_node'
+  dasha_year_basis: 'sidereal_365.25'
+}
+
+export type CalculationStatus = 'stub' | 'real' | 'partial' | 'failed'
+
+export type ChartIdentity = {
+  user_id: UUID
+  profile_id: UUID
+  calculation_id: UUID
+  chart_version_id: UUID
+  input_hash: string
+  settings_hash: string
+  engine_version: string
+  ephemeris_version: string
+  schema_version: string
+  chart_version: number
+  computed_at: ISODateTime
+}
+
+export type ChartJson = {
+  metadata: ChartIdentity & {
+    calculation_status: CalculationStatus
+  }
+  normalized_input: Record<string, unknown>
+  calculation_settings: AstrologySettings
+  astronomical_data: Record<string, unknown>
+  panchang: Record<string, unknown>
+  avkahada: Record<string, unknown>
+  planets: Record<string, unknown>
+  lagna: Record<string, unknown>
+  houses: Record<string, unknown>
+  d1_chart: Record<string, unknown>
+  divisional_charts: Record<string, unknown>
+  dashas: Record<string, unknown>
+  doshas: Record<string, unknown>
+  transits: Record<string, unknown>
+  aspects: Record<string, unknown>
+  ashtakavarga: Record<string, unknown>
+  jaimini: Record<string, unknown>
+  life_area_signatures: Record<string, unknown>
+  timing_signatures: Record<string, unknown>
+  prediction_ready_summaries: Record<string, unknown>
+  confidence_and_warnings: {
+    confidence: Record<string, ConfidenceScore>
+    warnings: AstroWarning[]
+  }
+  audit: {
+    sources: string[]
+    engine_modules: string[]
+    notes: string[]
+  }
+}
+
+export type PredictionContext = {
+  do_not_recalculate: true
+  chart_identity: {
+    profile_id: UUID
+    chart_version_id: UUID
+    schema_version: string
+    engine_version: string
+    ephemeris_version: string
+    calculation_status: CalculationStatus
+  }
+  confidence: Record<string, ConfidenceScore>
+  warnings: AstroWarning[]
+  core_natal_summary: Record<string, unknown>
+  life_area_signatures: Record<string, unknown>
+  current_timing: Record<string, unknown>
+  dashas: Record<string, unknown>
+  doshas: Record<string, unknown>
+  allowed_astro_terms: string[]
+  unsupported_fields: string[]
+  llm_instructions: {
+    do_not_calculate_astrology: true
+    do_not_modify_chart_values: true
+    do_not_invent_missing_data: true
+    do_not_infer_missing_data: true
+    explain_only_from_supplied_context: true
+    mention_warnings_where_relevant: true
+    refuse_deterministic_medical_legal_financial_death_or_guaranteed_event_predictions: true
+  }
+}

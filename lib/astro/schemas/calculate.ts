@@ -1,0 +1,8 @@
+import { z } from 'zod'
+
+export const calculateRequestSchema = z.object({
+  profile_id: z.string().uuid(),
+  force_recalc: z.boolean().optional().default(false),
+})
+
+export type CalculateRequestSchema = z.infer<typeof calculateRequestSchema>
