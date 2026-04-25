@@ -82,7 +82,7 @@ export default async function AstroPage() {
 
   const { data: chart } = await supabase
     .from('birth_charts')
-    .select('place_name')
+    .select('id, place_name')
     .eq('user_id', user.id)
     .single()
 
