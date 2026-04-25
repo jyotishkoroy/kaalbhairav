@@ -1,12 +1,5 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/rss-ingest",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/daily-tasks",
-      "schedule": "30 23 * * *"
-    }
-  ]
+  "git": {
+    "deploymentEnabled": false
+  }
 }
