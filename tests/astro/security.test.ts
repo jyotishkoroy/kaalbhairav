@@ -187,6 +187,90 @@ describe('Astro V1 security hardening', () => {
     }
   })
 
+  it('does not persist forbidden raw birth data in chart_json normalized input', () => {
+    const settings = getDefaultAstrologySettings()
+    const chartJson = buildChartJson({
+      user_id: 'user-test-1',
+      profile_id: 'profile-test-1',
+      calculation_id: 'calculation-test-1',
+      chart_version_id: 'chart-version-test-1',
+      chart_version: 1,
+      input_hash: sha256Canonical(sensitiveBirthProfile),
+      settings_hash: getSettingsHash(settings),
+      settings,
+      normalized_input: {
+        birth_date: sensitiveBirthProfile.birth_date,
+        birth_time: sensitiveBirthProfile.birth_time,
+        birth_place_name: sensitiveBirthProfile.birth_place_name,
+        latitude: sensitiveBirthProfile.latitude,
+        longitude: sensitiveBirthProfile.longitude,
+        timezone: sensitiveBirthProfile.timezone,
+        birth_time_known: sensitiveBirthProfile.birth_time_known,
+      },
+      engine_result: {},
+    })
+    const serialized = JSON.stringify(chartJson)
+
+    const forbiddenChartKeys = [
+      'birth_date',
+      'birth_time',
+      'birth_place_name',
+      'latitude',
+      'longitude',
+      'encrypted_birth_data',
+    ]
+
+    for (const forbiddenChartKey of forbiddenChartKeys) {
+      expect(chartJson.normalized_input).not.toHaveProperty(forbiddenChartKey)
+    }
+
+    const forbiddenChartValues = [
+      '1999-06-14',
+      '09:58:00',
+      '22.5666667',
+      '88.3666667',
+    ]
+
+    for (const forbiddenChartValue of forbiddenChartValues) {
+      expect(serialized).not.toContain(forbiddenChartValue)
+    }
+
+    expect(chartJson.normalized_input).toMatchObject({
+      timezone: sensitiveBirthProfile.timezone,
+      birth_time_known: sensitiveBirthProfile.birth_time_known,
+    })
+  })
+
+  it('does not expose forbidden raw birth data in LLM payload material', () => {
+    const predictionContext = buildStubPredictionContext()
+    const llmPayload = {
+      prediction_context: predictionContext,
+      user_question: 'What does my chart say about career?',
+      answer_policy: {
+        max_output_tokens: 900,
+        must_mention_stub_status: true,
+        must_mention_confidence: true,
+      },
+    }
+    const serialized = JSON.stringify(llmPayload)
+
+    const forbiddenPayloadFragments = [
+      'birth_date',
+      'birth_time',
+      'latitude',
+      'longitude',
+      'encrypted_birth_data',
+      '1999-06-14',
+      '09:58:00',
+      '22.5666667',
+      '88.3666667',
+    ]
+
+    for (const forbiddenPayloadFragment of forbiddenPayloadFragments) {
+      expect(serialized).not.toContain(forbiddenPayloadFragment)
+    }
+  })
+
   it('keeps LLM instructions explain-only and non-calculating', () => {
     const predictionContext = buildStubPredictionContext()
 
