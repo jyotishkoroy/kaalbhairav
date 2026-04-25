@@ -2,21 +2,12 @@ export type UUID = string
 export type ISODate = string
 export type ISODateTime = string
 
-export type BirthTimePrecision =
-  | 'exact_to_second'
-  | 'exact_to_minute'
-  | 'approx_5_min'
-  | 'approx_15_min'
-  | 'approx_1_hour'
-  | 'unknown'
-
-export type Gender =
-  | 'male'
-  | 'female'
-  | 'non_binary'
-  | 'unknown'
-  | 'not_provided'
-
+export type BirthTimePrecision = 'exact' | 'minute' | 'hour' | 'day_part' | 'unknown'
+export type Gender = 'male' | 'female' | 'non_binary' | 'unknown' | 'not_provided'
+export type Ayanamsa = 'lahiri' | 'raman' | 'krishnamurti' | 'true_chitra' | 'fagan_bradley' | 'yukteshwar' | 'custom'
+export type HouseSystem = 'whole_sign' | 'sripati' | 'bhava_chalit' | 'equal' | 'placidus' | 'kp'
+export type NodeType = 'mean_node' | 'true_node'
+export type ZodiacType = 'sidereal' | 'tropical'
 export type WarningSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical' | 'fatal'
 
 export type AstroWarning = {
@@ -49,17 +40,15 @@ export type BirthProfileInput = {
   data_consent_version: string
 }
 
-export type EncryptedBirthPayload = BirthProfileInput & {
-  submitted_at: ISODateTime
-}
+export type EncryptedBirthPayload = BirthProfileInput & { submitted_at: ISODateTime }
 
 export type AstrologySettings = {
-  astrology_system: 'parashari'
-  zodiac_type: 'sidereal'
-  ayanamsa: 'lahiri'
-  house_system: 'whole_sign'
-  node_type: 'mean_node'
-  dasha_year_basis: 'sidereal_365.25'
+  astrology_system: 'parashari' | 'jaimini' | 'kp' | 'mixed_research'
+  zodiac_type: ZodiacType
+  ayanamsa: Ayanamsa
+  house_system: HouseSystem
+  node_type: NodeType
+  dasha_year_basis: 'civil_365.2425' | 'sidereal_365.25' | 'traditional_360'
 }
 
 export type CalculationStatus = 'stub' | 'real' | 'partial' | 'failed'
@@ -79,9 +68,7 @@ export type ChartIdentity = {
 }
 
 export type ChartJson = {
-  metadata: ChartIdentity & {
-    calculation_status: CalculationStatus
-  }
+  metadata: ChartIdentity & { calculation_status: CalculationStatus }
   normalized_input: Record<string, unknown>
   calculation_settings: AstrologySettings
   astronomical_data: Record<string, unknown>
@@ -105,11 +92,7 @@ export type ChartJson = {
     confidence: Record<string, ConfidenceScore>
     warnings: AstroWarning[]
   }
-  audit: {
-    sources: string[]
-    engine_modules: string[]
-    notes: string[]
-  }
+  audit: { sources: string[]; engine_modules: string[]; notes: string[] }
 }
 
 export type PredictionContext = {

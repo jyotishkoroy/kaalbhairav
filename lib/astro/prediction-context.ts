@@ -1,18 +1,24 @@
 import type { ChartJson, PredictionContext } from './types'
 
-export function buildPredictionContext(chartJson: ChartJson): PredictionContext {
+const UNSUPPORTED_FIELDS_WHEN_STUB = [
+  'planetary_positions', 'lagna', 'houses', 'dashas',
+  'transits', 'ashtakavarga', 'doshas', 'panchang', 'avkahada',
+]
+
+export function buildPredictionContext(chart: ChartJson, _topic: string = 'general'): PredictionContext {
+  const isStub = chart.metadata.calculation_status === 'stub'
   return {
     do_not_recalculate: true,
     chart_identity: {
-      profile_id: chartJson.metadata.profile_id,
-      chart_version_id: chartJson.metadata.chart_version_id,
-      schema_version: chartJson.metadata.schema_version,
-      engine_version: chartJson.metadata.engine_version,
-      ephemeris_version: chartJson.metadata.ephemeris_version,
-      calculation_status: chartJson.metadata.calculation_status,
+      profile_id: chart.metadata.profile_id,
+      chart_version_id: chart.metadata.chart_version_id,
+      schema_version: chart.metadata.schema_version,
+      engine_version: chart.metadata.engine_version,
+      ephemeris_version: chart.metadata.ephemeris_version,
+      calculation_status: chart.metadata.calculation_status,
     },
-    confidence: chartJson.confidence_and_warnings.confidence,
-    warnings: chartJson.confidence_and_warnings.warnings,
+    confidence: chart.confidence_and_warnings.confidence,
+    warnings: chart.confidence_and_warnings.warnings,
     core_natal_summary: {
       lagna_sign: null,
       moon_sign: null,
@@ -20,19 +26,12 @@ export function buildPredictionContext(chartJson: ChartJson): PredictionContext 
       temperament_tags: [],
       pattern_tags: [],
     },
-    life_area_signatures: chartJson.life_area_signatures,
-    current_timing: chartJson.timing_signatures,
-    dashas: chartJson.dashas,
-    doshas: chartJson.doshas,
+    life_area_signatures: chart.life_area_signatures,
+    current_timing: chart.timing_signatures,
+    dashas: chart.dashas,
+    doshas: chart.doshas,
     allowed_astro_terms: [],
-    unsupported_fields: [
-      'planetary_positions',
-      'lagna',
-      'houses',
-      'dashas',
-      'transits',
-      'ashtakavarga',
-    ],
+    unsupported_fields: isStub ? UNSUPPORTED_FIELDS_WHEN_STUB : [],
     llm_instructions: {
       do_not_calculate_astrology: true,
       do_not_modify_chart_values: true,
