@@ -1,75 +1,67 @@
-import { NextResponse } from 'next/server'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
 import { astroChatRequestSchema } from '@/lib/astro/schemas/chat'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
-const ASTRO_CHAT_SYSTEM_PROMPT = `
-You are an astrology explanation layer.
+export const runtime = 'nodejs'
+export const maxDuration = 60
 
-You do not calculate astrology.
-You do not change chart values.
-You do not invent missing placements, dashas, yogas, doshas, or timings.
-You only explain the supplied backend-generated prediction_context.
+const redis = Redis.fromEnv()
+const dailyLimit = Number(process.env.ASTRO_DAILY_FREE_QUESTIONS ?? 20)
+const rl = new Ratelimit({
+  redis,
+  limiter: Ratelimit.fixedWindow(dailyLimit, '1 d'),
+  prefix: 'astro:v1:chat',
+})
 
-If the user asks for a value not present in the context, say that the backend has not calculated it yet.
+const SYSTEM_PROMPT = `You are an astrology explanation layer for Kaalbhairav.
 
-If confidence warnings exist, mention them.
+CRITICAL RULES:
+- You do NOT calculate astrology.
+- You do NOT change chart values.
+- You do NOT invent missing placements, dashas, yogas, doshas, or timings.
+- You ONLY explain the supplied backend-generated prediction_context.
 
-Do not provide deterministic medical, death, legal, or financial guarantees.
-Do not guarantee marriage, pregnancy, accidents, disasters, success, failure, or exact events.
+If the user asks for a value that is not present in the context, say: "The backend has not calculated that yet for your chart."
 
-Use cautious, symbolic, reflective wording.
-Present astrology as interpretation, not certainty.
-`.trim()
+If confidence is "low" or warnings exist, mention them transparently.
 
-export async function POST(request: Request) {
+You do NOT provide deterministic medical, death, legal, financial, marriage, pregnancy, accident, or guaranteed-event predictions. Always frame as reflection and symbolism.
+
+Required disclaimer when relevant: "This is offered for reflection and symbolic interpretation, not as a guarantee or professional advice. For medical, legal, financial, or mental-health concerns, consult a qualified professional."
+
+Respond in the user's language (English or Hindi). Be warm, grounded, brief.`
+
+const FORBIDDEN_KEYS = ['birth_date', 'birth_time', 'encrypted_birth_data', 'latitude', 'longitude']
+
+export async function POST(req: Request) {
   if (process.env.ASTRO_V1_CHAT_ENABLED !== 'true') {
-    return NextResponse.json(
-      { error: 'ASTRO_V1_CHAT_DISABLED' },
-      { status: 503 },
-    )
-  }
-
-  const groqApiKey = process.env.GROQ_API_KEY
-
-  if (!groqApiKey) {
-    return NextResponse.json({ error: 'GROQ_API_KEY_MISSING' }, { status: 500 })
+    return Response.json({ error: 'astro_v1_chat_disabled' }, { status: 503 })
   }
 
   const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
-  }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'unauthenticated' }, { status: 401 })
 
   let body: unknown
-
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 })
-  }
+  try { body = await req.json() } catch { return Response.json({ error: 'invalid_json' }, { status: 400 }) }
 
   const parsed = astroChatRequestSchema.safeParse(body)
+  if (!parsed.success) return Response.json({ error: 'invalid_input', issues: parsed.error.flatten() }, { status: 400 })
+  const { profile_id, session_id, topic = 'general', question } = parsed.data
 
-  if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error: 'VALIDATION_FAILED',
-        issues: parsed.error.flatten(),
-      },
-      { status: 400 },
-    )
+  const { success, remaining } = await rl.limit(user.id)
+  if (!success) {
+    return Response.json({
+      error: 'daily_limit',
+      message: 'You have reached today\'s reflection limit. Return tomorrow.',
+    }, { status: 429 })
   }
 
-  const { profile_id, session_id, topic = 'general', question } = parsed.data
   const service = createServiceClient()
 
-  const { data: latestChart, error: latestChartError } = await service
+  const { data: latestChart } = await service
     .from('chart_json_versions')
     .select('id')
     .eq('profile_id', profile_id)
@@ -78,21 +70,9 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle()
 
-  if (latestChartError) {
-    return NextResponse.json(
-      {
-        error: 'LATEST_CHART_LOOKUP_FAILED',
-        detail: latestChartError.message,
-      },
-      { status: 500 },
-    )
-  }
+  if (!latestChart) return Response.json({ error: 'chart_not_found', message: 'Please calculate your chart first.' }, { status: 404 })
 
-  if (!latestChart) {
-    return NextResponse.json({ error: 'CHART_NOT_FOUND' }, { status: 404 })
-  }
-
-  const { data: summary, error: summaryError } = await service
+  const { data: summary } = await service
     .from('prediction_ready_summaries')
     .select('id, chart_version_id, prediction_context')
     .eq('profile_id', profile_id)
@@ -101,50 +81,37 @@ export async function POST(request: Request) {
     .eq('topic', topic)
     .maybeSingle()
 
-  if (summaryError) {
-    return NextResponse.json(
-      {
-        error: 'PREDICTION_CONTEXT_LOOKUP_FAILED',
-        detail: summaryError.message,
-      },
-      { status: 500 },
-    )
+  if (!summary) return Response.json({ error: 'no_context', message: 'Please calculate your chart first.' }, { status: 404 })
+
+  // Safety gate: ensure no raw birth data leaked into prediction_context
+  const ctxStr = JSON.stringify(summary.prediction_context)
+  for (const k of FORBIDDEN_KEYS) {
+    if (ctxStr.includes(`"${k}"`)) {
+      console.error(`Safety gate: prediction_context contains forbidden key "${k}"`)
+      return Response.json({ error: 'safety_gate' }, { status: 500 })
+    }
   }
 
-  if (!summary) {
-    return NextResponse.json({ error: 'PREDICTION_CONTEXT_NOT_FOUND' }, { status: 404 })
-  }
-
-  let activeSessionId = session_id
-
-  if (!activeSessionId) {
-    const { data: newSession, error: sessionError } = await service
+  let sessionId = session_id
+  if (!sessionId) {
+    const { data: newSession } = await service
       .from('astro_chat_sessions')
       .insert({
         user_id: user.id,
         profile_id,
         chart_version_id: summary.chart_version_id,
-        title: question.slice(0, 80),
+        title: question.slice(0, 60),
         status: 'active',
       })
       .select('id')
       .single()
-
-    if (sessionError || !newSession) {
-      return NextResponse.json(
-        {
-          error: 'SESSION_CREATE_FAILED',
-          detail: sessionError?.message,
-        },
-        { status: 500 },
-      )
-    }
-
-    activeSessionId = newSession.id
+    sessionId = newSession?.id
   }
 
+  if (!sessionId) return Response.json({ error: 'session_create_failed' }, { status: 500 })
+
   await service.from('astro_chat_messages').insert({
-    session_id: activeSessionId,
+    session_id: sessionId,
     user_id: user.id,
     profile_id,
     chart_version_id: summary.chart_version_id,
@@ -154,68 +121,94 @@ export async function POST(request: Request) {
     topic,
   })
 
-  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${groqApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.GROQ_ANSWER_MODEL || 'llama-3.1-8b-instant',
-      temperature: 0.2,
-      max_tokens: 900,
-      messages: [
-        {
-          role: 'system',
-          content: ASTRO_CHAT_SYSTEM_PROMPT,
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            prediction_context: summary.prediction_context,
-            user_question: question,
-            answer_policy: {
-              max_output_tokens: 900,
-              must_mention_stub_status: true,
-              must_mention_confidence: true,
-            },
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+      }
+
+      send('meta', { remaining, session_id: sessionId })
+
+      let fullResponse = ''
+
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'system', content: `prediction_context (do not recalculate):\n${JSON.stringify(summary.prediction_context)}` },
+              { role: 'user', content: question },
+            ],
+            stream: true,
+            temperature: 0.6,
+            max_tokens: 900,
           }),
-        },
-      ],
-    }),
+        })
+
+        if (!res.ok || !res.body) throw new Error(`Groq ${res.status}`)
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() ?? ''
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            const payload = line.slice(6).trim()
+            if (payload === '[DONE]') break
+            try {
+              const json = JSON.parse(payload)
+              const token = json.choices?.[0]?.delta?.content
+              if (token) {
+                fullResponse += token
+                send('token', { t: token })
+              }
+            } catch { /* skip malformed chunks */ }
+          }
+        }
+      } catch {
+        send('error', { message: 'The Guru paused. Please try again.' })
+        controller.close()
+        return
+      }
+
+      if (fullResponse) {
+        await service.from('astro_chat_messages').insert({
+          session_id: sessionId,
+          user_id: user.id,
+          profile_id,
+          chart_version_id: summary.chart_version_id,
+          prediction_context_id: summary.id,
+          role: 'assistant',
+          content: fullResponse,
+          topic,
+          model_used: 'groq/llama-3.3-70b',
+        })
+      }
+
+      send('done', { session_id: sessionId })
+      controller.close()
+    },
   })
 
-  if (!groqResponse.ok) {
-    const detail = await groqResponse.text()
-
-    return NextResponse.json(
-      {
-        error: 'GROQ_REQUEST_FAILED',
-        detail,
-      },
-      { status: 502 },
-    )
-  }
-
-  const groqJson = await groqResponse.json()
-  const answer =
-    groqJson?.choices?.[0]?.message?.content ||
-    'The backend context was available, but no explanation was returned.'
-
-  await service.from('astro_chat_messages').insert({
-    session_id: activeSessionId,
-    user_id: user.id,
-    profile_id,
-    chart_version_id: summary.chart_version_id,
-    prediction_context_id: summary.id,
-    role: 'assistant',
-    content: answer,
-    topic,
-    model_used: process.env.GROQ_ANSWER_MODEL || 'llama-3.1-8b-instant',
-  })
-
-  return NextResponse.json({
-    session_id: activeSessionId,
-    answer,
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
   })
 }
