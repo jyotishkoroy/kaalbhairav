@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { BirthProfileForm } from '@/app/astro/components/BirthProfileForm'
@@ -11,20 +11,23 @@ export default function AstroSetupPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
 
-    const formData = new FormData(event.currentTarget)
-    const result = await saveBirthChart(formData)
+    try {
+      const formData = new FormData(event.currentTarget)
+      const result = await saveBirthChart(formData)
 
-    if (result?.success) {
-      router.push('/astro')
-    } else {
+      if (result?.success) {
+        router.push('/astro')
+        return
+      }
+
       alert(result?.error ?? 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   if (astroV1Enabled) {
