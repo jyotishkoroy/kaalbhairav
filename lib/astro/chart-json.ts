@@ -13,6 +13,22 @@ type BuildChartJsonInput = {
   engine_result: Record<string, unknown>
 }
 
+const RAW_BIRTH_INPUT_KEYS = new Set([
+  'birth_date',
+  'birth_time',
+  'birth_place',
+  'birth_place_name',
+  'latitude',
+  'longitude',
+  'encrypted_birth_data',
+])
+
+function redactRawBirthInput(input: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(input).filter(([key]) => !RAW_BIRTH_INPUT_KEYS.has(key)),
+  )
+}
+
 export function buildChartJson(input: BuildChartJsonInput): ChartJson {
   return {
     metadata: {
@@ -29,7 +45,7 @@ export function buildChartJson(input: BuildChartJsonInput): ChartJson {
       computed_at: new Date().toISOString(),
       calculation_status: 'stub',
     },
-    normalized_input: input.normalized_input,
+    normalized_input: redactRawBirthInput(input.normalized_input),
     calculation_settings: input.settings,
     astronomical_data: (input.engine_result.astronomical_data as Record<string, unknown>) ?? {},
     panchang: (input.engine_result.panchang as Record<string, unknown>) ?? {},
