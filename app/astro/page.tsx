@@ -92,7 +92,7 @@ export default async function AstroPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <AstroChat placeName={chart.place_name} />
+      <AstroChat placeName={chart.place_name} profileId={chart.id} />
     </main>
   )
 }

@@ -7,7 +7,13 @@ type Message = {
   content: string
 }
 
-export default function AstroChat({ placeName }: { placeName: string | null }) {
+export default function AstroChat({
+  placeName,
+  profileId,
+}: {
+  placeName: string | null
+  profileId: string
+}) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -31,10 +37,14 @@ export default function AstroChat({ placeName }: { placeName: string | null }) {
     setStreaming(true)
 
     try {
-      const response = await fetch('/api/llm/stream', {
+      const response = await fetch('/api/astro/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
+        credentials: 'include',
+        body: JSON.stringify({
+          profile_id: profileId,
+          question,
+        }),
       })
 
       if (!response.ok || !response.body) {
@@ -127,7 +137,7 @@ export default function AstroChat({ placeName }: { placeName: string | null }) {
       <div className="flex-1 overflow-y-auto space-y-6 pb-6">
         {messages.length === 0 && (
           <div className="text-center text-white/40 py-24">
-            <p className="text-lg mb-2">Ask what weighs on you.</p>
+            <p className="text-lg mb-2">Ask about this chart.</p>
             <p className="text-sm">
               Reflection and symbolism only. Medical, financial, and legal matters
               need qualified human practitioners.
