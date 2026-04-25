@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server'
 
 import { buildChartJson } from '@/lib/astro/chart-json'
 import { decryptJson } from '@/lib/astro/encryption'
-import { runAstroEngine } from '@/lib/astro/engine'
+import { runEngine } from '@/lib/astro/engine'
+import { ENGINE_VERSION, EPHEMERIS_VERSION, SCHEMA_VERSION } from '@/lib/astro/engine/version'
+import { sha256Canonical } from '@/lib/astro/hashing'
 import { normalizeBirthInput } from '@/lib/astro/normalize'
 import { buildPredictionContext } from '@/lib/astro/prediction-context'
-import { getDefaultAstrologySettings, getSettingsHash } from '@/lib/astro/settings'
+import { DEFAULT_SETTINGS, hashSettings } from '@/lib/astro/settings'
 import type { BirthProfileInput } from '@/lib/astro/types'
 import { calculateRequestSchema } from '@/lib/astro/schemas/calculate'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -68,10 +70,18 @@ export async function POST(request: Request) {
     profile.encrypted_birth_data,
   )
 
-  const { normalized, input_hash, warnings: normalizeWarnings } = normalizeBirthInput(decrypted)
-  const settings = getDefaultAstrologySettings()
-  const settingsHash = getSettingsHash(settings)
-  const engineVersion = 'v1.0.0'
+  const normalized = normalizeBirthInput(decrypted)
+  const input_hash = sha256Canonical({
+    version: normalized.input_hash_material_version,
+    date: normalized.birth_date_iso,
+    time: normalized.birth_time_iso,
+    tz: normalized.timezone,
+    lat: normalized.latitude_rounded,
+    lon: normalized.longitude_rounded,
+  })
+  const settings = DEFAULT_SETTINGS
+  const settingsHash = hashSettings(settings)
+  const engineVersion = ENGINE_VERSION
 
   if (!force_recalc) {
     const { data: cachedCalculation } = await service
@@ -99,7 +109,7 @@ export async function POST(request: Request) {
         prediction_context_id: cachedSummary?.id ?? null,
         reused_cache: true,
         calculation_status: 'stub',
-        warnings: normalizeWarnings,
+        warnings: normalized.warnings,
       })
     }
   }
@@ -132,8 +142,8 @@ export async function POST(request: Request) {
       input_hash,
       settings_hash: settingsHash,
       engine_version: engineVersion,
-      ephemeris_version: 'stub',
-      schema_version: '1.0.0',
+      ephemeris_version: EPHEMERIS_VERSION,
+      schema_version: SCHEMA_VERSION,
       force_recalc,
       idempotency_key: randomUUID(),
       started_at: new Date().toISOString(),
@@ -152,8 +162,7 @@ export async function POST(request: Request) {
   }
 
   const chartVersionId = randomUUID()
-  const engineResult = runAstroEngine()
-  const allWarnings = [...normalizeWarnings, ...engineResult.warnings]
+  const engineResult = runEngine(normalized, settings)
   const chartJson = buildChartJson({
     user_id: user.id,
     profile_id,
@@ -162,15 +171,10 @@ export async function POST(request: Request) {
     chart_version: nextChartVersion,
     input_hash,
     settings_hash: settingsHash,
+    normalized,
     settings,
-    normalized_input: normalized,
-    engine_result: {
-      ...engineResult,
-      warnings: allWarnings,
-    },
+    engine: engineResult,
   })
-
-  chartJson.confidence_and_warnings.warnings = allWarnings
 
   const { data: chartVersion, error: chartVersionError } = await service
     .from('chart_json_versions')
@@ -184,8 +188,8 @@ export async function POST(request: Request) {
       input_hash,
       settings_hash: settingsHash,
       engine_version: engineVersion,
-      ephemeris_version: 'stub',
-      schema_version: '1.0.0',
+      ephemeris_version: EPHEMERIS_VERSION,
+      schema_version: SCHEMA_VERSION,
     })
     .select('id')
     .single()
@@ -210,7 +214,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const predictionContext = buildPredictionContext(chartJson)
+  const predictionContext = buildPredictionContext(chartJson, 'general')
 
   const { data: predictionSummary, error: predictionSummaryError } = await service
     .from('prediction_ready_summaries')
@@ -263,10 +267,10 @@ export async function POST(request: Request) {
     detail: {
       calculation_status: 'stub',
       engine_version: engineVersion,
-      ephemeris_version: 'stub',
+      ephemeris_version: EPHEMERIS_VERSION,
       settings_hash: settingsHash,
       input_hash,
-      warning_count: allWarnings.length,
+      warning_count: engineResult.warnings.length,
     },
   })
 
@@ -276,6 +280,6 @@ export async function POST(request: Request) {
     prediction_context_id: predictionSummary.id,
     reused_cache: false,
     calculation_status: 'stub',
-    warnings: allWarnings,
+    warnings: engineResult.warnings,
   })
 }

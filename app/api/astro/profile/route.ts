@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { encryptJson } from '@/lib/astro/encryption'
-import { getDefaultAstrologySettings, getSettingsHash } from '@/lib/astro/settings'
+import { DEFAULT_SETTINGS, hashSettings } from '@/lib/astro/settings'
 import type { EncryptedBirthPayload } from '@/lib/astro/types'
 import { birthProfileInputSchema } from '@/lib/astro/schemas/profile'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -50,9 +50,10 @@ export async function POST(request: Request) {
     submitted_at: new Date().toISOString(),
   }
 
-  const encryptedBirthData = encryptJson(encryptedPayload)
-  const settings = getDefaultAstrologySettings()
-  const settingsHash = getSettingsHash(settings)
+  const keyVersion = Number(process.env.PII_ENCRYPTION_KEY_VERSION ?? 1)
+  const encryptedBirthData = encryptJson(encryptedPayload, keyVersion)
+  const settings = DEFAULT_SETTINGS
+  const settingsHash = hashSettings(settings)
   const service = createServiceClient()
 
   const { data: profile, error: profileError } = await service
@@ -61,11 +62,10 @@ export async function POST(request: Request) {
       user_id: user.id,
       display_name: input.display_name,
       encrypted_birth_data: encryptedBirthData,
-      pii_encryption_key_version: Number(process.env.PII_ENCRYPTION_KEY_VERSION ?? '1'),
+      pii_encryption_key_version: keyVersion,
       birth_year: Number(input.birth_date.slice(0, 4)),
       has_exact_birth_time:
-        input.birth_time_known &&
-        ['exact_to_second', 'exact_to_minute'].includes(input.birth_time_precision),
+        input.birth_time_known && input.birth_time_precision === 'exact',
       status: 'active',
     })
     .select('id')
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
     profile_id: profile.id,
     event: 'birth_profile_created',
     detail: {
-      pii_encryption_key_version: Number(process.env.PII_ENCRYPTION_KEY_VERSION ?? '1'),
+      pii_encryption_key_version: keyVersion,
       settings_hash: settingsHash,
       engine_mode: process.env.ASTRO_ENGINE_MODE ?? 'stub',
     },

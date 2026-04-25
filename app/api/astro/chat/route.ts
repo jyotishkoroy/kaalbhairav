@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { astroChatRequestSchema } from '@/lib/astro/schemas/chat'
+import { chatRequestSchema } from '@/lib/astro/schemas/chat'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 const ASTRO_CHAT_SYSTEM_PROMPT = `
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 })
   }
 
-  const parsed = astroChatRequestSchema.safeParse(body)
+  const parsed = chatRequestSchema.safeParse(body)
 
   if (!parsed.success) {
     return NextResponse.json(
