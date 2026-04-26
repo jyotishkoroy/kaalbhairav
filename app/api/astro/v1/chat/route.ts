@@ -114,8 +114,8 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+      const send = (event: string, data: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: event, ...data })}\n\n`))
       }
       send('meta', { remaining: remaining - 1, session_id: sessionId })
 
