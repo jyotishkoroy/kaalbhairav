@@ -1,387 +1,390 @@
 import type { AstrologySettings, AstroWarning } from '../types'
 import type { NormalizedBirthInput } from '../normalize'
 import type { EngineResult } from './index'
+import { isSwissEphemerisAvailable, isMoshierFallback, getSweVersion, sweJulday } from './swiss'
+import { getEngineDiagnostics, getEphemerisRangeMetadata, assertEphemerisRange } from './diagnostics'
+import { CONSTANTS_VERSION, RASHI_MAP_VERSION, NAKSHATRA_MAP_VERSION, DASHA_ORDER_VERSION, PANCHANG_SEQUENCE_VERSION } from '../calculations/constants'
+import { convertBirthTimeToUTC } from '../calculations/time'
+import { calculateJulianDay } from '../calculations/julian-day'
+import { calculateAyanamsa } from '../calculations/ayanamsa'
+import { calculateAllPlanets } from '../calculations/planets'
+import { calculateSign } from '../calculations/sign'
+import { calculateNakshatra } from '../calculations/nakshatra'
+import { calculateLagna } from '../calculations/lagna'
+import { calculateWholeSignHouses } from '../calculations/houses'
+import { calculateD1Chart } from '../calculations/d1'
+import { calculateNavamsaChart } from '../calculations/navamsa'
+import { calculateVimshottari } from '../calculations/vimshottari'
+import { calculatePanchangResult, calculateTithi } from '../calculations/panchang'
+import { calculateGrahaDrishti } from '../calculations/aspects'
+import { calculateYogas } from '../calculations/yogas'
+import { calculateDoshas } from '../calculations/doshas'
+import { calculateStrength } from '../calculations/strength'
+import { calculateLifeAreas } from '../calculations/life-areas'
+import { calculateTransits } from '../calculations/transits'
+import { calculateConfidence } from '../calculations/confidence'
+import { collectWarnings } from '../calculations/warnings'
+import { ENGINE_VERSION_REAL } from './version'
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const eph = require('ephemeris') as {
-  getAllPlanets: (date: Date, lon: number, lat: number, height: number) => {
-    observed: Record<string, { apparentLongitudeDd: number; is_retrograde?: boolean }>
-  }
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const ZODIAC_SIGNS = [
-  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
-  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
-]
-
-const NAKSHATRA_NAMES = [
-  'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
-  'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
-  'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
-  'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanistha',
-  'Shatabhisha', 'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati',
-]
-
-const DASHA_LORDS = ['Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury']
-const DASHA_YEARS: Record<string, number> = {
-  Ketu: 7, Venus: 20, Sun: 6, Moon: 10, Mars: 7, Rahu: 18, Jupiter: 16, Saturn: 19, Mercury: 17,
-}
-
-// nakshatra index 0–26 → dasha lord (repeating 9-lord cycle)
-const NAK_DASHA = NAKSHATRA_NAMES.map((_, i) => DASHA_LORDS[i % 9])
-
-const PLANET_KEYS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const
-
-// ─── Astronomy helpers ────────────────────────────────────────────────────────
-
-function julianDay(d: Date): number {
-  const Y = d.getUTCFullYear()
-  const M = d.getUTCMonth() + 1
-  const D = d.getUTCDate() +
-    (d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600) / 24
-  let y = Y, m = M
-  if (m <= 2) { y -= 1; m += 12 }
-  const A = Math.floor(y / 100)
-  const B = 2 - A + Math.floor(A / 4)
-  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + D + B - 1524.5
-}
-
-function lahiriAyanamsa(JD: number): number {
-  // IAU Lahiri / Chitrapaksha — accurate to ~0.01° for dates 1900–2100
-  const T = (JD - 2415020.0) / 36524.22
-  return 22.46045 + 1.39656 * T - 0.0000139 * T * T
-}
-
-function toSidereal(tropical: number, ayanamsa: number): number {
-  return ((tropical - ayanamsa) % 360 + 360) % 360
-}
-
-function gmst(JD: number): number {
-  const T = (JD - 2451545.0) / 36525
-  const θ = 280.46061837 + 360.98564736629 * (JD - 2451545.0) +
-    T * T * 0.000387933 - T * T * T / 38710000
-  return ((θ % 360) + 360) % 360
-}
-
-function tropicalAscendant(JD: number, lat: number, lon: number): number {
-  const RAMC = ((gmst(JD) + lon) % 360 + 360) % 360
-  const T = (JD - 2451545.0) / 36525
-  const eps = (23.439292 - 0.013004 * T) * (Math.PI / 180)
-  const r = RAMC * (Math.PI / 180)
-  const p = lat * (Math.PI / 180)
-  // Standard ascendant formula
-  let asc = Math.atan2(Math.cos(r), -(Math.sin(r) * Math.cos(eps) + Math.tan(p) * Math.sin(eps)))
-  asc = (asc * 180 / Math.PI + 360) % 360
-  return asc
-}
-
-function meanLunarNode(JD: number): number {
-  const T = (JD - 2451545.0) / 36525
-  const omega = 125.04452 - 1934.136261 * T + 0.0020708 * T * T + (T * T * T) / 450000
-  return ((omega % 360) + 360) % 360
-}
-
-// ─── Zodiac / nakshatra lookups ───────────────────────────────────────────────
-
-function signOf(sidereal: number) {
-  const i = Math.floor(sidereal / 30)
-  return { index: i, name: ZODIAC_SIGNS[i], degrees_in_sign: parseFloat((sidereal % 30).toFixed(4)) }
-}
-
-function nakshatraOf(sidereal: number) {
-  const span = 360 / 27
-  const i = Math.floor(sidereal / span)
-  const pada = Math.floor((sidereal % span) / (span / 4)) + 1
-  return { index: i, name: NAKSHATRA_NAMES[i], pada }
-}
-
-// ─── Birth-time UTC conversion ────────────────────────────────────────────────
-
-function birthDateUTC(normalized: NormalizedBirthInput): Date {
-  const time = normalized.birth_time_iso ?? '12:00:00'
-  const localStr = `${normalized.birth_date_iso}T${time}`
-  const utcGuess = new Date(localStr + 'Z')
-
-  // Format utcGuess in the target timezone; the difference reveals the offset
-  try {
-    const fmt = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: normalized.timezone,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false,
-    })
-    const localInTz = new Date(fmt.format(utcGuess).replace(' ', 'T') + 'Z')
-    const offsetMs = localInTz.getTime() - utcGuess.getTime()
-    return new Date(utcGuess.getTime() - offsetMs)
-  } catch {
-    return utcGuess // fallback: treat as UTC (warns from normalize already)
-  }
-}
-
-// ─── Vimshottari dasha ────────────────────────────────────────────────────────
-
-function vimshottariDasha(moonSidereal: number, birthUTC: Date): Record<string, unknown> {
-  const span = 360 / 27
-  const nakIdx = Math.floor(moonSidereal / span)
-  const fraction = (moonSidereal % span) / span
-
-  const lordAtBirth = NAK_DASHA[nakIdx]
-  const totalYears = DASHA_YEARS[lordAtBirth]
-  const elapsedYears = fraction * totalYears
-  const remainingYears = totalYears - elapsedYears
-
-  const startIdx = DASHA_LORDS.indexOf(lordAtBirth)
-  const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000
-
-  const dashaStart = new Date(birthUTC.getTime() - elapsedYears * MS_PER_YEAR)
-  const sequence: Array<{ lord: string; years: number; start: string; end: string }> = []
-  let cursor = dashaStart.getTime()
-
-  for (let i = 0; i < 9; i++) {
-    const lord = DASHA_LORDS[(startIdx + i) % 9]
-    const years = i === 0 ? totalYears : DASHA_YEARS[lord]
-    const end = cursor + years * MS_PER_YEAR
-    sequence.push({ lord, years, start: new Date(cursor).toISOString().slice(0, 10), end: new Date(end).toISOString().slice(0, 10) })
-    cursor = end
-  }
-
-  const now = Date.now()
-  const current = sequence.find(d => new Date(d.start).getTime() <= now && now < new Date(d.end).getTime()) ?? null
-
-  return {
-    system: 'vimshottari',
-    moon_nakshatra: NAKSHATRA_NAMES[nakIdx],
-    dasha_at_birth: {
-      lord: lordAtBirth,
-      total_years: totalYears,
-      elapsed_at_birth: parseFloat(elapsedYears.toFixed(2)),
-      remaining_at_birth: parseFloat(remainingYears.toFixed(2)),
-    },
-    sequence,
-    current_dasha: current,
-  }
-}
-
-// ─── Main export ──────────────────────────────────────────────────────────────
+const SCHEMA_VERSION = '2.0.0'
 
 export function runEngineReal(
   normalized: NormalizedBirthInput,
   settings: AstrologySettings,
 ): EngineResult {
-  const warnings: AstroWarning[] = [...normalized.warnings]
-  const unsupported: string[] = []
+  const legacyWarnings: AstroWarning[] = [...normalized.warnings]
 
-  // ── Validate settings ──────────────────────────────────────────────────────
+  // ── Engine availability check ───────────────────────────────────────────
+  const allowDebugMoshier = process.env.ALLOW_MOSHIER_FALLBACK === 'true' && process.env.NODE_ENV !== 'production'
+  if (!isSwissEphemerisAvailable() && !(allowDebugMoshier && isMoshierFallback())) {
+    return _failedResult('Swiss Ephemeris not available', legacyWarnings)
+  }
+
+  // ── Timezone status guard ───────────────────────────────────────────────
+  if (normalized.timezone_status === 'invalid') {
+    return _failedResult('Invalid timezone', legacyWarnings)
+  }
+
+  // ── Phase 1: Birth time → UTC ───────────────────────────────────────────
+  const birthTimeResult = convertBirthTimeToUTC({
+    birth_date: normalized.birth_date_iso,
+    birth_time: normalized.birth_time_iso ?? undefined,
+    birth_time_known: normalized.birth_time_known,
+    birth_time_precision: normalized.birth_time_precision,
+    timezone: normalized.timezone,
+  })
+
+  if (birthTimeResult.timezone_status === 'invalid' || birthTimeResult.timezone_status === 'nonexistent') {
+    return _failedResult(`Timezone issue: ${birthTimeResult.timezone_status}`, legacyWarnings)
+  }
+
+  if (!birthTimeResult.birth_utc) {
+    return _failedResult('Birth UTC conversion failed', legacyWarnings)
+  }
+
+  // ── Phase 2: Julian Day ─────────────────────────────────────────────────
+  const jdResult = calculateJulianDay(birthTimeResult.birth_utc, sweJulday)
+  const jd_ut = jdResult.jd_ut
+
+  // ── Ephemeris range check ───────────────────────────────────────────────
+  try {
+    assertEphemerisRange(jd_ut)
+  } catch (e) {
+    return _failedResult(String(e), legacyWarnings)
+  }
+
+  // ── Phase 3: Ayanamsa ───────────────────────────────────────────────────
+  const ayanamsaResult = calculateAyanamsa(jd_ut)
+  const ayanamsa = ayanamsaResult.value_degrees
+
+  // ── Phase 4: Settings normalization ────────────────────────────────────
+  const nodeType: 'mean_node' | 'true_node' =
+    settings.node_type === 'true_node' ? 'true_node' : 'mean_node'
+
   if (settings.zodiac_type !== 'sidereal') {
-    warnings.push({
-      warning_code: 'TROPICAL_NOT_SUPPORTED',
-      severity: 'medium',
-      affected_calculations: ['planets', 'lagna', 'houses', 'nakshatras'],
-      explanation: 'Only sidereal zodiac is supported in V1. Calculations use sidereal regardless.',
-      confidence_impact: -20,
-    })
+    legacyWarnings.push({ warning_code: 'TROPICAL_NOT_SUPPORTED', severity: 'medium', affected_calculations: ['planets', 'lagna'], explanation: 'Only sidereal zodiac supported. Using sidereal.', confidence_impact: -20 })
   }
   if (settings.ayanamsa !== 'lahiri') {
-    warnings.push({
-      warning_code: 'AYANAMSA_FALLBACK',
-      severity: 'low',
-      affected_calculations: ['planets', 'lagna'],
-      explanation: `Ayanamsa "${settings.ayanamsa}" requested but V1 only supports Lahiri. Using Lahiri.`,
-      confidence_impact: -5,
-    })
-  }
-  if (!['whole_sign', 'equal'].includes(settings.house_system)) {
-    warnings.push({
-      warning_code: 'HOUSE_SYSTEM_FALLBACK',
-      severity: 'low',
-      affected_calculations: ['houses'],
-      explanation: `House system "${settings.house_system}" not supported in V1. Using whole-sign.`,
-      confidence_impact: -5,
-    })
-  }
-  if (settings.node_type !== 'mean_node') {
-    warnings.push({
-      warning_code: 'TRUE_NODE_NOT_SUPPORTED',
-      severity: 'low',
-      affected_calculations: ['rahu', 'ketu'],
-      explanation: 'Only mean node supported in V1. True node requested but mean node used.',
-      confidence_impact: -3,
-    })
+    legacyWarnings.push({ warning_code: 'AYANAMSA_FALLBACK', severity: 'low', affected_calculations: ['planets', 'lagna'], explanation: `Ayanamsa "${settings.ayanamsa}" not supported. Using Lahiri.`, confidence_impact: -5 })
   }
 
-  // ── Time + JD ──────────────────────────────────────────────────────────────
-  const birthUTC = birthDateUTC(normalized)
-  const JD = julianDay(birthUTC)
-  const ayanamsa = lahiriAyanamsa(JD)
+  // ── Phase 5: Planetary positions ────────────────────────────────────────
+  const planets = calculateAllPlanets(jd_ut, ayanamsa, nodeType)
 
-  // ── Planetary positions via Moshier ephemeris ──────────────────────────────
-  const result = eph.getAllPlanets(birthUTC, normalized.longitude_rounded, normalized.latitude_rounded, 0)
-
-  const planets: Record<string, unknown> = {}
-
-  for (const key of PLANET_KEYS) {
-    const raw = result.observed[key]
-    if (!raw) continue
-    const tropical = raw.apparentLongitudeDd
-    const sidereal = toSidereal(tropical, ayanamsa)
-    const sign = signOf(sidereal)
-    const nak = nakshatraOf(sidereal)
-    planets[key] = {
-      name: key.charAt(0).toUpperCase() + key.slice(1),
-      tropical_longitude: parseFloat(tropical.toFixed(4)),
-      sidereal_longitude: parseFloat(sidereal.toFixed(4)),
-      sign: sign.name,
-      sign_index: sign.index,
-      degrees_in_sign: sign.degrees_in_sign,
-      nakshatra: nak.name,
-      nakshatra_index: nak.index,
-      pada: nak.pada,
-      is_retrograde: raw.is_retrograde ?? false,
-    }
-  }
-
-  // ── Rahu / Ketu (mean lunar nodes) ────────────────────────────────────────
-  const rahuTropical = meanLunarNode(JD)
-  const rahuSidereal = toSidereal(rahuTropical, ayanamsa)
-  const ketuSidereal = (rahuSidereal + 180) % 360
-
-  const rahuSign = signOf(rahuSidereal)
-  const rahuNak = nakshatraOf(rahuSidereal)
-  planets['rahu'] = {
-    name: 'Rahu',
-    tropical_longitude: parseFloat(rahuTropical.toFixed(4)),
-    sidereal_longitude: parseFloat(rahuSidereal.toFixed(4)),
-    sign: rahuSign.name, sign_index: rahuSign.index, degrees_in_sign: rahuSign.degrees_in_sign,
-    nakshatra: rahuNak.name, nakshatra_index: rahuNak.index, pada: rahuNak.pada,
-    is_retrograde: true,
-  }
-  const ketuSign = signOf(ketuSidereal)
-  const ketuNak = nakshatraOf(ketuSidereal)
-  planets['ketu'] = {
-    name: 'Ketu',
-    tropical_longitude: parseFloat(((rahuTropical + 180) % 360).toFixed(4)),
-    sidereal_longitude: parseFloat(ketuSidereal.toFixed(4)),
-    sign: ketuSign.name, sign_index: ketuSign.index, degrees_in_sign: ketuSign.degrees_in_sign,
-    nakshatra: ketuNak.name, nakshatra_index: ketuNak.index, pada: ketuNak.pada,
-    is_retrograde: true,
-  }
-
-  // ── Lagna / ascendant ──────────────────────────────────────────────────────
-  const lagnaUnknown = !normalized.birth_time_known
-  if (lagnaUnknown) {
-    warnings.push({
-      warning_code: 'LAGNA_UNCERTAIN',
-      severity: 'high',
-      affected_calculations: ['lagna', 'houses', 'dashas'],
-      explanation: 'Birth time unknown — lagna and house placements use noon as default and are unreliable.',
-      confidence_impact: -35,
-    })
-  }
-
-  const lagunaTropical = tropicalAscendant(JD, normalized.latitude_rounded, normalized.longitude_rounded)
-  const lagnaSidereal = toSidereal(lagunaTropical, ayanamsa)
-  const lagnaSign = signOf(lagnaSidereal)
-  const lagnaNak = nakshatraOf(lagnaSidereal)
-
-  const lagna: Record<string, unknown> = {
-    tropical_longitude: parseFloat(lagunaTropical.toFixed(4)),
-    sidereal_longitude: parseFloat(lagnaSidereal.toFixed(4)),
-    sign: lagnaSign.name,
-    sign_index: lagnaSign.index,
-    degrees_in_sign: lagnaSign.degrees_in_sign,
-    nakshatra: lagnaNak.name,
-    nakshatra_index: lagnaNak.index,
-    pada: lagnaNak.pada,
-    uncertain: lagnaUnknown,
-  }
-
-  // ── Whole-sign houses ──────────────────────────────────────────────────────
-  const houses: Record<string, unknown> = {}
-  for (let h = 1; h <= 12; h++) {
-    const signIdx = (lagnaSign.index + h - 1) % 12
-    houses[`house_${h}`] = {
-      house: h,
-      sign: ZODIAC_SIGNS[signIdx],
-      sign_index: signIdx,
-      uncertain: lagnaUnknown,
-    }
-  }
-
-  // ── D1 chart: planet → house mapping ──────────────────────────────────────
-  const d1Placements: Record<string, unknown> = {}
-  const allPlanetKeys = [...PLANET_KEYS, 'rahu', 'ketu'] as const
-  for (const key of allPlanetKeys) {
-    const p = planets[key] as { sign_index: number } | undefined
-    if (!p) continue
-    const houseNum = ((p.sign_index - lagnaSign.index + 12) % 12) + 1
-    d1Placements[key] = { house: houseNum, sign: ZODIAC_SIGNS[p.sign_index], sign_index: p.sign_index }
-  }
-
-  const d1_chart: Record<string, unknown> = {
-    system: 'whole_sign',
-    lagna_sign: lagnaSign.name,
-    lagna_sign_index: lagnaSign.index,
-    placements: d1Placements,
-    uncertain: lagnaUnknown,
-  }
-
-  // ── Vimshottari dasha ──────────────────────────────────────────────────────
-  const moonPlanet = planets['moon'] as { sidereal_longitude: number } | undefined
-  const dashas = moonPlanet
-    ? vimshottariDasha(moonPlanet.sidereal_longitude, birthUTC)
-    : { available: false, reason: 'moon position unavailable' }
-
-  if (!moonPlanet) unsupported.push('dashas')
-
-  // ── Life area signatures (placeholder — V1 stub values) ───────────────────
-  const life_area_signatures: Record<string, unknown> = {
-    career: { available: false, reason: 'detailed interpretation not implemented in V1' },
-    relationships: { available: false, reason: 'detailed interpretation not implemented in V1' },
-    wealth: { available: false, reason: 'detailed interpretation not implemented in V1' },
-    health: { available: false, reason: 'detailed interpretation not implemented in V1' },
-    spirituality: { available: false, reason: 'detailed interpretation not implemented in V1' },
-  }
-
-  unsupported.push(
-    'divisional_charts', 'doshas', 'transits', 'aspects',
-    'ashtakavarga', 'jaimini', 'timing_signatures',
+  // ── Phase 6: Lagna and houses ───────────────────────────────────────────
+  const lagna = calculateLagna(
+    jd_ut,
+    normalized.latitude_full,
+    normalized.longitude_full,
+    ayanamsa,
+    normalized.birth_time_known,
+    normalized.birth_time_precision,
   )
+  const houses = calculateWholeSignHouses(lagna)
 
+  // ── Phase 7: D1 chart ───────────────────────────────────────────────────
+  const d1Chart = calculateD1Chart(planets, lagna, houses)
+
+  // ── Phase 8: D9 Navamsa ─────────────────────────────────────────────────
+  const navamsa = calculateNavamsaChart(planets, lagna)
+
+  // ── Phase 9: Vimshottari Dasha ──────────────────────────────────────────
+  const moonPos = planets['Moon']
+  const dasha = moonPos
+    ? calculateVimshottari(moonPos.sidereal_longitude, birthTimeResult.birth_utc)
+    : null
+
+  // ── Phase 10: Panchang ──────────────────────────────────────────────────
+  let panchang = null
+  try {
+    const sunPos = planets['Sun']
+    const localDate = birthTimeResult.birth_local_wall_time.split('T')[0]
+    panchang = calculatePanchangResult({
+      calculationInstantUtc: birthTimeResult.birth_utc,
+      localDate,
+      timezone: normalized.timezone,
+      latitude: normalized.latitude_full,
+      longitude: normalized.longitude_full,
+      moonSidereal: moonPos?.sidereal_longitude ?? 0,
+      sunSidereal: sunPos?.sidereal_longitude ?? 0,
+    })
+  } catch {
+    // Panchang failure is non-fatal
+  }
+
+  // ── Phase 11: Aspects ───────────────────────────────────────────────────
+  const aspects = calculateGrahaDrishti(d1Chart, false)
+
+  // ── Phase 12: Yogas ─────────────────────────────────────────────────────
+  const yogas = calculateYogas(d1Chart, aspects, navamsa)
+
+  // ── Phase 13: Doshas ────────────────────────────────────────────────────
+  const doshas = calculateDoshas(d1Chart, aspects, planets)
+
+  // ── Phase 14: Strength ──────────────────────────────────────────────────
+  const strength = calculateStrength(planets, d1Chart, navamsa, aspects)
+
+  // ── Phase 15: Life Areas ────────────────────────────────────────────────
+  const lifeAreas = calculateLifeAreas(d1Chart, aspects, strength.indicators, lagna)
+
+  // ── Phase 16: Daily Transits ────────────────────────────────────────────
+  let transits = null
+  try {
+    const natalMoonSignIdx = moonPos?.sign_index ?? 0
+    transits = calculateTransits(natalMoonSignIdx, lagna)
+  } catch {
+    // Non-fatal
+  }
+
+  // ── Phase 17: Tithi ────────────────────────────────────────────────────
+  const sunPos = planets['Sun']
+  const tithi = moonPos && sunPos
+    ? calculateTithi(moonPos.sidereal_longitude, sunPos.sidereal_longitude)
+    : null
+
+  // ── Phase 18: Confidence ────────────────────────────────────────────────
+  const moonNearBoundary = (moonPos?.boundary_warnings.some(w => w.includes('nakshatra boundary'))) ?? false
+  const anyPlanetBoundary = Object.values(planets).some(p =>
+    p.boundary_warnings.some(w => w.includes('sign boundary')),
+  )
+  const confidence = calculateConfidence({
+    birth_time_known: normalized.birth_time_known,
+    birth_time_precision: normalized.birth_time_precision,
+    timezone_status: birthTimeResult.timezone_status,
+    moon_near_nakshatra_boundary: moonNearBoundary,
+    lagna_near_sign_boundary: lagna?.near_sign_boundary ?? false,
+    any_planet_near_sign_boundary: anyPlanetBoundary,
+    high_latitude_ascendant_instability: lagna?.high_latitude_flag ?? false,
+    panchang_sunrise_unavailable: !panchang?.sunrise_utc,
+    swiss_ephemeris_available: isSwissEphemerisAvailable(),
+  })
+
+  // ── Phase 19: Warnings ──────────────────────────────────────────────────
+  const allBoundaryWarnings = Object.values(planets).flatMap(p => p.boundary_warnings)
+  const structuredWarnings = collectWarnings({
+    birth_time_known: normalized.birth_time_known,
+    birth_time_precision: normalized.birth_time_precision,
+    timezone_status: birthTimeResult.timezone_status,
+    planet_boundary_warnings: allBoundaryWarnings,
+    moon_near_nakshatra_boundary: moonNearBoundary,
+    lagna_near_sign_boundary: lagna?.near_sign_boundary ?? false,
+    latitude: normalized.latitude_full,
+    panchang_available: !!panchang?.sunrise_utc,
+    daily_transit_available: !!transits,
+    yoga_statuses: yogas.map(y => y.status),
+    dosha_statuses: doshas.map(d => d.status),
+    swiss_ephemeris_available: isSwissEphemerisAvailable(),
+  })
+
+  // ── Phase 20: Diagnostics ───────────────────────────────────────────────
+  const diagnostics = getEngineDiagnostics()
+  const ephemerisRange = getEphemerisRangeMetadata()
+
+  // ── Phase 20a: Core natal summary ──────────────────────────────────────
+  const coreDashaAtBirth = dasha ? {
+    lord: dasha.birth_dasha_lord,
+    elapsed_years: dasha.dasha_elapsed_years,
+    remaining_years: dasha.dasha_remaining_years,
+  } : null
+
+  const coreNatalSummary = {
+    ascendant: lagna,
+    sun_sign: calculateSign(planets['Sun']?.sidereal_longitude ?? 0),
+    moon_sign: calculateSign(planets['Moon']?.sidereal_longitude ?? 0),
+    moon_nakshatra: calculateNakshatra(planets['Moon']?.sidereal_longitude ?? 0),
+    birth_tithi: tithi,
+    dasha_at_birth: coreDashaAtBirth,
+    confidence,
+    warnings: structuredWarnings,
+  }
+
+  // ── Phase 20b: Prediction-ready context (no raw birth inputs) ───────────
+  const predictionReadyContext = {
+    calculation_metadata: {
+      ephemeris_engine: 'swiss_ephemeris' as const,
+      swiss_ephemeris_version: getSweVersion(),
+      timezone_engine: 'luxon' as const,
+      ayanamsa: 'lahiri' as const,
+      node_type: nodeType,
+      sidereal_method: 'tropical_minus_ayanamsa' as const,
+      moshier_fallback: isMoshierFallback(),
+      constants_version: CONSTANTS_VERSION,
+      rashi_map_version: RASHI_MAP_VERSION,
+      nakshatra_map_version: NAKSHATRA_MAP_VERSION,
+      dasha_order_version: DASHA_ORDER_VERSION,
+      panchang_sequence_version: PANCHANG_SEQUENCE_VERSION,
+    },
+    core_natal_summary: coreNatalSummary,
+    planet_positions: Object.values(planets),
+    lagna,
+    houses,
+    d1_chart: d1Chart,
+    d9_chart: navamsa,
+    dasha,
+    panchang,
+    daily_transits: transits,
+    aspects,
+    yogas,
+    doshas,
+    strength_weakness: strength,
+    life_area_signatures: lifeAreas,
+    confidence,
+    warnings: structuredWarnings,
+    unsupported_fields: [] as string[],
+  }
+
+  // ── Assemble master output ──────────────────────────────────────────────
+  const masterOutput = {
+    schema_version: SCHEMA_VERSION,
+    calculation_status: confidence.rejected ? 'rejected' as const : 'calculated' as const,
+    rejection_reason: confidence.rejected ? confidence.rejection_reason : undefined,
+
+    input_use: {
+      used_for_astronomical_calculation: [
+        'birth_date', 'birth_time', 'birth_time_known', 'birth_time_precision',
+        'latitude', 'longitude', 'timezone', 'calendar_system',
+      ],
+      excluded_from_astronomical_calculation: ['display_name', 'birth_place_name', 'gender', 'data_consent_version'],
+    },
+
+    birth_time_result: birthTimeResult,
+    julian_day: jdResult,
+    ayanamsa: ayanamsaResult,
+
+    external_engine_metadata: {
+      ephemeris_engine: 'swiss_ephemeris' as const,
+      swiss_ephemeris_version: getSweVersion(),
+      timezone_engine: 'luxon' as const,
+      ayanamsa: 'lahiri' as const,
+      node_type: nodeType,
+      sidereal_method: 'tropical_minus_ayanamsa' as const,
+      moshier_fallback: isMoshierFallback(),
+    },
+
+    constants_version: {
+      constants_version: CONSTANTS_VERSION,
+      rashi_map_version: RASHI_MAP_VERSION,
+      nakshatra_map_version: NAKSHATRA_MAP_VERSION,
+      dasha_order_version: DASHA_ORDER_VERSION,
+      panchang_sequence_version: PANCHANG_SEQUENCE_VERSION,
+      tradition_settings: { node_type: nodeType, ayanamsa: 'lahiri' },
+    },
+
+    planetary_positions: {
+      Sun: planets['Sun'],
+      Moon: planets['Moon'],
+      Mercury: planets['Mercury'],
+      Venus: planets['Venus'],
+      Mars: planets['Mars'],
+      Jupiter: planets['Jupiter'],
+      Saturn: planets['Saturn'],
+      Rahu: planets['Rahu'],
+      Ketu: planets['Ketu'],
+    },
+
+    sun_sign: calculateSign(planets['Sun']?.sidereal_longitude ?? 0),
+    moon_sign: calculateSign(planets['Moon']?.sidereal_longitude ?? 0),
+    nakshatra: calculateNakshatra(planets['Moon']?.sidereal_longitude ?? 0),
+    pada: calculateNakshatra(planets['Moon']?.sidereal_longitude ?? 0).pada,
+    tithi,
+    lagna,
+    whole_sign_houses: houses,
+    d1_rashi_chart: d1Chart,
+    navamsa_d9: navamsa,
+    vimshottari_dasha: dasha,
+    planetary_aspects_drishti: aspects,
+    yogas,
+    doshas,
+    strength_weakness_indicators: strength,
+    life_area_signatures: lifeAreas,
+    panchang,
+    daily_transits: transits,
+    confidence,
+    warnings: structuredWarnings,
+    validation_results: [],
+    core_natal_summary: coreNatalSummary,
+    prediction_ready_context: predictionReadyContext,
+    engine_boot_diagnostics: diagnostics,
+    ephemeris_range_metadata: ephemerisRange,
+  }
+
+  // Build the EngineResult shape (compatible with existing chart-json consumer)
   return {
     calculation_status: 'real',
     astronomical_data: {
-      julian_day: parseFloat(JD.toFixed(4)),
-      ayanamsa_value: parseFloat(ayanamsa.toFixed(4)),
+      julian_day: jdResult.jd_ut,
+      ayanamsa_value: ayanamsa,
       ayanamsa_system: 'lahiri',
-      birth_utc: birthUTC.toISOString(),
+      birth_utc: birthTimeResult.birth_utc,
+      schema_version: SCHEMA_VERSION,
+      master_output: masterOutput,
     },
-    panchang: {},
+    panchang: panchang ?? {},
     avkahada: {},
     planets,
-    lagna,
-    houses,
-    d1_chart,
-    divisional_charts: {},
-    dashas,
-    doshas: {},
-    transits: {},
-    aspects: {},
+    lagna: lagna ?? { available: false, reason: 'unknown_birth_time' },
+    houses: Object.fromEntries(houses.map(h => [`house_${h.house_number}`, h])),
+    d1_chart: d1Chart,
+    divisional_charts: { navamsa_d9: navamsa },
+    dashas: dasha ?? { available: false, reason: 'moon_position_unavailable' },
+    doshas: Object.fromEntries(doshas.map(d => [d.dosha_id, d])),
+    transits: transits ?? {},
+    aspects: { graha_drishti: aspects },
     ashtakavarga: {},
     jaimini: {},
-    life_area_signatures,
-    timing_signatures: {},
-    warnings,
+    life_area_signatures: Object.fromEntries(lifeAreas.map(la => [la.life_area, la])),
+    timing_signatures: { yogas: Object.fromEntries(yogas.map(y => [y.yoga_id, y])) },
+    warnings: legacyWarnings,
     audit: {
-      sources: ['moshier-ephemeris (ephemeris@2.2.0)'],
-      engine_modules: ['planets', 'lagna', 'houses_whole_sign', 'vimshottari_dasha', 'mean_lunar_node'],
+      sources: [isMoshierFallback() ? 'moshier-via-sweph (fallback)' : `swiss-ephemeris@${getSweVersion()}`],
+      engine_modules: ['planets', 'lagna', 'houses', 'navamsa', 'vimshottari', 'panchang', 'aspects', 'yogas', 'doshas', 'strength', 'life_areas', 'transits'],
       notes: [
-        `Lahiri ayanamsa: ${ayanamsa.toFixed(4)}°`,
-        `Birth UTC: ${birthUTC.toISOString()}`,
-        lagnaUnknown ? 'Lagna computed from noon — uncertain' : 'Lagna computed from provided birth time',
-        `Unsupported in V1: ${unsupported.join(', ')}`,
+        `Lahiri ayanamsa: ${ayanamsa.toFixed(6)}°`,
+        `Birth UTC: ${birthTimeResult.birth_utc}`,
+        `JD UT: ${jd_ut.toFixed(6)}`,
+        `Confidence: ${confidence.score}/100 (${confidence.label})`,
+        isMoshierFallback() ? 'WARNING: Using Moshier fallback — SE files not found' : 'Swiss Ephemeris files loaded',
+        `Engine version: ${ENGINE_VERSION_REAL}`,
       ],
     },
+  }
+}
+
+function _failedResult(reason: string, warnings: AstroWarning[]): EngineResult {
+  return {
+    calculation_status: 'error',
+    astronomical_data: { error: reason, schema_version: SCHEMA_VERSION },
+    panchang: {}, avkahada: {}, planets: {}, lagna: {}, houses: {},
+    d1_chart: {}, divisional_charts: {}, dashas: {}, doshas: {},
+    transits: {}, aspects: {}, ashtakavarga: {}, jaimini: {},
+    life_area_signatures: {}, timing_signatures: {},
+    warnings: [...warnings, {
+      warning_code: 'CALCULATION_FAILED',
+      severity: 'high',
+      affected_calculations: ['all'],
+      explanation: reason,
+      confidence_impact: -100,
+    }],
+    audit: { sources: [], engine_modules: [], notes: [reason] },
   }
 }
