@@ -1,17 +1,21 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import type { AstroGuidanceAnswer } from '@/lib/astro/conversation/types'
 
-type Message = {
+type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
+  mode?: 'clarifying_question' | 'final_answer' | 'error'
+  structured_answer?: AstroGuidanceAnswer['final_answer']
 }
 
 export function AstroV1Chat({ profileId, isReal }: { profileId: string; isReal: boolean }) {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,21 +29,26 @@ export function AstroV1Chat({ profileId, isReal }: { profileId: string; isReal: 
     setInput('')
     setError(null)
     setMessages((prev) => [...prev, { role: 'user', content: question }])
-
     setStreaming(true)
+
+    // Optimistic assistant placeholder (for legacy token streaming)
+    let assistantAdded = false
     let assistantContent = ''
-    setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
     try {
       const res = await fetch('/api/astro/v1/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile_id: profileId, question }),
+        body: JSON.stringify({
+          profile_id: profileId,
+          question,
+          ...(sessionId ? { session_id: sessionId } : {}),
+        }),
       })
 
       if (!res.ok || !res.body) {
         const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error ?? 'Request failed')
+        throw new Error(errData.message ?? errData.error ?? 'Request failed')
       }
 
       const reader = res.body.getReader()
@@ -58,23 +67,64 @@ export function AstroV1Chat({ profileId, isReal }: { profileId: string; isReal: 
           if (payload === '[DONE]') break
           try {
             const json = JSON.parse(payload)
+
+            if (json.type === 'meta') {
+              if (json.session_id) setSessionId(json.session_id)
+            }
+
+            if (json.type === 'clarifying_question' && json.question) {
+              setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: json.question as string, mode: 'clarifying_question' },
+              ])
+              assistantAdded = true
+            }
+
+            if (json.type === 'final_answer') {
+              const rendered = (json.rendered as string) ?? ''
+              const answer = json.answer as AstroGuidanceAnswer | undefined
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: 'assistant',
+                  content: rendered,
+                  mode: 'final_answer',
+                  structured_answer: answer?.final_answer,
+                },
+              ])
+              assistantAdded = true
+            }
+
+            // Legacy token streaming (fallback path)
             if (json.type === 'token' && json.t) {
-              assistantContent += json.t
-              setMessages((prev) => {
-                const updated = [...prev]
-                updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
-                return updated
-              })
+              assistantContent += json.t as string
+              if (!assistantAdded) {
+                setMessages((prev) => [...prev, { role: 'assistant', content: assistantContent }])
+                assistantAdded = true
+              } else {
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
+                  return updated
+                })
+              }
             }
+
             if (json.type === 'error') {
-              throw new Error(json.message ?? 'Stream error')
+              throw new Error((json.message as string) ?? 'Stream error')
             }
-          } catch {}
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== 'Stream error') continue
+            throw parseErr
+          }
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
-      setMessages((prev) => prev.slice(0, -1))
+      // Remove the optimistic assistant bubble if nothing was added from stream
+      if (!assistantAdded) {
+        setMessages((prev) => prev.filter((_, i) => i < prev.length - 0))
+      }
     } finally {
       setStreaming(false)
     }
@@ -104,14 +154,13 @@ export function AstroV1Chat({ profileId, isReal }: { profileId: string; isReal: 
           </p>
         )}
         {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                 m.role === 'user'
                   ? 'bg-orange-800/60 text-white'
+                  : m.mode === 'clarifying_question'
+                  ? 'bg-amber-900/30 border border-amber-700/30 text-white/90'
                   : 'bg-white/8 border border-white/10 text-white/90'
               }`}
             >
@@ -125,9 +174,18 @@ export function AstroV1Chat({ profileId, isReal }: { profileId: string; isReal: 
             </div>
           </div>
         ))}
-        {error && (
-          <div className="text-center text-red-400 text-sm">{error}</div>
+        {streaming && !messages[messages.length - 1]?.content && (
+          <div className="flex justify-start">
+            <div className="bg-white/8 border border-white/10 rounded-2xl px-4 py-3">
+              <span className="inline-flex gap-1">
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:300ms]" />
+              </span>
+            </div>
+          </div>
         )}
+        {error && <div className="text-center text-red-400 text-sm">{error}</div>}
         <div ref={bottomRef} />
       </div>
 
