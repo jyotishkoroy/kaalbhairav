@@ -25,6 +25,16 @@ export default async function ChatPage({ params }: Props) {
 
   if (!profile) notFound()
 
+  const { data: chartVersion } = await supabase
+    .from('chart_json_versions')
+    .select('engine_version')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isReal = chartVersion?.engine_version?.includes('real') ?? false
+
   return (
     <main className="flex flex-col h-screen max-w-2xl mx-auto px-4">
       <header className="py-4 border-b border-white/10 flex items-center gap-3">
@@ -33,7 +43,10 @@ export default async function ChatPage({ params }: Props) {
         </a>
         <div>
           <p className="font-medium">{profile.display_name}</p>
-          <p className="text-xs text-yellow-400/80">Stub mode — detailed predictions unavailable until Phase 5</p>
+          {isReal
+            ? <p className="text-xs text-green-400/80">Real ephemeris active — planetary positions are accurate</p>
+            : <p className="text-xs text-yellow-400/80">Stub mode — recalculate your profile to activate real ephemeris</p>
+          }
         </div>
       </header>
       <AstroV1Chat profileId={profileId} />
