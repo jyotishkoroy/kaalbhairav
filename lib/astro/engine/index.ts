@@ -1,6 +1,7 @@
 import type { AstrologySettings, AstroWarning, CalculationStatus } from '../types'
 import type { NormalizedBirthInput } from '../normalize'
-import { ENGINE_VERSION, EPHEMERIS_VERSION } from './version'
+import { getRuntimeEngineVersion, getRuntimeEphemerisVersion } from './version'
+import { runEngineReal } from './real'
 
 export type EngineResult = {
   calculation_status: CalculationStatus
@@ -26,23 +27,29 @@ export type EngineResult = {
 
 export function runEngine(
   normalized: NormalizedBirthInput,
-  _settings: AstrologySettings,
+  settings: AstrologySettings,
 ): EngineResult {
   const mode = process.env.ASTRO_ENGINE_MODE ?? 'stub'
-  if (mode !== 'stub') {
-    throw new Error(`ASTRO_ENGINE_MODE="${mode}" not implemented yet. V1 only supports stub mode.`)
+
+  if (mode === 'real') {
+    return runEngineReal(normalized, settings)
   }
+
+  // ── Stub mode ──────────────────────────────────────────────────────────────
+  const engineVersion = getRuntimeEngineVersion()
+  const ephemerisVersion = getRuntimeEphemerisVersion()
+
   const stubWarning: AstroWarning = {
     warning_code: 'ENGINE_STUB_MODE',
     severity: 'high',
     affected_calculations: ['planets', 'lagna', 'houses', 'dashas', 'doshas', 'transits'],
     explanation: 'V1 engine is in stub mode. Real planetary positions are not yet calculated.',
-    suggested_action: 'Wait for V2 release with real ephemeris.',
+    suggested_action: 'Set ASTRO_ENGINE_MODE=real to activate the ephemeris engine.',
     confidence_impact: -60,
   }
   return {
     calculation_status: 'stub',
-    astronomical_data: { engine_version: ENGINE_VERSION, ephemeris_version: EPHEMERIS_VERSION },
+    astronomical_data: { engine_version: engineVersion, ephemeris_version: ephemerisVersion },
     panchang: {}, avkahada: {}, planets: {}, lagna: {}, houses: {},
     d1_chart: {}, divisional_charts: {}, dashas: {}, doshas: {},
     transits: {}, aspects: {}, ashtakavarga: {}, jaimini: {},
@@ -58,7 +65,7 @@ export function runEngine(
     audit: {
       sources: ['stub'],
       engine_modules: ['stub'],
-      notes: [`V1 engine running in stub mode. Engine version ${ENGINE_VERSION}.`],
+      notes: [`V1 engine running in stub mode. Engine version ${engineVersion}.`],
     },
   }
 }
