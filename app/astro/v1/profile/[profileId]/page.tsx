@@ -84,8 +84,22 @@ export default async function ProfilePage({ params }: Props) {
     ? ((expandedSections.expanded_sections as Record<string, unknown>).life_area_signatures as LifeAreaSignatures | undefined)
     : undefined
 
+  // DEBUG — remove after diagnosis
+  const _dbgHasChartJson = !!chartVersion?.chart_json
+  const _dbgHasExpandedSections = !!(expandedSections?.expanded_sections)
+  const _dbgNavamsaStatus = navamsa?.status ?? 'undefined'
+  const _dbgChartJsonKeys = chartVersion?.chart_json
+    ? Object.keys(chartVersion.chart_json as Record<string, unknown>).join(', ')
+    : 'chart_json is null'
+
   return (
     <main className="max-w-2xl mx-auto px-6 py-12">
+      <div className="bg-gray-900 border border-gray-600 rounded p-3 mb-4 text-xs font-mono text-gray-300 space-y-1">
+        <p>dbg: chart_json exists={String(_dbgHasChartJson)}</p>
+        <p>dbg: expanded_sections exists={String(_dbgHasExpandedSections)}</p>
+        <p>dbg: navamsa status={_dbgNavamsaStatus}</p>
+        <p>dbg: chart_json keys={_dbgChartJsonKeys}</p>
+      </div>
       <div className="flex items-center gap-3 mb-8">
         <Link href="/astro/v1" className="text-white/40 hover:text-white/70 text-sm transition">
           ← Back
