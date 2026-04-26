@@ -7,7 +7,7 @@ type Message = {
   content: string
 }
 
-export function AstroV1Chat({ profileId }: { profileId: string }) {
+export function AstroV1Chat({ profileId, isReal }: { profileId: string; isReal: boolean }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -93,10 +93,14 @@ export function AstroV1Chat({ profileId }: { profileId: string }) {
         {messages.length === 0 && (
           <p className="text-center text-white/30 text-sm mt-12">
             Ask a question about your birth chart.
-            <br />
-            <span className="text-yellow-400/60">
-              Note: detailed planetary predictions are in stub mode until Phase 5.
-            </span>
+            {!isReal && (
+              <>
+                <br />
+                <span className="text-yellow-400/60">
+                  Recalculate your profile to activate real ephemeris data.
+                </span>
+              </>
+            )}
           </p>
         )}
         {messages.map((m, i) => (

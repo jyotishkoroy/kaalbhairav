@@ -49,7 +49,7 @@ export default async function ChatPage({ params }: Props) {
           }
         </div>
       </header>
-      <AstroV1Chat profileId={profileId} />
+      <AstroV1Chat profileId={profileId} isReal={isReal} />
     </main>
   )
 }
