@@ -36,7 +36,7 @@ export default async function ProfilePage({ params }: Props) {
 
   const { data: chartVersion } = await supabase
     .from('chart_json_versions')
-    .select('id, schema_version, engine_version, calculation_status, created_at')
+    .select('id, schema_version, engine_version, created_at')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -44,13 +44,13 @@ export default async function ProfilePage({ params }: Props) {
 
   const { data: predictionSummary } = await supabase
     .from('prediction_ready_summaries')
-    .select('id, context_schema_version, created_at')
+    .select('id, prediction_context_version, created_at')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
 
-  const isStub = chartVersion?.calculation_status === 'stub' || !chartVersion
+  const isStub = !chartVersion || (chartVersion.engine_version?.includes('stub') ?? true)
   const calculationStatus = calculation?.status ?? 'none'
 
   return (
@@ -95,7 +95,7 @@ export default async function ProfilePage({ params }: Props) {
           <div className="p-4 border border-white/10 rounded-lg bg-white/5">
             <p className="text-xs text-white/40 mb-1">Prediction context</p>
             <p className="font-medium">
-              {predictionSummary ? 'Ready (stub)' : 'Not generated'}
+              {predictionSummary ? (isStub ? 'Ready (stub)' : 'Ready') : 'Not generated'}
             </p>
           </div>
           {chartVersion && (
@@ -125,7 +125,7 @@ export default async function ProfilePage({ params }: Props) {
 
       {isStub && (
         <p className="mt-6 text-xs text-white/30 text-center">
-          Full chart display (planets, houses, dashas) will be available once Phase 5 (real ephemeris) is complete.
+          Click Recalculate to generate your chart with the real ephemeris engine.
         </p>
       )}
     </main>
