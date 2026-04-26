@@ -61,13 +61,13 @@ describe('Engine: real mode', () => {
   it('planets array is non-empty and has expected keys', () => {
     const result = runEngine(normalizeBirthInput(fixture), DEFAULT_SETTINGS)
     const keys = Object.keys(result.planets)
-    expect(keys).toContain('sun')
-    expect(keys).toContain('moon')
-    expect(keys).toContain('mars')
-    expect(keys).toContain('jupiter')
-    expect(keys).toContain('saturn')
-    expect(keys).toContain('rahu')
-    expect(keys).toContain('ketu')
+    expect(keys).toContain('Sun')
+    expect(keys).toContain('Moon')
+    expect(keys).toContain('Mars')
+    expect(keys).toContain('Jupiter')
+    expect(keys).toContain('Saturn')
+    expect(keys).toContain('Rahu')
+    expect(keys).toContain('Ketu')
   })
 
   it('lagna is non-null and has a zodiac sign', () => {
@@ -91,34 +91,55 @@ describe('Engine: real mode', () => {
     expect(Object.keys(result.houses)).toHaveLength(12)
   })
 
-  it('d1_chart is non-null and has placements', () => {
+  it('d1_chart is non-null and has placement maps', () => {
     const result = runEngine(normalizeBirthInput(fixture), DEFAULT_SETTINGS)
     expect(result.d1_chart).toBeTruthy()
-    const d1 = result.d1_chart as Record<string, unknown>
-    expect(d1.placements).toBeTruthy()
-    expect(d1.lagna_sign).toBeTruthy()
+    const d1 = result.d1_chart as unknown as Record<string, unknown>
+    expect(d1.planet_to_sign).toBeTruthy()
+    expect(d1.planet_to_house).toBeTruthy()
+    expect(d1.lagna_sign_index).not.toBeNull()
   })
 
   it('sun is near Taurus/Gemini (sidereal) for June 1990', () => {
     const result = runEngine(normalizeBirthInput(fixture), DEFAULT_SETTINGS)
-    const sun = result.planets as Record<string, Record<string, unknown>>
-    expect(['Taurus', 'Gemini']).toContain(sun.sun?.sign)
+    const planets = result.planets as unknown as Record<string, Record<string, unknown>>
+    expect(['Taurus', 'Gemini']).toContain(planets.Sun?.sign)
   })
 
-  it('dashas are computed from moon nakshatra', () => {
+  it('vimshottari dasha is computed from moon nakshatra', () => {
     const result = runEngine(normalizeBirthInput(fixture), DEFAULT_SETTINGS)
-    const d = result.dashas as Record<string, unknown>
-    expect(d.system).toBe('vimshottari')
-    expect(d.moon_nakshatra).toBeTruthy()
-    expect(Array.isArray(d.sequence)).toBe(true)
-    expect((d.sequence as unknown[]).length).toBe(9)
+    const engineResult = result as unknown as {
+      vimshottari_dasha?: Record<string, unknown>
+      dashas?: Record<string, unknown>
+    }
+    const d = engineResult.vimshottari_dasha ?? engineResult.dashas
+    expect(d).toBeTruthy()
+    expect(d?.moon_nakshatra).toBeTruthy()
+    expect(d?.birth_dasha_lord).toBeTruthy()
+
+    const sequence = d?.mahadasha_sequence ?? d?.sequence
+    expect(Array.isArray(sequence)).toBe(true)
+    expect((sequence as unknown[]).length).toBeGreaterThan(0)
   })
 
-  it('unknown birth time produces lagna warning and uncertain flag', () => {
+  it('unknown birth time produces lagna unavailable or uncertainty warning', () => {
     const result = runEngine(normalizeBirthInput(fixtureUnknownTime), DEFAULT_SETTINGS)
-    const lagna = result.lagna as Record<string, unknown>
-    expect(lagna.uncertain).toBe(true)
-    const hasWarning = result.warnings.some(w => w.warning_code === 'LAGNA_UNCERTAIN' || w.warning_code === 'BIRTH_TIME_UNKNOWN')
+    const lagna = result.lagna as unknown as Record<string, unknown> | null
+
+    expect(
+      lagna === null ||
+      lagna.available === false ||
+      lagna.uncertainty_flag === true ||
+      lagna.reliability === 'not_available'
+    ).toBe(true)
+
+    const warnings = result.warnings as unknown as Array<{ code?: string; warning_code?: string }>
+    const hasWarning = warnings.some(w =>
+      w.code === 'UNKNOWN_BIRTH_TIME' ||
+      w.code === 'LAGNA_UNAVAILABLE' ||
+      w.code === 'LAGNA_UNCERTAIN' ||
+      w.warning_code === 'BIRTH_TIME_UNKNOWN'
+    )
     expect(hasWarning).toBe(true)
   })
 

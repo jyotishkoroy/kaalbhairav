@@ -54,7 +54,7 @@ export type AstrologySettings = {
   dasha_year_basis: 'civil_365.2425' | 'sidereal_365.25' | 'traditional_360'
 }
 
-export type CalculationStatus = 'stub' | 'real' | 'partial' | 'failed'
+export type CalculationStatus = 'stub' | 'real' | 'partial' | 'failed' | 'error'
 
 export type ChartIdentity = {
   user_id: UUID
