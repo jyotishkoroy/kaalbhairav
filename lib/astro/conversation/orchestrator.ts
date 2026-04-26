@@ -17,8 +17,9 @@ type PriorState = {
 }
 
 function extractPriorState(recentMetadata: unknown[]): PriorState {
+  // recentMetadata is ordered descending (most recent first) — find the newest CQ
   const meta = recentMetadata as Array<Record<string, unknown>>
-  const lastCQ = [...meta].reverse().find((m) => m?.mode === 'clarifying_question')
+  const lastCQ = meta.find((m) => m?.mode === 'clarifying_question')
   if (!lastCQ) return { sub_questions_asked: 0, is_continuation: false, topic: null, known_context: {} }
   return {
     sub_questions_asked: Number(lastCQ.sub_questions_asked ?? 0),

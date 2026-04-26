@@ -6,7 +6,7 @@ const TOPIC_KEYWORDS: Record<AstroTopic, string[]> = {
   family: ['parents', 'mother', 'father', 'sibling', 'child', 'children', 'home', 'family', 'brother', 'sister', 'son', 'daughter', 'parent', 'in-law'],
   health: ['health', 'illness', 'anxiety', 'surgery', 'treatment', 'pain', 'sick', 'disease', 'hospital', 'medicine', 'doctor', 'mental', 'recover'],
   money: ['money', 'debt', 'salary', 'investment', 'loan', 'property', 'finance', 'financial', 'wealth', 'savings', 'income', 'profit', 'loss', 'stock'],
-  daily_guidance: ['today', 'tomorrow', 'this day', 'daily', 'how will my day', 'day go', 'morning', 'evening', 'tonight', 'this week', 'how will i do today'],
+  daily_guidance: ['today', 'tomorrow', 'this day', 'daily', 'how will my day', 'how will be my day', 'day go', 'my day', 'morning', 'evening', 'tonight', 'this week', 'how will i do today', 'how is my day', 'aaj', 'kal'],
   spiritual: ['puja', 'mantra', 'sadhana', 'guru', 'bhakti', 'dream', 'deity', 'temple', 'prayer', 'spiritual', 'meditation', 'karma', 'dharma'],
   general: [],
 }
