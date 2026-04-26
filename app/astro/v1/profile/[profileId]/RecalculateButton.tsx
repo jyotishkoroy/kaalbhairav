@@ -13,7 +13,7 @@ export function RecalculateButton({ profileId }: { profileId: string }) {
       const res = await fetch('/api/astro/v1/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile_id: profileId }),
+        body: JSON.stringify({ profile_id: profileId, force_recalc: true }),
       })
       if (res.ok) {
         router.refresh()
