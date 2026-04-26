@@ -6,7 +6,7 @@ import { decryptJson } from '@/lib/astro/encryption'
 import { normalizeBirthInput } from '@/lib/astro/normalize'
 import { sha256Canonical } from '@/lib/astro/hashing'
 import { runEngine } from '@/lib/astro/engine'
-import { ENGINE_VERSION, EPHEMERIS_VERSION, SCHEMA_VERSION } from '@/lib/astro/engine/version'
+import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from '@/lib/astro/engine/version'
 import { buildChartJson } from '@/lib/astro/chart-json'
 import { buildPredictionContext } from '@/lib/astro/prediction-context'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       .eq('profile_id', profile_id)
       .eq('input_hash', inputHash)
       .eq('settings_hash', settingsHash)
-      .eq('engine_version', ENGINE_VERSION)
+      .eq('engine_version', getRuntimeEngineVersion())
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .limit(1)
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
         calculation_id: cached.id,
         chart_version_id: cached.current_chart_version_id,
         reused_cache: true,
-        calculation_status: 'stub',
+        calculation_status: process.env.ASTRO_ENGINE_MODE === 'real' ? 'real' : 'stub',
         warnings: [],
       })
     }
@@ -111,8 +111,8 @@ export async function POST(req: NextRequest) {
       status: 'running',
       input_hash: inputHash,
       settings_hash: settingsHash,
-      engine_version: ENGINE_VERSION,
-      ephemeris_version: EPHEMERIS_VERSION,
+      engine_version: getRuntimeEngineVersion(),
+      ephemeris_version: getRuntimeEphemerisVersion(),
       schema_version: SCHEMA_VERSION,
       force_recalc,
       started_at: new Date().toISOString(),
@@ -150,8 +150,8 @@ export async function POST(req: NextRequest) {
         chart_version: 1,
         input_hash: inputHash,
         settings_hash: settingsHash,
-        engine_version: ENGINE_VERSION,
-        ephemeris_version: EPHEMERIS_VERSION,
+        engine_version: getRuntimeEngineVersion(),
+        ephemeris_version: getRuntimeEphemerisVersion(),
         schema_version: SCHEMA_VERSION,
         chart_json: finalChartJson,
       })
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
       calculation_id: calc.id,
       chart_version_id: newChartId,
       event: 'calculation_completed',
-      detail: { engine_version: ENGINE_VERSION, status: engineResult.calculation_status },
+      detail: { engine_version: getRuntimeEngineVersion(), status: engineResult.calculation_status },
     })
 
     return NextResponse.json({

@@ -1,7 +1,7 @@
 import type { ChartJson, AstrologySettings, ConfidenceScore } from './types'
 import type { NormalizedBirthInput } from './normalize'
 import type { EngineResult } from './engine'
-import { ENGINE_VERSION, EPHEMERIS_VERSION, SCHEMA_VERSION } from './engine/version'
+import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from './engine/version'
 
 export function buildChartJson(args: {
   user_id: string
@@ -28,8 +28,8 @@ export function buildChartJson(args: {
       chart_version_id: args.chart_version_id,
       input_hash: args.input_hash,
       settings_hash: args.settings_hash,
-      engine_version: ENGINE_VERSION,
-      ephemeris_version: EPHEMERIS_VERSION,
+      engine_version: getRuntimeEngineVersion(),
+      ephemeris_version: getRuntimeEphemerisVersion(),
       schema_version: SCHEMA_VERSION,
       chart_version: args.chart_version,
       computed_at: new Date().toISOString(),
