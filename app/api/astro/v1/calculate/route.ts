@@ -11,6 +11,13 @@ import { buildChartJson } from '@/lib/astro/chart-json'
 import { buildPredictionContext } from '@/lib/astro/prediction-context'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
 import type { BirthProfileInput, AstrologySettings } from '@/lib/astro/types'
+import type { PlanetName, ZodiacSign } from '@/lib/astro/engine/types'
+import { calculateDailyTransits } from '@/lib/astro/calculations/transits'
+import { calculatePanchang } from '@/lib/astro/calculations/panchang'
+import { calculateCurrentTiming } from '@/lib/astro/calculations/timing'
+import { calculateNavamsa } from '@/lib/astro/calculations/navamsa'
+import { calculateAspects } from '@/lib/astro/calculations/aspects'
+import { calculateLifeAreaSignatures } from '@/lib/astro/calculations/life-areas'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -126,6 +133,94 @@ export async function POST(req: NextRequest) {
 
   try {
     const engineResult = runEngine(normalized, settingsForHash)
+
+    const engineMode = process.env.ASTRO_ENGINE_MODE ?? 'stub'
+    const nowUtc = new Date().toISOString()
+
+    // Extract typed data from engine result for expanded section calculations
+    const planetsRaw = engineResult.planets as Record<string, {
+      sidereal_longitude: number; sign: string; sign_index: number; is_retrograde?: boolean
+    } | undefined>
+    const lagnaRaw = engineResult.lagna as { sidereal_longitude: number; sign_index: number } | null
+    const housesRaw = engineResult.houses as Record<string, { sign: string; sign_index: number }>
+    const d1Raw = engineResult.d1_chart as { placements?: Record<string, { house: number; sign: string }> } | null
+    const dashasRaw = engineResult.dashas as {
+      sequence?: Array<{ lord: string; start: string; end: string }>
+    } | null
+
+    const PLANET_KEY_MAP: Record<string, PlanetName> = {
+      sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus', mars: 'Mars',
+      jupiter: 'Jupiter', saturn: 'Saturn', rahu: 'Rahu', ketu: 'Ketu',
+    }
+
+    const planetsSidereal = Object.entries(planetsRaw)
+      .filter(([k, v]) => PLANET_KEY_MAP[k] && v)
+      .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], longitude_deg: v!.sidereal_longitude }))
+
+    const houseSignsRaw = Array.from({ length: 12 }, (_, i) => {
+      const h = housesRaw[`house_${i + 1}`]
+      return h?.sign ?? ''
+    })
+    const houseSignsArray: ZodiacSign[] = houseSignsRaw.every((s) => s !== '')
+      ? (houseSignsRaw as ZodiacSign[])
+      : []
+
+    const planetHousesForAspects = d1Raw?.placements
+      ? Object.entries(d1Raw.placements)
+          .filter(([k]) => PLANET_KEY_MAP[k])
+          .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house }))
+      : []
+
+    const planetHousesForLifeAreas = d1Raw?.placements
+      ? Object.entries(d1Raw.placements)
+          .filter(([k]) => PLANET_KEY_MAP[k])
+          .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house, sign: v.sign as ZodiacSign }))
+      : []
+
+    const dashaSequence = dashasRaw?.sequence
+      ? dashasRaw.sequence.map((d) => ({ lord: d.lord, start_date: d.start, end_date: d.end }))
+      : null
+
+    const [dailyTransits, panchangResult, currentTiming, navamsa, aspects, lifeAreas] =
+      await Promise.all([
+        calculateDailyTransits({
+          natal_house_signs: houseSignsArray,
+          now_utc: nowUtc,
+          ayanamsa: settingsForHash.ayanamsa,
+          engine_mode: engineMode,
+        }),
+        calculatePanchang({
+          now_utc: nowUtc,
+          observer_timezone: normalized.timezone,
+          observer_latitude: normalized.latitude_rounded,
+          observer_longitude: normalized.longitude_rounded,
+          ayanamsa: settingsForHash.ayanamsa,
+          engine_mode: engineMode,
+        }),
+        calculateCurrentTiming({
+          dasha_sequence: dashaSequence,
+          now_utc: nowUtc,
+          observer_latitude: normalized.latitude_rounded,
+          observer_longitude: normalized.longitude_rounded,
+          ayanamsa: settingsForHash.ayanamsa,
+          engine_mode: engineMode,
+        }),
+        calculateNavamsa({
+          planets_sidereal: planetsSidereal,
+          lagna_sidereal_deg: lagnaRaw?.sidereal_longitude ?? null,
+          engine_mode: engineMode,
+        }),
+        calculateAspects({
+          planet_houses: planetHousesForAspects,
+          engine_mode: engineMode,
+        }),
+        calculateLifeAreaSignatures({
+          house_signs: houseSignsArray,
+          planet_houses: planetHousesForLifeAreas,
+          engine_mode: engineMode,
+        }),
+      ])
+
     const newChartId = randomUUID()
     const finalChartJson = buildChartJson({
       user_id: user.id,
@@ -138,6 +233,14 @@ export async function POST(req: NextRequest) {
       normalized,
       settings: settingsForHash,
       engine: engineResult,
+      expanded_sections: {
+        daily_transits: dailyTransits,
+        panchang: panchangResult,
+        current_timing: currentTiming,
+        navamsa_d9: navamsa,
+        basic_aspects: aspects,
+        life_area_signatures: lifeAreas,
+      },
     })
 
     const { error: chartErr } = await service
