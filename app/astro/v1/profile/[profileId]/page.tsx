@@ -9,10 +9,20 @@ import type {
   NavamsaD9,
   BasicAspects,
   LifeAreaSignatures,
+  PlanetName,
+  ZodiacSign,
 } from '@/lib/astro/engine/types'
+import { calculateNavamsa } from '@/lib/astro/calculations/navamsa'
+import { calculateAspects } from '@/lib/astro/calculations/aspects'
+import { calculateLifeAreaSignatures } from '@/lib/astro/calculations/life-areas'
 
 type Props = {
   params: Promise<{ profileId: string }>
+}
+
+const PLANET_KEY_MAP: Record<string, PlanetName> = {
+  sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus', mars: 'Mars',
+  jupiter: 'Jupiter', saturn: 'Saturn', rahu: 'Rahu', ketu: 'Ketu',
 }
 
 export default async function ProfilePage({ params }: Props) {
@@ -61,45 +71,73 @@ export default async function ProfilePage({ params }: Props) {
   const isStub = !chartVersion || (chartVersion.engine_version?.includes('stub') ?? true)
   const calculationStatus = calculation?.status ?? 'none'
 
-  const expandedSections = chartVersion?.chart_json
+  // Derive engine mode from stored chart metadata (avoids env var dependency on page render)
+  const chartMeta = chartVersion?.chart_json
     ? (chartVersion.chart_json as Record<string, unknown>)
     : null
+  const storedCalcStatus = (chartMeta?.metadata as Record<string, unknown> | undefined)?.calculation_status as string | undefined
+  const engineMode = storedCalcStatus === 'real' ? 'real' : 'stub'
 
-  const dailyTransits = expandedSections?.expanded_sections
-    ? ((expandedSections.expanded_sections as Record<string, unknown>).daily_transits as DailyTransits | undefined)
-    : undefined
-  const panchang = expandedSections?.expanded_sections
-    ? ((expandedSections.expanded_sections as Record<string, unknown>).panchang as Panchang | undefined)
-    : undefined
-  const currentTiming = expandedSections?.expanded_sections
-    ? ((expandedSections.expanded_sections as Record<string, unknown>).current_timing as CurrentTimingContext | undefined)
-    : undefined
-  const navamsa = expandedSections?.expanded_sections
-    ? ((expandedSections.expanded_sections as Record<string, unknown>).navamsa_d9 as NavamsaD9 | undefined)
-    : undefined
-  const aspects = expandedSections?.expanded_sections
-    ? ((expandedSections.expanded_sections as Record<string, unknown>).basic_aspects as BasicAspects | undefined)
-    : undefined
-  const lifeAreas = expandedSections?.expanded_sections
-    ? ((expandedSections.expanded_sections as Record<string, unknown>).life_area_signatures as LifeAreaSignatures | undefined)
-    : undefined
+  // Extract planet and house data directly from stored chart_json
+  const planetsRaw = chartMeta?.planets as Record<string, {
+    sidereal_longitude: number; sign: string; sign_index: number; is_retrograde?: boolean
+  } | undefined> | undefined
 
-  // DEBUG — remove after diagnosis
-  const _dbgHasChartJson = !!chartVersion?.chart_json
-  const _dbgHasExpandedSections = !!(expandedSections?.expanded_sections)
-  const _dbgNavamsaStatus = navamsa?.status ?? 'undefined'
-  const _dbgChartJsonKeys = chartVersion?.chart_json
-    ? Object.keys(chartVersion.chart_json as Record<string, unknown>).join(', ')
-    : 'chart_json is null'
+  const lagnaRaw = chartMeta?.lagna as { sidereal_longitude: number; sign_index: number } | undefined
+  const housesRaw = chartMeta?.houses as Record<string, { sign: string }> | undefined
+  const d1Raw = chartMeta?.d1_chart as { placements?: Record<string, { house: number; sign: string }> } | undefined
+
+  const planetsSidereal = planetsRaw
+    ? Object.entries(planetsRaw)
+        .filter(([k, v]) => PLANET_KEY_MAP[k] && v)
+        .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], longitude_deg: v!.sidereal_longitude }))
+    : []
+
+  const houseSignsRaw = housesRaw
+    ? Array.from({ length: 12 }, (_, i) => housesRaw[`house_${i + 1}`]?.sign ?? '')
+    : []
+  const houseSignsArray: ZodiacSign[] = houseSignsRaw.length === 12 && houseSignsRaw.every((s) => s !== '')
+    ? (houseSignsRaw as ZodiacSign[])
+    : []
+
+  const planetHousesForAspects = d1Raw?.placements
+    ? Object.entries(d1Raw.placements)
+        .filter(([k]) => PLANET_KEY_MAP[k])
+        .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house }))
+    : []
+
+  const planetHousesForLifeAreas = d1Raw?.placements
+    ? Object.entries(d1Raw.placements)
+        .filter(([k]) => PLANET_KEY_MAP[k])
+        .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house, sign: v.sign as ZodiacSign }))
+    : []
+
+  // Compute the three deterministic sections directly from stored chart data
+  const [navamsa, aspects, lifeAreas] = await Promise.all([
+    calculateNavamsa({
+      planets_sidereal: planetsSidereal,
+      lagna_sidereal_deg: lagnaRaw?.sidereal_longitude ?? null,
+      engine_mode: engineMode,
+    }),
+    calculateAspects({
+      planet_houses: planetHousesForAspects,
+      engine_mode: engineMode,
+    }),
+    calculateLifeAreaSignatures({
+      house_signs: houseSignsArray,
+      planet_houses: planetHousesForLifeAreas,
+      engine_mode: engineMode,
+    }),
+  ])
+
+  // Check stored expanded_sections for the time-dependent ones (transit/panchang/timing)
+  const storedExpanded = chartMeta?.expanded_sections as Record<string, unknown> | undefined
+  const dailyTransits = storedExpanded?.daily_transits as DailyTransits | undefined
+  const panchang = storedExpanded?.panchang as Panchang | undefined
+  const currentTiming = storedExpanded?.current_timing as CurrentTimingContext | undefined
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-12">
-      <div className="bg-gray-900 border border-gray-600 rounded p-3 mb-4 text-xs font-mono text-gray-300 space-y-1">
-        <p>dbg: chart_json exists={String(_dbgHasChartJson)}</p>
-        <p>dbg: expanded_sections exists={String(_dbgHasExpandedSections)}</p>
-        <p>dbg: navamsa status={_dbgNavamsaStatus}</p>
-        <p>dbg: chart_json keys={_dbgChartJsonKeys}</p>
-      </div>
       <div className="flex items-center gap-3 mb-8">
         <Link href="/astro/v1" className="text-white/40 hover:text-white/70 text-sm transition">
           ← Back
@@ -192,12 +230,11 @@ export default async function ProfilePage({ params }: Props) {
             <div className="space-y-1 text-sm text-white/70">
               {panchang.vara && <p>Vara: {panchang.vara}</p>}
               {panchang.tithi && (
-                <p>Tithi: {panchang.tithi.name} ({panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} Paksha, {panchang.tithi.completion_percent.toFixed(0)}% complete)</p>
+                <p>Tithi: {panchang.tithi.name} ({panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} Paksha)</p>
               )}
               {panchang.nakshatra && <p>Nakshatra: {panchang.nakshatra}</p>}
               {panchang.yoga && <p>Yoga: {panchang.yoga}</p>}
               {panchang.karana && <p>Karana: {panchang.karana}</p>}
-              {panchang.sunrise_utc && <p>Sunrise (UTC): {panchang.sunrise_utc}</p>}
             </div>
           )}
           {panchang?.warnings.map((w, i) => (
@@ -212,7 +249,7 @@ export default async function ProfilePage({ params }: Props) {
                 <p>Mahadasha: {currentTiming.current_mahadasha.lord} ({currentTiming.current_mahadasha.start_date} – {currentTiming.current_mahadasha.end_date})</p>
               )}
               {currentTiming.current_antardasha && (
-                <p>Antardasha: {currentTiming.current_antardasha.lord} ({currentTiming.current_antardasha.start_date} – {currentTiming.current_antardasha.end_date})</p>
+                <p>Antardasha: {currentTiming.current_antardasha.lord}</p>
               )}
               {currentTiming.elapsed_dasha_percent != null && (
                 <p>Mahadasha elapsed: {currentTiming.elapsed_dasha_percent.toFixed(1)}%</p>
@@ -224,58 +261,54 @@ export default async function ProfilePage({ params }: Props) {
           ))}
         </SectionCard>
 
-        <SectionCard title="Navamsa (D9)" status={navamsa?.status}>
-          {navamsa && (
-            <div className="space-y-1 text-sm text-white/70">
-              {navamsa.navamsa_lagna && <p className="font-medium text-white/80">Navamsa Lagna: {navamsa.navamsa_lagna}</p>}
-              <div className="grid grid-cols-3 gap-1 mt-2">
-                {navamsa.planets.map((p) => (
-                  <p key={p.planet} className="text-xs">
-                    {p.planet}: {p.navamsa_sign} (H{p.navamsa_house})
-                  </p>
-                ))}
-              </div>
-            </div>
+        <SectionCard title="Navamsa (D9)" status={navamsa.status}>
+          {navamsa.navamsa_lagna && (
+            <p className="font-medium text-white/80 text-sm mb-2">Navamsa Lagna: {navamsa.navamsa_lagna}</p>
           )}
-          {navamsa?.warnings.map((w, i) => (
+          <div className="grid grid-cols-3 gap-1">
+            {navamsa.planets.map((p) => (
+              <p key={p.planet} className="text-xs text-white/70">
+                {p.planet}: {p.navamsa_sign} (H{p.navamsa_house})
+              </p>
+            ))}
+          </div>
+          {navamsa.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
 
-        <SectionCard title="Planetary Aspects (Drishti)" status={aspects?.status}>
-          {aspects && aspects.aspects.length > 0 && (
-            <div className="space-y-1 text-sm text-white/70">
-              {aspects.aspects
-                .filter((a) => a.aspected_planet !== null)
-                .slice(0, 12)
-                .map((a, i) => (
-                  <p key={i}>
-                    {a.aspecting_planet} → {a.aspected_planet} ({a.aspect_type.replace(/_/g, ' ')}, {a.strength})
-                  </p>
-                ))}
-              {aspects.aspects.filter((a) => a.aspected_planet !== null).length > 12 && (
-                <p className="text-white/30 text-xs">+{aspects.aspects.filter((a) => a.aspected_planet !== null).length - 12} more</p>
-              )}
-            </div>
-          )}
-          {aspects?.warnings.map((w, i) => (
-            <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          ))}
-        </SectionCard>
-
-        <SectionCard title="Life-Area Signatures" status={lifeAreas?.status}>
-          {lifeAreas && lifeAreas.signatures.length > 0 && (
-            <div className="space-y-1 text-sm text-white/70">
-              {lifeAreas.signatures.map((s) => (
-                <div key={s.area} className="flex justify-between gap-2">
-                  <span className="text-white/50 capitalize w-40 shrink-0">{s.area.replace(/_/g, ' ')}</span>
-                  <span className="text-xs">H{s.house_number} {s.house_sign} · lord {s.lord} in H{s.lord_placement_house}</span>
-                  {s.strength_note && <span className="text-green-400/70 text-xs">{s.strength_note}</span>}
-                </div>
+        <SectionCard title="Planetary Aspects (Drishti)" status={aspects.status}>
+          <div className="space-y-1 text-sm text-white/70">
+            {aspects.aspects
+              .filter((a) => a.aspected_planet !== null)
+              .slice(0, 12)
+              .map((a, i) => (
+                <p key={i}>
+                  {a.aspecting_planet} → {a.aspected_planet} ({a.aspect_type.replace(/_/g, ' ')}, {a.strength})
+                </p>
               ))}
-            </div>
-          )}
-          {lifeAreas?.warnings.map((w, i) => (
+            {aspects.aspects.filter((a) => a.aspected_planet !== null).length > 12 && (
+              <p className="text-white/30 text-xs">
+                +{aspects.aspects.filter((a) => a.aspected_planet !== null).length - 12} more
+              </p>
+            )}
+          </div>
+          {aspects.warnings.map((w, i) => (
+            <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
+          ))}
+        </SectionCard>
+
+        <SectionCard title="Life-Area Signatures" status={lifeAreas.status}>
+          <div className="space-y-1 text-sm text-white/70">
+            {lifeAreas.signatures.map((s) => (
+              <div key={s.area} className="flex justify-between gap-2">
+                <span className="text-white/50 capitalize w-40 shrink-0">{s.area.replace(/_/g, ' ')}</span>
+                <span className="text-xs">H{s.house_number} {s.house_sign} · lord {s.lord} in H{s.lord_placement_house}</span>
+                {s.strength_note && <span className="text-green-400/70 text-xs">{s.strength_note}</span>}
+              </div>
+            ))}
+          </div>
+          {lifeAreas.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
@@ -312,7 +345,7 @@ function SectionCard({
       </div>
       {isUnavailable ? (
         <p className="text-white/30 text-sm">
-          Not available in stub mode. Will populate once{' '}
+          Not available yet. Will populate once{' '}
           <code className="text-xs text-orange-400">ASTRO_ENGINE_MODE=real</code> is active and chart
           is recalculated.
         </p>
