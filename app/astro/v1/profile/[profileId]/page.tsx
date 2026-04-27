@@ -159,13 +159,13 @@ export default async function ProfilePage({ params }: Props) {
 
       <div className="space-y-4">
         <SectionCard title="Daily Transits" status={dailyTransits?.status}>
-          {dailyTransits?.transits.map((t) => (
+          {Array.isArray((dailyTransits as { transits?: Array<{ planet: string; sign: string; house_transited: number; retrograde?: boolean }> } | undefined)?.transits) && (dailyTransits as { transits: Array<{ planet: string; sign: string; house_transited: number; retrograde?: boolean }> }).transits.map((t) => (
             <p key={t.planet} className="text-sm text-white/70">
               {t.planet}: {t.sign} - House {t.house_transited}
               {t.retrograde ? ' (R)' : ''}
             </p>
           ))}
-          {dailyTransits?.warnings.map((w, i) => (
+          {Array.isArray(dailyTransits?.warnings) && dailyTransits.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
@@ -182,7 +182,7 @@ export default async function ProfilePage({ params }: Props) {
               {panchang.karana && <p>Karana: {panchang.karana}</p>}
             </div>
           )}
-          {panchang?.warnings.map((w, i) => (
+          {Array.isArray(panchang?.warnings) && panchang.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
@@ -201,7 +201,7 @@ export default async function ProfilePage({ params }: Props) {
               )}
             </div>
           )}
-          {currentTiming?.warnings.map((w, i) => (
+          {Array.isArray(currentTiming?.warnings) && currentTiming.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
@@ -219,9 +219,9 @@ export default async function ProfilePage({ params }: Props) {
               ))}
             </div>
           )}
-          {Array.isArray((navamsa as { warnings?: string[] } | undefined)?.warnings) && ((navamsa as { warnings: string[] }).warnings.map((w, i) => (
+          {Array.isArray((navamsa as { warnings?: string[] } | undefined)?.warnings) && (navamsa as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          )))}
+          ))}
         </SectionCard>
 
         <SectionCard title="Planetary Aspects (Drishti)" status={aspects?.status}>
@@ -231,7 +231,7 @@ export default async function ProfilePage({ params }: Props) {
               .slice(0, 12)
               .map((a, i) => (
                 <p key={i}>
-                  {a.aspecting_planet} - {a.aspected_planet} ({a.aspect_type.replace(/_/g, ' ')}, {a.strength})
+                  {formatLabel(a.aspecting_planet)} - {formatLabel(a.aspected_planet)} ({formatLabel(a.aspect_type)}, {formatLabel(a.strength)})
                 </p>
               ))}
             {Array.isArray((aspects as { aspects?: Array<{ aspected_planet: string | null }> } | undefined)?.aspects) && (aspects as { aspects: Array<{ aspected_planet: string | null }> }).aspects.filter((a) => a.aspected_planet !== null).length > 12 && (
@@ -240,28 +240,63 @@ export default async function ProfilePage({ params }: Props) {
               </p>
             )}
           </div>
-          {Array.isArray((aspects as { warnings?: string[] } | undefined)?.warnings) && ((aspects as { warnings: string[] }).warnings.map((w, i) => (
+          {Array.isArray((aspects as { warnings?: string[] } | undefined)?.warnings) && (aspects as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          )))}
+          ))}
         </SectionCard>
 
         <SectionCard title="Life-Area Signatures" status={lifeAreas?.status}>
           <div className="space-y-1 text-sm text-white/70">
             {Array.isArray((lifeAreas as { signatures?: Array<{ area: string; house_number: number; house_sign: string | null; lord: string | null; lord_placement_house: number | null; strength_note?: string | null }> } | undefined)?.signatures) && (lifeAreas as { signatures: Array<{ area: string; house_number: number; house_sign: string | null; lord: string | null; lord_placement_house: number | null; strength_note?: string | null }> }).signatures.map((s) => (
-              <div key={s.area} className="flex justify-between gap-2">
-                <span className="text-white/50 capitalize w-40 shrink-0">{s.area.replace(/_/g, ' ')}</span>
-                <span className="text-xs">H{s.house_number} {s.house_sign} · lord {s.lord} in H{s.lord_placement_house}</span>
-                {s.strength_note && <span className="text-green-400/70 text-xs">{s.strength_note}</span>}
+              <div key={formatLabel(s.area)} className="flex justify-between gap-2">
+                <span className="text-white/50 capitalize w-40 shrink-0">{formatLabel(s.area)}</span>
+                <span className="text-xs">
+                  H{formatLabel(s.house_number)} {formatLabel(s.house_sign)} · lord {formatLabel(s.lord)} in H{formatLabel(s.lord_placement_house)}
+                </span>
+                {s.strength_note && <span className="text-green-400/70 text-xs">{formatLabel(s.strength_note)}</span>}
               </div>
             ))}
           </div>
-          {Array.isArray((lifeAreas as { warnings?: string[] } | undefined)?.warnings) && ((lifeAreas as { warnings: string[] }).warnings.map((w, i) => (
+          {Array.isArray((lifeAreas as { warnings?: string[] } | undefined)?.warnings) && (lifeAreas as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          )))}
+          ))}
         </SectionCard>
       </div>
     </main>
   )
+}
+
+function formatLabel(value: unknown): string {
+  if (value == null) return '—'
+
+  if (typeof value === 'string') {
+    return value.replace(/_/g, ' ')
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const candidate =
+      record.name ??
+      record.label ??
+      record.value ??
+      record.sign ??
+      record.planet ??
+      record.house ??
+      record.area ??
+      record.type ??
+      null
+
+    if (typeof candidate === 'string') return candidate.replace(/_/g, ' ')
+    if (typeof candidate === 'number' || typeof candidate === 'boolean') return String(candidate)
+
+    return '—'
+  }
+
+  return String(value)
 }
 
 function SectionCard({
