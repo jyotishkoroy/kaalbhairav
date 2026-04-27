@@ -1,8 +1,8 @@
-import { getAscendant } from '../engine/swiss'
-import { normalize360 } from './math'
-import { calculateSign } from './sign'
-import { calculateNakshatra } from './nakshatra'
-import { nearSignBoundary } from './boundary'
+import { getAscendant } from '../engine/swiss.ts'
+import { normalize360 } from './math.ts'
+import { calculateSign } from './sign.ts'
+import { calculateNakshatra } from './nakshatra.ts'
+import { nearSignBoundary } from './boundary.ts'
 
 export type LagnaReliability = 'high' | 'medium' | 'low' | 'not_available'
 

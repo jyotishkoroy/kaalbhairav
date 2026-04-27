@@ -1,6 +1,6 @@
-import { DASHA_SEQUENCE, DASHA_YEARS, NAKSHATRA_MAP, NAKSHATRA_SPAN, DASHA_YEAR_DAYS, VIMSHOTTARI_TOTAL_YEARS, type DashaLord } from './constants'
-import { normalize360 } from './math'
-import { nearNakshatraBoundary } from './boundary'
+import { DASHA_SEQUENCE, DASHA_YEARS, NAKSHATRA_MAP, NAKSHATRA_SPAN, DASHA_YEAR_DAYS, VIMSHOTTARI_TOTAL_YEARS, type DashaLord } from './constants.ts'
+import { normalize360 } from './math.ts'
+import { nearNakshatraBoundary } from './boundary.ts'
 
 export type DashaPeriod = {
   level: 'mahadasha' | 'antardasha' | 'pratyantardasha'

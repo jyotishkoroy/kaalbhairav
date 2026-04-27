@@ -1,7 +1,7 @@
-import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master'
-import type { AstrologySettings, BirthProfileInput } from '../types'
-import type { NormalizedBirthInput } from '../normalize'
-import { getAstroEngineServiceApiKey, getAstroEngineServiceUrl } from './backend'
+import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master.ts'
+import type { AstrologySettings, BirthProfileInput } from '../types.ts'
+import type { NormalizedBirthInput } from '../normalize.ts'
+import { getAstroEngineServiceApiKey, getAstroEngineServiceUrl } from './backend.ts'
 
 export type RemoteAstroRuntime = {
   user_id: string

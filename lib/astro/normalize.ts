@@ -1,4 +1,4 @@
-import type { BirthProfileInput, AstroWarning, BirthTimePrecision } from './types'
+import type { BirthProfileInput, AstroWarning, BirthTimePrecision } from './types.ts'
 
 export type NormalizedBirthInput = {
   input_hash_material_version: '2.0.0'

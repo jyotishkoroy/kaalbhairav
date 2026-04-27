@@ -1,5 +1,5 @@
-import type { ChartJson, PredictionContext, AstroExpandedSections } from './types'
-import type { DailyTransits, Panchang, CurrentTimingContext, NavamsaD9, BasicAspects, LifeAreaSignatures } from './engine/types'
+import type { ChartJson, PredictionContext, AstroExpandedSections } from './types.ts'
+import type { DailyTransits, Panchang, CurrentTimingContext, NavamsaD9, BasicAspects, LifeAreaSignatures } from './engine/types.ts'
 
 const UNSUPPORTED_FIELDS_WHEN_STUB = [
   'planetary_positions', 'lagna', 'houses', 'dashas',

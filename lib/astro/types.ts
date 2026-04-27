@@ -1,4 +1,4 @@
-import type { AstroExpandedSections } from './engine/types'
+import type { AstroExpandedSections } from './engine/types.ts'
 export type { AstroExpandedSections }
 
 export type UUID = string

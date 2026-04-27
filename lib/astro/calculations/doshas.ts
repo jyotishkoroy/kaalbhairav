@@ -1,6 +1,6 @@
-import type { D1Chart } from './d1'
-import type { GrahaDrishti } from './aspects'
-import type { PlanetPosition } from './planets'
+import type { D1Chart } from './d1.ts'
+import type { GrahaDrishti } from './aspects.ts'
+import type { PlanetPosition } from './planets.ts'
 
 export type DoshaResult = {
   dosha_id: string

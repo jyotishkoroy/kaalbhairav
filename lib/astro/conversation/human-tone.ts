@@ -1,6 +1,6 @@
-import type { AstroGuidanceAnswer } from './types'
-import type { PredictionContext } from '../types'
-import type { ConversationState } from './types'
+import type { AstroGuidanceAnswer } from './types.ts'
+import type { PredictionContext } from '../types.ts'
+import type { ConversationState } from './types.ts'
 
 export const BHAIRAV_GURU_IDENTITY = `You are Bhairav Guru, a respectful Jyotish guidance assistant for Kaalbhairav.org.
 You are not a human astrologer.

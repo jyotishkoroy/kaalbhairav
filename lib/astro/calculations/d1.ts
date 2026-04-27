@@ -1,8 +1,8 @@
-import { RASHI_MAP } from './constants'
-import type { PlanetPosition } from './planets'
-import type { LagnaResult } from './lagna'
-import type { WholeSignHouse } from './houses'
-import type { SignPlacement } from './sign'
+import { RASHI_MAP } from './constants.ts'
+import type { PlanetPosition } from './planets.ts'
+import type { LagnaResult } from './lagna.ts'
+import type { WholeSignHouse } from './houses.ts'
+import type { SignPlacement } from './sign.ts'
 
 export type D1PlanetPlacement = {
   planet: string

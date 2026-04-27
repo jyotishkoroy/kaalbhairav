@@ -1,4 +1,4 @@
-import { getSweVersion } from './swiss'
+import { getSweVersion } from './swiss.ts'
 
 export const ENGINE_VERSION_STUB = 'v2.0.0-stub'
 export const ENGINE_VERSION_REAL = 'v2.0.0-real-sweph'

@@ -1,4 +1,4 @@
-import type { ConversationState, AstroTopic } from './types'
+import type { ConversationState, AstroTopic } from './types.ts'
 
 const MAX_SUB_QUESTIONS = 3
 

@@ -1,4 +1,4 @@
-import { getLahiriAyanamsa } from '../engine/swiss'
+import { getLahiriAyanamsa } from '../engine/swiss.ts'
 
 export type AyanamsaResult = {
   name: 'lahiri'

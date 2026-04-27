@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AstroGuidanceAnswer } from './types'
+import type { AstroGuidanceAnswer } from './types.ts'
 
 const confidenceLabelSchema = z.enum(['low', 'medium', 'medium-high', 'high'])
 const confidenceInt = z.number().int().min(0).max(100)

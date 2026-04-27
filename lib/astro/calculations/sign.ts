@@ -1,6 +1,6 @@
-import { RASHI_MAP } from './constants'
-import { normalize360 } from './math'
-import { nearSignBoundary } from './boundary'
+import { RASHI_MAP } from './constants.ts'
+import { normalize360 } from './math.ts'
+import { nearSignBoundary } from './boundary.ts'
 
 export type SignPlacement = {
   sign: string

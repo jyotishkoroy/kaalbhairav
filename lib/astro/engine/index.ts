@@ -1,7 +1,7 @@
-import type { AstrologySettings, AstroWarning, CalculationStatus } from '../types'
-import type { NormalizedBirthInput } from '../normalize'
-import { getRuntimeEngineVersion, getRuntimeEphemerisVersion } from './version'
-import { runEngineReal } from './real'
+import type { AstrologySettings, AstroWarning, CalculationStatus } from '../types.ts'
+import type { NormalizedBirthInput } from '../normalize.ts'
+import { getRuntimeEngineVersion, getRuntimeEphemerisVersion } from './version.ts'
+import { runEngineReal } from './real.ts'
 
 export type EngineResult = {
   calculation_status: CalculationStatus

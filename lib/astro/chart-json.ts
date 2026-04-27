@@ -1,7 +1,7 @@
-import type { ChartJson, AstrologySettings, ConfidenceScore, AstroExpandedSections } from './types'
-import type { NormalizedBirthInput } from './normalize'
-import type { EngineResult } from './engine'
-import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from './engine/version'
+import type { ChartJson, AstrologySettings, ConfidenceScore, AstroExpandedSections } from './types.ts'
+import type { NormalizedBirthInput } from './normalize.ts'
+import type { EngineResult } from './engine/index.ts'
+import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from './engine/version.ts'
 
 export function buildChartJson(args: {
   user_id: string

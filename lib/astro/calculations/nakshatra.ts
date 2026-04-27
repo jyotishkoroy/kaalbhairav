@@ -1,6 +1,6 @@
-import { NAKSHATRA_MAP, NAKSHATRA_SPAN, PADA_SPAN } from './constants'
-import { normalize360 } from './math'
-import { nearNakshatraBoundary, nearPadaBoundary } from './boundary'
+import { NAKSHATRA_MAP, NAKSHATRA_SPAN, PADA_SPAN } from './constants.ts'
+import { normalize360 } from './math.ts'
+import { nearNakshatraBoundary, nearPadaBoundary } from './boundary.ts'
 
 export type NakshatraPlacement = {
   nakshatra: string

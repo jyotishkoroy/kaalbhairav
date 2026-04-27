@@ -1,9 +1,9 @@
-import { LIFE_AREA_HOUSE, SIGN_LORD_BY_SIGN_INDEX, RASHI_MAP } from './constants'
-import type { D1Chart } from './d1'
-import type { GrahaDrishti } from './aspects'
-import type { StrengthIndicator } from './strength'
-import type { LagnaResult } from './lagna'
-import type { LifeAreaSignatures, LifeAreaSignature as LegacyLifeAreaSignature, LifeArea, ZodiacSign, PlanetName } from '../engine/types'
+import { LIFE_AREA_HOUSE, SIGN_LORD_BY_SIGN_INDEX, RASHI_MAP } from './constants.ts'
+import type { D1Chart } from './d1.ts'
+import type { GrahaDrishti } from './aspects.ts'
+import type { StrengthIndicator } from './strength.ts'
+import type { LagnaResult } from './lagna.ts'
+import type { LifeAreaSignatures, LifeAreaSignature as LegacyLifeAreaSignature, LifeArea, ZodiacSign, PlanetName } from '../engine/types.ts'
 
 // ─── Master-spec Life Area Signature ──────────────────────────────────────
 

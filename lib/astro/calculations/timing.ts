@@ -1,4 +1,4 @@
-import type { CurrentTimingContext } from '../engine/types'
+import type { CurrentTimingContext } from '../engine/types.ts'
 
 export type TimingInput = {
   dasha_sequence: Array<{ lord: string; start_date: string; end_date: string }> | null

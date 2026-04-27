@@ -1,5 +1,5 @@
-import { RASHI_MAP } from './constants'
-import type { LagnaResult, LagnaReliability } from './lagna'
+import { RASHI_MAP } from './constants.ts'
+import type { LagnaResult, LagnaReliability } from './lagna.ts'
 
 export type WholeSignHouse = {
   house_number: number

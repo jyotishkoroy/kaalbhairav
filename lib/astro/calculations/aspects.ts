@@ -1,6 +1,6 @@
-import { aspectOffsets } from './constants'
-import type { D1Chart } from './d1'
-import type { BasicAspects, Aspect, PlanetName } from '../engine/types'
+import { aspectOffsets } from './constants.ts'
+import type { D1Chart } from './d1.ts'
+import type { BasicAspects, Aspect, PlanetName } from '../engine/types.ts'
 
 // ─── Master-spec Graha Drishti ─────────────────────────────────────────────
 

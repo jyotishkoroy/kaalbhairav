@@ -1,9 +1,9 @@
-import { RASHI_MAP, NAVAMSA_START } from './constants'
-import { normalize360 } from './math'
-import { nearNavamsaBoundary } from './boundary'
-import type { PlanetPosition } from './planets'
-import type { LagnaResult } from './lagna'
-import type { NavamsaD9, ZodiacSign, PlanetName, NavamsaPlanet } from '../engine/types'
+import { RASHI_MAP, NAVAMSA_START } from './constants.ts'
+import { normalize360 } from './math.ts'
+import { nearNavamsaBoundary } from './boundary.ts'
+import type { PlanetPosition } from './planets.ts'
+import type { LagnaResult } from './lagna.ts'
+import type { NavamsaD9, ZodiacSign, PlanetName, NavamsaPlanet } from '../engine/types.ts'
 
 // ─── New master-spec types ─────────────────────────────────────────────────
 

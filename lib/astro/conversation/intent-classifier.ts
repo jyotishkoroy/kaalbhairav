@@ -1,4 +1,4 @@
-import type { AstroTopic, ConversationSpecificity, IntentClassification } from './types'
+import type { AstroTopic, ConversationSpecificity, IntentClassification } from './types.ts'
 
 const TOPIC_KEYWORDS: Record<AstroTopic, string[]> = {
   career: ['job', 'work', 'meeting', 'manager', 'boss', 'client', 'promotion', 'interview', 'business', 'office', 'career', 'colleague', 'appraisal', 'employ'],

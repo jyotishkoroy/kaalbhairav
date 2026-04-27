@@ -1,5 +1,5 @@
-import type { PredictionContext } from '../types'
-import type { ConversationState } from './types'
+import type { PredictionContext } from '../types.ts'
+import type { ConversationState } from './types.ts'
 
 export type ConfidenceResult = {
   astrology_data_confidence: number

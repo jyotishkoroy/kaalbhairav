@@ -1,5 +1,5 @@
-import { normalize360 } from './math'
-import { TITHI_NAMES, BOUNDARY_THRESHOLD_DEGREES } from './constants'
+import { normalize360 } from './math.ts'
+import { TITHI_NAMES, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
 
 export type TithiResult = {
   moon_sun_angle: number

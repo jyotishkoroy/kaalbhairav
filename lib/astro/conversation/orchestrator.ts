@@ -1,10 +1,10 @@
-import type { OrchestratorInput, OrchestratorOutput, ConversationState, AstroTopic } from './types'
-import type { PredictionContext } from '../types'
-import { classifyIntent } from './intent-classifier'
-import { evaluateFollowUp } from './follow-up-policy'
-import { buildSystemPrompt, buildUserPrompt, buildSafeContext, renderFinalAnswer } from './human-tone'
-import { computeConfidence } from './confidence-scoring'
-import { parseAndValidate, SAFE_FALLBACK_ANSWER, SAFE_FALLBACK_RENDERED } from './answer-contract'
+import type { OrchestratorInput, OrchestratorOutput, ConversationState, AstroTopic } from './types.ts'
+import type { PredictionContext } from '../types.ts'
+import { classifyIntent } from './intent-classifier.ts'
+import { evaluateFollowUp } from './follow-up-policy.ts'
+import { buildSystemPrompt, buildUserPrompt, buildSafeContext, renderFinalAnswer } from './human-tone.ts'
+import { computeConfidence } from './confidence-scoring.ts'
+import { parseAndValidate, SAFE_FALLBACK_ANSWER, SAFE_FALLBACK_RENDERED } from './answer-contract.ts'
 
 const ORCHESTRATOR_VERSION = '1.0.0'
 const FORBIDDEN_KEYS = ['birth_date', 'birth_time', 'encrypted_birth_data', 'latitude', 'longitude']

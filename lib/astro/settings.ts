@@ -1,5 +1,5 @@
-import type { AstrologySettings } from './types'
-import { sha256Canonical } from './hashing'
+import type { AstrologySettings } from './types.ts'
+import { sha256Canonical } from './hashing.ts'
 
 export const DEFAULT_SETTINGS: AstrologySettings = {
   astrology_system: 'parashari',

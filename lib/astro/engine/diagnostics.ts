@@ -1,4 +1,4 @@
-import { initSwissEphemeris, getEphemerisRange, calcPlanet, getLahiriAyanamsa, SE_SUN, SEFLG_SWIEPH, type SwissEphStatus } from './swiss'
+import { initSwissEphemeris, getEphemerisRange, calcPlanet, getLahiriAyanamsa, SE_SUN, SEFLG_SWIEPH, type SwissEphStatus } from './swiss.ts'
 import { DateTime } from 'luxon'
 
 export type EngineBootDiagnostics = {
@@ -70,7 +70,7 @@ const EXPECTED_CONSTANTS: Record<string, number> = {
 import {
   SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN,
   SE_MEAN_NODE, SE_TRUE_NODE, SE_SIDM_LAHIRI, SEFLG_SPEED, SEFLG_SIDEREAL,
-} from './swiss'
+} from './swiss.ts'
 
 function verifyConstants(): { passed: boolean; mismatches: string[] } {
   const actual: Record<string, number> = {

@@ -1,18 +1,18 @@
 import { DateTime } from 'luxon'
-import { getSunriseOrSet, SE_CALC_RISE, SE_CALC_SET } from '../engine/swiss'
-import { calculateJulianDay } from './julian-day'
-import { sweJulday } from '../engine/swiss'
-import { calculateSign } from './sign'
-import { calculateNakshatra } from './nakshatra'
-import { normalize360 } from './math'
-import { nearYogaBoundary } from './boundary'
-import { YOGA_NAMES, VARA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants'
-import { calculateTithi, type TithiResult } from './tithi'
-import { calculateAyanamsa } from './ayanamsa'
-import { calculateAllPlanets } from './planets'
-import { assertEphemerisRange } from '../engine/diagnostics'
-import type { NakshatraPlacement } from './nakshatra'
-import type { SignPlacement } from './sign'
+import { getSunriseOrSet, SE_CALC_RISE, SE_CALC_SET } from '../engine/swiss.ts'
+import { calculateJulianDay } from './julian-day.ts'
+import { sweJulday } from '../engine/swiss.ts'
+import { calculateSign } from './sign.ts'
+import { calculateNakshatra } from './nakshatra.ts'
+import { normalize360 } from './math.ts'
+import { nearYogaBoundary } from './boundary.ts'
+import { YOGA_NAMES, VARA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
+import { calculateTithi, type TithiResult } from './tithi.ts'
+import { calculateAyanamsa } from './ayanamsa.ts'
+import { calculateAllPlanets } from './planets.ts'
+import { assertEphemerisRange } from '../engine/diagnostics.ts'
+import type { NakshatraPlacement } from './nakshatra.ts'
+import type { SignPlacement } from './sign.ts'
 
 export type PanchangResult = {
   panchang_local_date: string
@@ -220,7 +220,7 @@ export type PanchangInput = {
 
 export type PanchangInputLegacy = PanchangInput
 
-import type { Panchang, Vara as VaraType } from '../engine/types'
+import type { Panchang, Vara as VaraType } from '../engine/types.ts'
 
 const VARA_MAP_LEGACY: Record<number, VaraType> = {
   0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday',

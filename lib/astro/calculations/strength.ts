@@ -1,8 +1,8 @@
-import type { GrahaName } from './constants'
-import type { PlanetPosition } from './planets'
-import type { D1Chart } from './d1'
-import type { NavamsaChart } from './navamsa'
-import type { GrahaDrishti } from './aspects'
+import type { GrahaName } from './constants.ts'
+import type { PlanetPosition } from './planets.ts'
+import type { D1Chart } from './d1.ts'
+import type { NavamsaChart } from './navamsa.ts'
+import type { GrahaDrishti } from './aspects.ts'
 
 export type StrengthIndicator = {
   planet: string

@@ -1,9 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { calculateAstroEngine } from './calculate'
-import { astroEngineCalculationRequestSchema, astroEngineServiceResponseSchema } from '../../../lib/astro/schemas/engine-request'
-import { normalizeBirthInput } from '../../../lib/astro/normalize'
-import { astroV1ApiEnabled } from '../../../lib/astro/feature-flags'
-import { runStartupValidation } from '../../../lib/astro/engine/diagnostics'
+import { calculateAstroEngine } from './calculate.ts'
+import { astroEngineCalculationRequestSchema, astroEngineServiceResponseSchema } from '../../../lib/astro/schemas/engine-request.ts'
+import { normalizeBirthInput } from '../../../lib/astro/normalize.ts'
+import { astroV1ApiEnabled } from '../../../lib/astro/feature-flags.ts'
+import { runStartupValidation } from '../../../lib/astro/engine/diagnostics.ts'
 
 const port = Number(process.env.PORT ?? 3000)
 const apiKey = process.env.ASTRO_ENGINE_SERVICE_API_KEY?.trim() ?? ''

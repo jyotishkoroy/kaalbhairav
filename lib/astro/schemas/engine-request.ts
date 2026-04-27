@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { calculateRequestSchema } from './calculate'
-import { masterAstroOutputSchema } from './master'
+import { calculateRequestSchema } from './calculate.ts'
+import { masterAstroOutputSchema } from './master.ts'
 
 export const astroEngineCalculationRequestSchema = z.object({
   input: z.object({

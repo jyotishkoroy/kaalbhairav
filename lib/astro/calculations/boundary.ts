@@ -1,5 +1,5 @@
-import { BOUNDARY_THRESHOLD_DEGREES, NAKSHATRA_SPAN, PADA_SPAN, SIGN_SPAN_DEGREES } from './constants'
-import { normalize360 } from './math'
+import { BOUNDARY_THRESHOLD_DEGREES, NAKSHATRA_SPAN, PADA_SPAN, SIGN_SPAN_DEGREES } from './constants.ts'
+import { normalize360 } from './math.ts'
 
 export function nearSignBoundary(sidereal: number): boolean {
   const pos = normalize360(sidereal) % SIGN_SPAN_DEGREES
