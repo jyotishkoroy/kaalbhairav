@@ -3,7 +3,9 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { chatRequestSchema } from '@/lib/astro/schemas/chat'
-import { astroV1ChatEnabled } from '@/lib/astro/feature-flags'
+import { astroV1ChatEnabled, astroConversationOrchestratorEnabled } from '@/lib/astro/feature-flags'
+import { runOrchestrator } from '@/lib/astro/conversation/orchestrator'
+import type { PredictionContext } from '@/lib/astro/types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -36,10 +38,13 @@ Required disclaimer when relevant: "This is offered for reflection and symbolic 
 
 Respond in the user's language (English or Hindi). Be warm, grounded, brief.`
 
+const FORBIDDEN_KEYS = ['birth_date', 'birth_time', 'encrypted_birth_data', 'latitude', 'longitude']
+
 export async function POST(req: NextRequest) {
   if (!astroV1ChatEnabled()) {
     return Response.json({ error: 'astro_v1_chat_disabled' }, { status: 503 })
   }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'unauthenticated' }, { status: 401 })
@@ -64,7 +69,7 @@ export async function POST(req: NextRequest) {
     .select('id, prediction_context, chart_version_id')
     .eq('profile_id', profile_id)
     .eq('user_id', user.id)
-    .eq('topic', topic ?? 'general')
+    .eq('topic', 'general')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -73,9 +78,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'no_context', message: 'Please calculate your chart first.' }, { status: 404 })
   }
 
-  // Safety gate — reject if forbidden keys appear in payload destined for LLM
   const ctxStr = JSON.stringify(summary.prediction_context)
-  const FORBIDDEN_KEYS = ['birth_date', 'birth_time', 'encrypted_birth_data', 'latitude', 'longitude']
   for (const k of FORBIDDEN_KEYS) {
     if (ctxStr.includes(`"${k}"`)) {
       console.error('safety_gate_triggered', k)
@@ -114,6 +117,86 @@ export async function POST(req: NextRequest) {
   })
 
   const encoder = new TextEncoder()
+
+  if (astroConversationOrchestratorEnabled()) {
+    // --- Orchestrator path ---
+    const { data: recentRows } = await service
+      .from('astro_chat_messages')
+      .select('classifier_result')
+      .eq('session_id', sessionId)
+      .eq('role', 'assistant')
+      .not('classifier_result', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(6)
+
+    const recentMetadata = recentRows?.map((r) => r.classifier_result).filter(Boolean) ?? []
+
+    const predictionContext = summary.prediction_context as PredictionContext
+
+    const result = await runOrchestrator(
+      {
+        user_id: user.id,
+        profile_id,
+        session_id: sessionId,
+        question,
+        recent_message_metadata: recentMetadata,
+      },
+      predictionContext,
+    )
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (type: string, data: Record<string, unknown>) => {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type, ...data })}\n\n`),
+          )
+        }
+
+        send('meta', { remaining: remaining - 1, session_id: sessionId })
+
+        let assistantContent: string
+        let validationStatus: string
+
+        if (result.mode === 'clarifying_question') {
+          send('clarifying_question', { question: result.clarifying_question })
+          assistantContent = result.clarifying_question
+          validationStatus = 'clarifying_question'
+        } else {
+          send('final_answer', { answer: result.answer, rendered: result.rendered })
+          assistantContent = result.rendered
+          validationStatus = result.metadata.validation_status as string ?? 'unknown'
+        }
+
+        await service.from('astro_chat_messages').insert({
+          session_id: sessionId,
+          user_id: user.id,
+          profile_id,
+          chart_version_id: summary.chart_version_id,
+          prediction_context_id: summary.id,
+          role: 'assistant',
+          content: assistantContent,
+          topic: result.state.topic ?? 'general',
+          model_used: result.mode === 'final_answer' ? 'groq/llama-3.3-70b' : null,
+          classifier_result: result.metadata,
+          validation_status: validationStatus,
+        })
+
+        send('done', { session_id: sessionId })
+        controller.close()
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    })
+  }
+
+  // --- Legacy streaming path (orchestrator disabled) ---
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: string, data: Record<string, unknown>) => {

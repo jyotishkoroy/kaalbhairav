@@ -1,4 +1,4 @@
-import type { ChartJson, AstrologySettings, ConfidenceScore } from './types'
+import type { ChartJson, AstrologySettings, ConfidenceScore, AstroExpandedSections } from './types'
 import type { NormalizedBirthInput } from './normalize'
 import type { EngineResult } from './engine'
 import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from './engine/version'
@@ -14,6 +14,7 @@ export function buildChartJson(args: {
   normalized: NormalizedBirthInput
   settings: AstrologySettings
   engine: EngineResult
+  expanded_sections?: AstroExpandedSections
 }): ChartJson {
   const overallConfidence: ConfidenceScore =
     args.engine.calculation_status === 'stub'
@@ -66,5 +67,6 @@ export function buildChartJson(args: {
       warnings: args.engine.warnings,
     },
     audit: args.engine.audit,
+    expanded_sections: args.expanded_sections,
   }
 }

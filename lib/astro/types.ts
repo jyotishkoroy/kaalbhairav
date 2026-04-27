@@ -1,3 +1,6 @@
+import type { AstroExpandedSections } from './engine/types'
+export type { AstroExpandedSections }
+
 export type UUID = string
 export type ISODate = string
 export type ISODateTime = string
@@ -51,7 +54,7 @@ export type AstrologySettings = {
   dasha_year_basis: 'civil_365.2425' | 'sidereal_365.25' | 'traditional_360'
 }
 
-export type CalculationStatus = 'stub' | 'real' | 'partial' | 'failed'
+export type CalculationStatus = 'stub' | 'real' | 'partial' | 'failed' | 'error'
 
 export type ChartIdentity = {
   user_id: UUID
@@ -93,12 +96,12 @@ export type ChartJson = {
     warnings: AstroWarning[]
   }
   audit: { sources: string[]; engine_modules: string[]; notes: string[] }
+  expanded_sections?: AstroExpandedSections
 }
 
 export type PredictionContext = {
   do_not_recalculate: true
   chart_identity: {
-    profile_id: UUID
     chart_version_id: UUID
     schema_version: string
     engine_version: string
@@ -112,6 +115,16 @@ export type PredictionContext = {
   current_timing: Record<string, unknown>
   dashas: Record<string, unknown>
   doshas: Record<string, unknown>
+  expanded_context?: {
+    daily_transits_summary: string | null
+    panchang_summary: string | null
+    current_timing_summary: string | null
+    navamsa_lagna: string | null
+    navamsa_summary: string | null
+    aspects_summary: string | null
+    life_areas_summary: string | null
+    sections_unavailable: string[]
+  }
   allowed_astro_terms: string[]
   unsupported_fields: string[]
   llm_instructions: {

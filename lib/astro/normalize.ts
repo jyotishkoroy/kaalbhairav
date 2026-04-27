@@ -1,7 +1,7 @@
 import type { BirthProfileInput, AstroWarning, BirthTimePrecision } from './types'
 
 export type NormalizedBirthInput = {
-  input_hash_material_version: '1.0.0'
+  input_hash_material_version: '2.0.0'
   birth_date_iso: string
   birth_time_iso: string | null
   birth_time_known: boolean
@@ -9,6 +9,10 @@ export type NormalizedBirthInput = {
   birth_time_uncertainty_seconds: number
   timezone: string
   timezone_status: 'valid' | 'invalid' | 'ambiguous' | 'unknown'
+  // Full precision for astronomical calculation (no rounding)
+  latitude_full: number
+  longitude_full: number
+  // Rounded for display/hashing (3 decimal places)
   latitude_rounded: number
   longitude_rounded: number
   coordinate_confidence: number
@@ -41,10 +45,16 @@ export function normalizeBirthInput(input: BirthProfileInput): NormalizedBirthIn
       confidence_impact: -25,
     })
   }
-  const latitudeRounded = Math.round(input.latitude * 1000) / 1000
-  const longitudeRounded = Math.round(input.longitude * 1000) / 1000
+
+  // Full precision for astronomical calculations
+  const latitude_full = input.latitude
+  const longitude_full = input.longitude
+  // Display/hash precision (3 decimal places ≈ 110m)
+  const latitude_rounded = Math.round(input.latitude * 1000) / 1000
+  const longitude_rounded = Math.round(input.longitude * 1000) / 1000
+
   return {
-    input_hash_material_version: '1.0.0',
+    input_hash_material_version: '2.0.0',
     birth_date_iso: input.birth_date,
     birth_time_iso: input.birth_time ?? null,
     birth_time_known: input.birth_time_known,
@@ -52,9 +62,11 @@ export function normalizeBirthInput(input: BirthProfileInput): NormalizedBirthIn
     birth_time_uncertainty_seconds: PRECISION_TO_UNCERTAINTY[input.birth_time_precision],
     timezone: input.timezone,
     timezone_status: timezoneStatus,
-    latitude_rounded: latitudeRounded,
-    longitude_rounded: longitudeRounded,
-    coordinate_confidence: 0.85,
+    latitude_full,
+    longitude_full,
+    latitude_rounded,
+    longitude_rounded,
+    coordinate_confidence: 0.95,
     warnings,
   }
 }
