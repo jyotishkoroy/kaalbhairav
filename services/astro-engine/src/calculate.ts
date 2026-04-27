@@ -1,6 +1,6 @@
-import type { AstrologySettings, BirthProfileInput } from '../../../lib/astro/types'
-import type { NormalizedBirthInput } from '../../../lib/astro/normalize'
-import { calculateMasterAstroOutput } from '../../../lib/astro/calculations/master'
+import type { AstrologySettings, BirthProfileInput } from '../../../lib/astro/types.ts'
+import type { NormalizedBirthInput } from '../../../lib/astro/normalize.ts'
+import { calculateMasterAstroOutput } from '../../../lib/astro/calculations/master.ts'
 
 export async function calculateAstroEngine(args: {
   input: BirthProfileInput

@@ -5,5 +5,7 @@ services:
       dockerfile: services/astro-engine/Dockerfile
     environment:
       PORT: "3000"
+      ASTRO_V1_API_ENABLED: "true"
+      SWISS_EPHE_PATH: "/app/ephe"
     ports:
       - "3000:3000"

@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
+import { createRequire } from 'module'
 
 // ─── Swiss Ephemeris numeric constants ────────────────────────────────────
 // Hardcoded because sweph npm package does not export them as JS properties.
@@ -109,6 +110,7 @@ export type SwissEphStatus = {
 let _sweph: SwephInstance | null = null
 let _initialized = false
 let _status: SwissEphStatus | null = null
+const require = createRequire(import.meta.url)
 
 // ─── Resolve ephemeris path ───────────────────────────────────────────────
 
@@ -183,10 +185,8 @@ export function initSwissEphemeris(): SwissEphStatus {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     _sweph = require('sweph') as SwephInstance
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const pkg = require('sweph/package.json') as { version?: string }
       swePackageVersion = `sweph@${pkg.version ?? 'unknown'}`
     } catch {

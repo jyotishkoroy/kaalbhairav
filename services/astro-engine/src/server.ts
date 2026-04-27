@@ -79,7 +79,13 @@ export async function handleAstroEngineRequest(req: IncomingMessage, res: Server
   }
   const parsed = astroEngineCalculationRequestSchema.safeParse(requestBody)
   if (!parsed.success) {
-    sendJson(400, { error: 'invalid_input', issues: parsed.error.issues })
+    sendJson(400, {
+      error: 'invalid_input',
+      issues: parsed.error.issues.map(issue => ({
+        path: issue.path.map(segment => String(segment)),
+        message: issue.message,
+      })),
+    })
     return
   }
 
