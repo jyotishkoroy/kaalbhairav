@@ -251,6 +251,85 @@ describe('profile chart json adapter', () => {
     expect(rowsOf(expanded.planetary_aspects)[0]?.summary).toBe('Sun → Moon: graha drishti 7th')
   })
 
+  it('maps the v2 planetary_aspects_drishti shape into house summaries', () => {
+    const expanded = buildProfileExpandedSectionsFromMasterOutput({
+      calculation_status: 'calculated',
+      planetary_aspects_drishti: {
+        status: 'real',
+        calculated_at: '2026-01-01T00:00:00.000Z',
+        aspects: [
+          {
+            source_planet: 'Sun',
+            source_house: 10,
+            aspect_offset: 7,
+            target_house: 4,
+            target_sign_index: 7,
+            tradition: 'classical_default',
+            reliability: 'high',
+          },
+        ],
+      },
+      d1_rashi_chart: {
+        houses: [
+          { house_number: 4, sign: 'Scorpio', sign_index: 7 },
+        ],
+        occupying_planets_by_house: {
+          '4': [],
+        },
+      },
+    } as never)
+
+    expect(expanded.planetary_aspects?.status).toBe('real')
+    expect(rowsOf(expanded.planetary_aspects)).toHaveLength(1)
+    expect(rowsOf(expanded.planetary_aspects)[0]).toMatchObject({
+      from: 'Sun',
+      to: 'House 4',
+      type: '7th drishti',
+      source_house: 10,
+      target_house: 4,
+      target_sign: 'Scorpio',
+      strength: 'high',
+      tradition: 'classical default',
+      summary: 'Sun aspects House 4 (Scorpio) — 7th drishti',
+    })
+  })
+
+  it('expands v2 aspects into one row per occupied target planet', () => {
+    const expanded = buildProfileExpandedSectionsFromMasterOutput({
+      calculation_status: 'calculated',
+      planetary_aspects_drishti: {
+        status: 'real',
+        calculated_at: '2026-01-01T00:00:00.000Z',
+        aspects: [
+          {
+            source_planet: 'Saturn',
+            source_house: 9,
+            aspect_offset: 3,
+            target_house: 11,
+            target_sign_index: 2,
+            tradition: 'classical_default',
+            reliability: 'high',
+          },
+        ],
+      },
+      d1_rashi_chart: {
+        houses: [
+          { house_number: 11, sign: 'Gemini', sign_index: 2 },
+        ],
+        occupying_planets_by_house: {
+          '11': ['Moon', 'Mercury'],
+        },
+      },
+    } as never)
+
+    expect(expanded.planetary_aspects?.status).toBe('real')
+    expect(rowsOf(expanded.planetary_aspects)).toHaveLength(2)
+    expect(rowsOf(expanded.planetary_aspects).map((row) => row.summary)).toEqual([
+      'Saturn aspects Moon in House 11 (Gemini) — Saturn 3rd drishti',
+      'Saturn aspects Mercury in House 11 (Gemini) — Saturn 3rd drishti',
+    ])
+  })
+
   it('normalizes life area signatures into useful summaries', () => {
     const expanded = buildProfileExpandedSectionsFromMasterOutput({
       calculation_status: 'calculated',

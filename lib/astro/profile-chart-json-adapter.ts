@@ -56,7 +56,17 @@ export type NavamsaDisplay = {
   warnings: string[]
 }
 
-export type AspectDisplayRow = { from: string; to: string; type: string; strength?: string | number | null; summary: string }
+export type AspectDisplayRow = {
+  from: string
+  to: string
+  type: string
+  source_house: number | string | null
+  target_house: number | string | null
+  target_sign: string | null
+  strength?: string | number | null
+  tradition: string | null
+  summary: string
+}
 export type AspectDisplay = {
   status: 'real' | 'partial' | 'not_available'
   calculated_at: string
@@ -125,6 +135,15 @@ function displayString(value: unknown): string | null {
   return null
 }
 
+function displayNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
 function objectEntriesToRecords(value: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(value)) {
     return value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item))
@@ -186,6 +205,49 @@ function adaptHouses(output: MasterAstroCalculationOutput): Record<string, unkno
 
 function adaptD1Chart(output: MasterAstroCalculationOutput): Record<string, unknown> {
   return toRecord((output as MaybeObject)?.d1_rashi_chart ?? (output as MaybeObject)?.d1_chart)
+}
+
+function houseSignFromD1(output: MasterAstroCalculationOutput, houseNumber: number | string | null | undefined): string | null {
+  const house = displayNumber(houseNumber)
+  if (house == null) return null
+  const d1 = adaptD1Chart(output)
+  const houses = toArray(d1.houses)
+  const match = houses.find((item) => {
+    const row = toRecord(item)
+    return displayNumber(row.house_number) === house
+  })
+  return displayString(match ? toRecord(match).sign : null)
+}
+
+function occupantsForHouse(output: MasterAstroCalculationOutput, houseNumber: number | string | null | undefined): string[] {
+  const house = displayNumber(houseNumber)
+  if (house == null) return []
+  const d1 = adaptD1Chart(output)
+  const occupants = toRecord(d1.occupying_planets_by_house)
+  const value = occupants[String(house)]
+  return Array.isArray(value) ? value.map(displayString).filter((planet): planet is string => !!planet) : []
+}
+
+function aspectTypeFromOffset(offset: unknown, planet?: unknown): string | null {
+  const planetName = displayString(planet)
+  const numericOffset =
+    typeof offset === 'number'
+      ? offset
+      : typeof offset === 'string' && offset.trim() !== ''
+        ? Number(offset)
+        : NaN
+
+  if (!Number.isFinite(numericOffset)) return null
+
+  if (planetName === 'Mars' && numericOffset === 4) return 'Mars 4th drishti'
+  if (planetName === 'Mars' && numericOffset === 8) return 'Mars 8th drishti'
+  if (planetName === 'Jupiter' && numericOffset === 5) return 'Jupiter 5th drishti'
+  if (planetName === 'Jupiter' && numericOffset === 9) return 'Jupiter 9th drishti'
+  if (planetName === 'Saturn' && numericOffset === 3) return 'Saturn 3rd drishti'
+  if (planetName === 'Saturn' && numericOffset === 10) return 'Saturn 10th drishti'
+  if (numericOffset === 7) return '7th drishti'
+
+  return `${numericOffset}th drishti`
 }
 
 function adaptDailyTransits(output: MasterAstroCalculationOutput): DailyTransitDisplay {
@@ -386,7 +448,56 @@ function adaptAspects(output: MasterAstroCalculationOutput): AspectDisplay {
     (output as MaybeObject)?.drishti
   const record = toRecord(source)
   if (!source) {
-    return { status: 'not_available', calculated_at: nowISO(), rows: [], warnings: ['Aspects were not returned by the calculator.'] }
+    const d1 = adaptD1Chart(output)
+    const planetToHouse = toRecord(d1.planet_to_house)
+    const houseEntries = Object.entries(planetToHouse).flatMap(([planet, rawHouse]) => {
+      const house = displayNumber(rawHouse)
+      if (house == null) return []
+      return [{ planet, house }]
+    })
+    if (houseEntries.length === 0) {
+      return { status: 'not_available', calculated_at: nowISO(), rows: [], warnings: ['Aspects were not returned by the calculator.'] }
+    }
+    const fallbackRows = []
+    for (const { planet, house } of houseEntries) {
+      const type = '7th drishti'
+      const targetHouse = ((house - 1 + 7 - 1 + 12) % 12) + 1
+      const targetSign = houseSignFromD1(output, targetHouse)
+      const occupants = occupantsForHouse(output, targetHouse)
+      if (occupants.length > 0) {
+        for (const target of occupants) {
+          fallbackRows.push({
+            from: planet,
+            to: target,
+            type,
+            source_house: house,
+            target_house: targetHouse,
+            target_sign: targetSign,
+            strength: null,
+            tradition: null,
+            summary: targetSign ? `${planet} aspects ${target} in House ${targetHouse} (${targetSign}) — ${type}` : `${planet} aspects ${target} in House ${targetHouse} — ${type}`,
+          })
+        }
+      } else {
+        fallbackRows.push({
+          from: planet,
+          to: `House ${targetHouse}`,
+          type,
+          source_house: house,
+          target_house: targetHouse,
+          target_sign: targetSign,
+          strength: null,
+          tradition: null,
+          summary: targetSign ? `${planet} aspects House ${targetHouse} (${targetSign}) — ${type}` : `${planet} aspects House ${targetHouse} — ${type}`,
+        })
+      }
+    }
+    return {
+      status: fallbackRows.length > 0 ? 'real' : 'partial',
+      calculated_at: nowISO(),
+      rows: fallbackRows,
+      warnings: fallbackRows.length > 0 ? [] : ['Aspect data exists but no displayable aspect rows were found.'],
+    }
   }
   const aspectItems = Array.isArray(source)
     ? source
@@ -399,15 +510,46 @@ function adaptAspects(output: MasterAstroCalculationOutput): AspectDisplay {
           : objectEntriesToRecords(record.aspects ?? source)
   const rows = aspectItems.flatMap((item) => {
     const row = toRecord(item)
-    const from = displayString(row.aspecting_planet ?? row.from ?? row.source ?? row.planet ?? row.graha)
-    const to = displayString(row.aspected_planet ?? row.to ?? row.target ?? row.aspected ?? row.receiver)
-    const type = displayString(row.aspect_type ?? row.type ?? row.aspect ?? row.drishti_type ?? row.relationship)
-    const strength = displayString(row.strength ?? row.score ?? row.weight)
-    const summary = displayString(row.summary) ?? displayString(row.label)
-    if (!summary && (!from || !to || !type)) return []
-    const resolvedSummary = summary ?? (from && to && type ? `${from} → ${to}: ${type}` : from && to ? `${from} → ${to}` : null)
-    if (!resolvedSummary) return []
-    return [{ from: from ?? 'Unknown', to: to ?? 'Unknown', type: type ?? 'Unknown', strength: strength ?? null, summary: resolvedSummary }]
+    const from = displayString(row.aspecting_planet ?? row.from ?? row.source ?? row.planet ?? row.graha ?? row.source_planet)
+    const sourceHouse = displayNumber(row.source_house)
+    const targetHouse = displayNumber(row.target_house ?? row.aspected_house)
+    const targetHouseSource = (row.target_house ?? row.aspected_house) as number | string | null | undefined
+    const targetSign = displayString(row.target_sign ?? row.target_sign_name)
+      ?? houseSignFromD1(output, targetHouse ?? targetHouseSource)
+    const type =
+      displayString(row.aspect_type ?? row.type ?? row.aspect ?? row.drishti_type ?? row.relationship)
+      ?? aspectTypeFromOffset(row.aspect_offset, row.source_planet ?? from)
+    const strength = displayString(row.strength ?? row.score ?? row.weight ?? row.reliability)
+    const tradition = displayString(row.tradition)
+    const targetOccupants = occupantsForHouse(output, targetHouse)
+    const summary =
+      targetHouse != null && targetOccupants.length > 0 && from && type
+        ? targetOccupants.flatMap((target) => {
+            const resolvedTargetSign = targetSign ?? houseSignFromD1(output, targetHouse)
+            if (!resolvedTargetSign) {
+              return [`${from} aspects ${target} in House ${targetHouse} — ${type}`]
+            }
+            return [`${from} aspects ${target} in House ${targetHouse} (${resolvedTargetSign}) — ${type}`]
+          })
+        : targetHouse != null && from && type
+          ? [targetSign ? `${from} aspects House ${targetHouse} (${targetSign}) — ${type}` : `${from} aspects House ${targetHouse} — ${type}`]
+          : from && displayString(row.to ?? row.aspected_planet ?? row.target ?? row.receiver)
+            ? [displayString(row.summary) ?? `${from} → ${displayString(row.to ?? row.aspected_planet ?? row.target ?? row.receiver)}: ${type ?? 'Unknown'}`]
+            : displayString(row.summary) || displayString(row.label)
+              ? [displayString(row.summary) ?? displayString(row.label) ?? '']
+              : []
+    if (summary.length === 0) return []
+    return summary.map((entry, index) => ({
+      from: from ?? 'Unknown',
+      to: targetOccupants[index] ?? (displayString(row.to ?? row.aspected_planet ?? row.target ?? row.receiver) ?? (targetHouse != null ? `House ${targetHouse}` : 'Unknown')),
+      type: type ?? 'Unknown',
+      source_house: sourceHouse,
+      target_house: targetHouse,
+      target_sign: targetSign,
+      strength: strength ?? null,
+      tradition: tradition ?? null,
+      summary: entry,
+    }))
   })
   const warnings = filterStringArray(record.warnings)
   if (!rows.length) warnings.push('Aspect data exists but no displayable aspect rows were found.')
