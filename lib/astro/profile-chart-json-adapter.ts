@@ -16,6 +16,10 @@ function mapStatus(status: string | undefined): DailyTransits['status'] | Pancha
   return 'not_available'
 }
 
+function filterStringArray(values: unknown): string[] {
+  return Array.isArray(values) ? values.filter((entry): entry is string => typeof entry === 'string') : []
+}
+
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 }
@@ -42,6 +46,24 @@ function mapChartStatus(status: string | undefined): ChartJson['metadata']['calc
   return 'real'
 }
 
+export function formatProfileChartStatus(status: unknown): string {
+  switch (status) {
+    case 'calculated':
+    case 'real':
+      return 'Real'
+    case 'partial':
+      return 'Partial'
+    case 'failed':
+    case 'error':
+    case 'rejected':
+      return 'Failed'
+    case 'stub':
+      return 'Stub'
+    default:
+      return 'Unknown'
+  }
+}
+
 function adaptPlanets(output: MasterAstroCalculationOutput): Record<string, unknown> {
   return toRecord((output as MaybeObject)?.planetary_positions)
 }
@@ -65,12 +87,16 @@ function adaptDailyTransits(output: MasterAstroCalculationOutput): DailyTransits
     }
   }
 
-  const transits = Array.isArray(source.transit_planets) ? source.transit_planets : []
+  const transits = Array.isArray(source.transits)
+    ? source.transits
+    : Array.isArray(source.transit_planets)
+      ? source.transit_planets
+      : []
   return {
     status: mapStatus(typeof source.status === 'string' ? source.status : undefined) as DailyTransits['status'],
     calculated_at: typeof source.current_utc === 'string' ? source.current_utc : (typeof source.calculated_at === 'string' ? source.calculated_at : nowISO()),
     transits: transits as TransitPlanet[],
-    warnings: Array.isArray(source.warnings) ? source.warnings.filter((warning): warning is string => typeof warning === 'string') : [],
+    warnings: filterStringArray(source.warnings),
   }
 }
 
@@ -93,9 +119,9 @@ function adaptPanchang(output: MasterAstroCalculationOutput): Panchang {
   }
 
   return {
-    status: mapStatus(typeof source.status === 'string' ? source.status : undefined) as Panchang['status'],
+    status: mapStatus(typeof source.status === 'string' ? source.status : (source.calculation_status as string | undefined)) as Panchang['status'],
     calculated_at: typeof source.calculation_instant_utc === 'string' ? source.calculation_instant_utc : (typeof source.calculated_at === 'string' ? source.calculated_at : nowISO()),
-    date_local: typeof source.panchang_local_date === 'string' ? source.panchang_local_date : '',
+    date_local: typeof source.panchang_local_date === 'string' ? source.panchang_local_date : (typeof source.date_local === 'string' ? source.date_local : ''),
     vara: asVara(source.vara),
     tithi: (source.tithi as Panchang['tithi']) ?? null,
     nakshatra: asNakshatra(source.nakshatra),
@@ -103,13 +129,16 @@ function adaptPanchang(output: MasterAstroCalculationOutput): Panchang {
     karana: asKarana(source.karana),
     sunrise_utc: typeof source.sunrise_utc === 'string' ? source.sunrise_utc : null,
     sunset_utc: typeof source.sunset_utc === 'string' ? source.sunset_utc : null,
-    warnings: Array.isArray(source.warnings) ? source.warnings.filter((warning): warning is string => typeof warning === 'string') : [],
+    warnings: filterStringArray(source.warnings),
   }
 }
 
 function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput): CurrentTimingContext {
   const source = (output as MaybeObject)?.vimshottari_dasha as Record<string, unknown> | undefined
-  if (!source) {
+  const currentDasha = source ? toRecord(source.current_dasha) : {}
+  const hasCurrentDasha = !!(currentDasha.mahadasha || currentDasha.antardasha || currentDasha.pratyantardasha)
+
+  if (!source || !hasCurrentDasha) {
     return {
       status: 'not_available',
       calculated_at: nowISO(),
@@ -122,7 +151,9 @@ function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput)
     }
   }
 
-  const currentDasha = toRecord(source.current_dasha)
+  const currentMahadasha = currentDasha.mahadasha ?? source.current_mahadasha ?? null
+  const currentAntardasha = currentDasha.antardasha ?? source.current_antardasha ?? null
+  const currentPratyantardasha = currentDasha.pratyantardasha ?? source.current_pratyantardasha ?? null
   const elapsed = typeof source.dasha_elapsed_years === 'number' ? source.dasha_elapsed_years : null
   const total = typeof source.dasha_total_years === 'number' ? source.dasha_total_years : null
   const elapsedPercent = elapsed != null && total != null && Number.isFinite(elapsed) && Number.isFinite(total) && total > 0
@@ -132,12 +163,12 @@ function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput)
   return {
     status: 'real',
     calculated_at: nowISO(),
-    current_mahadasha: (currentDasha.mahadasha as DashaPeriod | null) ?? null,
-    current_antardasha: (currentDasha.antardasha as DashaPeriod | null) ?? null,
-    current_pratyantardasha: (currentDasha.pratyantardasha as DashaPeriod | null) ?? null,
+    current_mahadasha: currentMahadasha as DashaPeriod | null,
+    current_antardasha: currentAntardasha as DashaPeriod | null,
+    current_pratyantardasha: currentPratyantardasha as DashaPeriod | null,
     transiting_lagna_sign: null,
     elapsed_dasha_percent: elapsedPercent,
-    warnings: Array.isArray(source.boundary_warnings) ? source.boundary_warnings.filter((warning): warning is string => typeof warning === 'string') : [],
+    warnings: filterStringArray(source.boundary_warnings ?? source.warnings),
   }
 }
 
@@ -147,6 +178,14 @@ export function buildProfileExpandedSectionsFromMasterOutput(output: MasterAstro
     panchang: adaptPanchang(output),
     current_timing: adaptCurrentTimingFromVimshottari(output),
   }
+}
+
+export function buildProfileExpandedSectionsFromStoredChartJson(chartJson: Record<string, unknown> | null | undefined): AstroExpandedSections | null {
+  if (!chartJson) return null
+  const storedExpanded = chartJson.expanded_sections as AstroExpandedSections | undefined
+  if (storedExpanded) return storedExpanded
+  if (!chartJson.astronomical_data) return null
+  return buildProfileExpandedSectionsFromMasterOutput(chartJson.astronomical_data as MasterAstroCalculationOutput)
 }
 
 export function buildProfileChartJsonFromMasterOutput(args: {

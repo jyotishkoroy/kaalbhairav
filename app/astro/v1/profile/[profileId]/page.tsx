@@ -15,7 +15,7 @@ import type {
 import { calculateNavamsa } from '@/lib/astro/calculations/navamsa'
 import { calculateAspects } from '@/lib/astro/calculations/aspects'
 import { calculateLifeAreaSignatures } from '@/lib/astro/calculations/life-areas'
-import { buildProfileExpandedSectionsFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
+import { buildProfileExpandedSectionsFromStoredChartJson, formatProfileChartStatus } from '@/lib/astro/profile-chart-json-adapter'
 
 type Props = {
   params: Promise<{ profileId: string }>
@@ -52,14 +52,6 @@ export default async function ProfilePage({ params }: Props) {
 
   if (!profile) notFound()
 
-  const { data: calculation } = await supabase
-    .from('chart_calculations')
-    .select('id, status, engine_version, ephemeris_version, created_at, error_message')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
   const { data: chartVersion } = await supabase
     .from('chart_json_versions')
     .select('id, schema_version, engine_version, created_at, chart_json')
@@ -77,13 +69,13 @@ export default async function ProfilePage({ params }: Props) {
     .single()
 
   const isStub = !chartVersion || (chartVersion.engine_version?.includes('stub') ?? true)
-  const calculationStatus = calculation?.status ?? 'none'
 
   const chartMeta = chartVersion?.chart_json
     ? (chartVersion.chart_json as Record<string, unknown>)
     : null
-  const storedCalcStatus = (chartMeta?.metadata as Record<string, unknown> | undefined)?.calculation_status as string | undefined
-  const engineMode = storedCalcStatus === 'real' ? 'real' : 'stub'
+  const chartMetadata = (chartMeta?.metadata as Record<string, unknown> | undefined) ?? undefined
+  const storedCalcStatus = chartMetadata?.calculation_status as string | undefined
+  const engineMode = storedCalcStatus === 'real' || storedCalcStatus === 'calculated' ? 'real' : 'stub'
 
   const planetsRaw = chartMeta?.planets as Record<string, {
     sidereal_longitude: number; sign: string; sign_index: number; is_retrograde?: boolean
@@ -134,17 +126,42 @@ export default async function ProfilePage({ params }: Props) {
     }),
   ])
 
-  const storedExpanded = chartMeta?.expanded_sections as Record<string, unknown> | undefined
-  const fallbackExpanded = chartMeta?.astronomical_data
-    ? buildProfileExpandedSectionsFromMasterOutput(chartMeta.astronomical_data as never)
-    : undefined
-  const mergedExpanded = {
-    ...fallbackExpanded,
-    ...storedExpanded,
-  } as Record<string, unknown> | undefined
-  const dailyTransits = mergedExpanded?.daily_transits as DailyTransits | undefined
-  const panchang = mergedExpanded?.panchang as Panchang | undefined
-  const currentTiming = mergedExpanded?.current_timing as CurrentTimingContext | undefined
+  const expandedSections = buildProfileExpandedSectionsFromStoredChartJson(chartMeta)
+  const dailyTransits = expandedSections?.daily_transits as DailyTransits | undefined
+  const panchang = expandedSections?.panchang as Panchang | undefined
+  const currentTiming = expandedSections?.current_timing as CurrentTimingContext | undefined
+  const storedExpandedRecord = chartMeta?.expanded_sections as Record<string, unknown> | undefined
+  const fallbackExpandedRecord = (!storedExpandedRecord && chartMeta?.astronomical_data)
+    ? (buildProfileExpandedSectionsFromStoredChartJson(chartMeta) as Record<string, unknown> | null)
+    : null
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[astro-profile-debug]', {
+      profileId,
+      chartVersionId: chartVersion?.id ?? null,
+      hasChartMeta: !!chartMeta,
+      hasExpandedSections: !!chartMeta?.expanded_sections,
+      dailyStatus: storedExpandedRecord?.daily_transits
+        ? (storedExpandedRecord.daily_transits as { status?: string }).status ?? null
+        : null,
+      panchangStatus: storedExpandedRecord?.panchang
+        ? (storedExpandedRecord.panchang as { status?: string }).status ?? null
+        : null,
+      currentTimingStatus: storedExpandedRecord?.current_timing
+        ? (storedExpandedRecord.current_timing as { status?: string }).status ?? null
+        : null,
+      hasAstronomicalData: !!chartMeta?.astronomical_data,
+      fallbackDailyStatus: fallbackExpandedRecord?.daily_transits
+        ? (fallbackExpandedRecord.daily_transits as { status?: string }).status ?? null
+        : null,
+      fallbackPanchangStatus: fallbackExpandedRecord?.panchang
+        ? (fallbackExpandedRecord.panchang as { status?: string }).status ?? null
+        : null,
+      fallbackCurrentTimingStatus: fallbackExpandedRecord?.current_timing
+        ? (fallbackExpandedRecord.current_timing as { status?: string }).status ?? null
+        : null,
+    })
+  }
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-12">
@@ -183,7 +200,7 @@ export default async function ProfilePage({ params }: Props) {
         <div className="grid grid-cols-2 gap-3">
           <div className="p-4 border border-white/10 rounded-lg bg-white/5">
             <p className="text-xs text-white/40 mb-1">Calculation status</p>
-            <p className="font-medium capitalize">{calculationStatus}</p>
+            <p className="font-medium">{formatProfileChartStatus(storedCalcStatus)}</p>
           </div>
           <div className="p-4 border border-white/10 rounded-lg bg-white/5">
             <p className="text-xs text-white/40 mb-1">Prediction context</p>
@@ -195,11 +212,11 @@ export default async function ProfilePage({ params }: Props) {
             <>
               <div className="p-4 border border-white/10 rounded-lg bg-white/5">
                 <p className="text-xs text-white/40 mb-1">Engine version</p>
-                <p className="font-medium text-sm">{chartVersion.engine_version}</p>
+                <p className="font-medium text-sm">{(chartMetadata?.engine_version as string | undefined) ?? chartVersion.engine_version}</p>
               </div>
               <div className="p-4 border border-white/10 rounded-lg bg-white/5">
                 <p className="text-xs text-white/40 mb-1">Chart schema</p>
-                <p className="font-medium text-sm">v{chartVersion.schema_version}</p>
+                <p className="font-medium text-sm">v{(chartMetadata?.schema_version as string | undefined) ?? chartVersion.schema_version}</p>
               </div>
             </>
           )}

@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 
-import { buildProfileExpandedSectionsFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
+import {
+  buildProfileExpandedSectionsFromMasterOutput,
+  buildProfileExpandedSectionsFromStoredChartJson,
+  formatProfileChartStatus,
+} from '@/lib/astro/profile-chart-json-adapter'
 
 function makeMasterOutput(overrides: Record<string, unknown> = {}) {
   return {
@@ -97,5 +101,23 @@ describe('profile chart json adapter', () => {
   it('maps calculated panchang status to real and computes dasha percent', () => {
     const expanded = buildProfileExpandedSectionsFromMasterOutput(makeMasterOutput() as never)
     expect(expanded.current_timing?.elapsed_dasha_percent).toBe(25)
+  })
+
+  it('formats calculated chart status as Real', () => {
+    expect(formatProfileChartStatus('calculated')).toBe('Real')
+    expect(formatProfileChartStatus('real')).toBe('Real')
+    expect(formatProfileChartStatus('failed')).toBe('Failed')
+  })
+
+  it('derives expanded sections from stored astronomical data when expanded_sections is missing', () => {
+    const chartJson = {
+      astronomical_data: makeMasterOutput(),
+    }
+
+    const expanded = buildProfileExpandedSectionsFromStoredChartJson(chartJson)
+
+    expect(expanded?.daily_transits?.status).toBe('real')
+    expect(expanded?.panchang?.status).toBe('real')
+    expect(expanded?.current_timing?.status).toBe('real')
   })
 })

@@ -16,6 +16,70 @@ import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+async function persistCalculatedOutput(args: {
+  service: Awaited<ReturnType<typeof createServiceClient>>
+  userId: string
+  profileId: string
+  calcId: string
+  inputHash: string
+  settingsHash: string
+  chartJson: ReturnType<typeof buildProfileChartJsonFromMasterOutput>
+  output: MasterAstroCalculationOutput
+  runtimeEngineVersion: string
+  runtimeEphemerisVersion: string
+  schemaVersion: string
+}) {
+  const chartVersionId = args.chartJson.metadata.chart_version_id
+
+  const { error: chartErr } = await args.service
+    .from('chart_json_versions')
+    .insert({
+      id: chartVersionId,
+      user_id: args.userId,
+      profile_id: args.profileId,
+      calculation_id: args.calcId,
+      chart_version: 1,
+      input_hash: args.inputHash,
+      settings_hash: args.settingsHash,
+      engine_version: args.runtimeEngineVersion,
+      ephemeris_version: args.runtimeEphemerisVersion,
+      schema_version: args.schemaVersion,
+      chart_json: args.chartJson,
+    })
+  if (chartErr) throw new Error(`chart_insert_failed: ${chartErr.message}`)
+
+  const { error: predictionErr } = await args.service.from('prediction_ready_summaries').insert({
+    user_id: args.userId,
+    profile_id: args.profileId,
+    chart_version_id: chartVersionId,
+    topic: 'general',
+    prediction_context: args.output.prediction_ready_context,
+  })
+  if (predictionErr) throw new Error(`prediction_insert_failed: ${predictionErr.message}`)
+
+  const { error: calcCompleteErr } = await args.service
+    .from('chart_calculations')
+    .update({
+      status: 'completed',
+      current_chart_version_id: chartVersionId,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', args.calcId)
+  if (calcCompleteErr) throw new Error(`calc_complete_failed: ${calcCompleteErr.message}`)
+
+  const { error: auditErr } = await args.service.from('calculation_audit_logs').insert({
+    user_id: args.userId,
+    profile_id: args.profileId,
+    calculation_id: args.calcId,
+    chart_version_id: chartVersionId,
+    event: 'calculation_completed',
+    detail: { engine_version: args.runtimeEngineVersion, status: args.output.calculation_status },
+  })
+  if (auditErr) throw new Error(`audit_insert_failed: ${auditErr.message}`)
+
+  return chartVersionId
+}
+
 export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
@@ -85,33 +149,28 @@ export async function POST(req: NextRequest) {
     production: process.env.NODE_ENV === 'production',
   }
 
+  let remoteOutput: MasterAstroCalculationOutput | null = null
   if (isRemoteAstroEngineConfigured()) {
-    const output = await calculateMasterAstroOutputRemote({
+    remoteOutput = await calculateMasterAstroOutputRemote({
       input: decryptedInput,
       normalized,
       settings: settingsForHash,
       runtime,
     })
 
-    if (output.calculation_status === 'rejected') {
+    if (remoteOutput.calculation_status === 'rejected') {
       return NextResponse.json(
         {
-          ...output,
+          ...remoteOutput,
           calculation_id: randomUUID(),
           reused_cache: false,
         },
         { status: 422 },
       )
     }
-
-    return NextResponse.json({
-      ...output,
-      calculation_id: randomUUID(),
-      reused_cache: false,
-    })
   }
 
-  if (!force_recalc) {
+  if (!force_recalc && !remoteOutput) {
     const { data: cached } = await service
       .from('chart_calculations')
       .select('id, current_chart_version_id')
@@ -173,13 +232,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { calculateMasterAstroOutput } = await import('@/lib/astro/calculations/master')
-    const output = await calculateMasterAstroOutput({
-      input: decryptedInput,
-      normalized,
-      settings: settingsForHash,
-      runtime,
-    })
+    const output = remoteOutput ?? await (async () => {
+      const { calculateMasterAstroOutput } = await import('@/lib/astro/calculations/master')
+      return calculateMasterAstroOutput({
+        input: decryptedInput,
+        normalized,
+        settings: settingsForHash,
+        runtime,
+      })
+    })()
 
     if (output.calculation_status === 'rejected') {
       await service
@@ -232,58 +293,40 @@ export async function POST(req: NextRequest) {
       ephemerisVersion: getRuntimeEphemerisVersion(),
       schemaVersion: SCHEMA_VERSION,
     })
-
-    const { error: chartErr } = await service
-      .from('chart_json_versions')
-      .insert({
-        id: chartVersionId,
-        user_id: user.id,
-        profile_id,
-        calculation_id: calc.id,
-        chart_version: 1,
-        input_hash: inputHash,
-        settings_hash: settingsHash,
-        engine_version: getRuntimeEngineVersion(),
-        ephemeris_version: getRuntimeEphemerisVersion(),
-        schema_version: SCHEMA_VERSION,
-        chart_json: chartJson,
-      })
-
-    if (chartErr) throw new Error('chart_insert_failed')
-
-    await service.from('prediction_ready_summaries').insert({
-      user_id: user.id,
-      profile_id,
-      chart_version_id: chartVersionId,
-      topic: 'general',
-      prediction_context: output.prediction_ready_context,
-    })
-
-    await service
-      .from('chart_calculations')
-      .update({
-        status: 'completed',
-        current_chart_version_id: chartVersionId,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', calc.id)
-
-    await service.from('calculation_audit_logs').insert({
-      user_id: user.id,
-      profile_id,
-      calculation_id: calc.id,
-      chart_version_id: chartVersionId,
-      event: 'calculation_completed',
-      detail: { engine_version: getRuntimeEngineVersion(), status: output.calculation_status },
+    const persistedChartVersionId = await persistCalculatedOutput({
+      service,
+      userId: user.id,
+      profileId: profile_id,
+      calcId: calc.id,
+      inputHash,
+      settingsHash,
+      chartJson,
+      output,
+      runtimeEngineVersion: getRuntimeEngineVersion(),
+      runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
+      schemaVersion: SCHEMA_VERSION,
     })
 
     return NextResponse.json({
       ...output,
       calculation_id: calc.id,
-      chart_version_id: chartVersionId,
+      chart_version_id: persistedChartVersionId,
       reused_cache: false,
+      debug_saved_chart_json: {
+        hasExpandedSections: !!chartJson.expanded_sections,
+        dailyStatus: chartJson.expanded_sections?.daily_transits?.status ?? null,
+        panchangStatus: chartJson.expanded_sections?.panchang?.status ?? null,
+        currentTimingStatus: chartJson.expanded_sections?.current_timing?.status ?? null,
+        hasMasterDailyTransits: !!output.daily_transits,
+        hasMasterPanchang: !!output.panchang,
+        hasMasterVimshottari: !!output.vimshottari_dasha,
+        savedChartVersionId: persistedChartVersionId,
+      },
     })
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[astro-v1-calculate-error]', error)
+    }
     await service
       .from('chart_calculations')
       .update({
@@ -298,7 +341,7 @@ export async function POST(req: NextRequest) {
         calculation_status: 'rejected',
         rejection_reason: error instanceof Error ? error.message : 'unknown',
       } satisfies Partial<MasterAstroCalculationOutput>,
-      { status: 422 },
+      { status: 500 },
     )
   }
 }

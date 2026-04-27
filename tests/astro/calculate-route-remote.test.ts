@@ -58,12 +58,30 @@ vi.mock('../../lib/supabase/server', () => ({
         ? { data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' } }
         : { data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' } }
 
-      return {
+      const query = {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             single: vi.fn(async () => payload),
+            maybeSingle: vi.fn(async () => payload),
+            order: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => payload),
+              })),
+            })),
           })),
         })),
+        insert: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn(async () => ({ data: { id: 'calc-row-1' }, error: null })),
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: null, error: null })),
+        })),
+      }
+
+      return {
+        ...query,
       }
     }),
   })),
