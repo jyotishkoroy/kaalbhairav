@@ -15,6 +15,7 @@ import type {
 import { calculateNavamsa } from '@/lib/astro/calculations/navamsa'
 import { calculateAspects } from '@/lib/astro/calculations/aspects'
 import { calculateLifeAreaSignatures } from '@/lib/astro/calculations/life-areas'
+import { buildProfileExpandedSectionsFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
 
 type Props = {
   params: Promise<{ profileId: string }>
@@ -134,9 +135,16 @@ export default async function ProfilePage({ params }: Props) {
   ])
 
   const storedExpanded = chartMeta?.expanded_sections as Record<string, unknown> | undefined
-  const dailyTransits = storedExpanded?.daily_transits as DailyTransits | undefined
-  const panchang = storedExpanded?.panchang as Panchang | undefined
-  const currentTiming = storedExpanded?.current_timing as CurrentTimingContext | undefined
+  const fallbackExpanded = chartMeta?.astronomical_data
+    ? buildProfileExpandedSectionsFromMasterOutput(chartMeta.astronomical_data as never)
+    : undefined
+  const mergedExpanded = {
+    ...fallbackExpanded,
+    ...storedExpanded,
+  } as Record<string, unknown> | undefined
+  const dailyTransits = mergedExpanded?.daily_transits as DailyTransits | undefined
+  const panchang = mergedExpanded?.panchang as Panchang | undefined
+  const currentTiming = mergedExpanded?.current_timing as CurrentTimingContext | undefined
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-12">

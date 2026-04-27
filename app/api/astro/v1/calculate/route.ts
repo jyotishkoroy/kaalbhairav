@@ -11,6 +11,7 @@ import { calculateMasterAstroOutputRemote } from '@/lib/astro/engine/remote'
 import { isRemoteAstroEngineConfigured } from '@/lib/astro/engine/backend'
 import type { BirthProfileInput, AstrologySettings } from '@/lib/astro/types'
 import type { MasterAstroCalculationOutput } from '@/lib/astro/schemas/master'
+import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -209,22 +210,17 @@ export async function POST(req: NextRequest) {
     }
 
     const chartVersionId = randomUUID()
-    const chartJson = {
-      metadata: {
-        user_id: user.id,
-        profile_id,
-        calculation_id: calc.id,
-        chart_version_id: chartVersionId,
-        input_hash: inputHash,
-        settings_hash: settingsHash,
-        engine_version: getRuntimeEngineVersion(),
-        ephemeris_version: getRuntimeEphemerisVersion(),
-        schema_version: SCHEMA_VERSION,
-        chart_version: 1,
-        computed_at: new Date().toISOString(),
-        calculation_status: output.calculation_status,
-      },
-      normalized_input: {
+    const chartJson = buildProfileChartJsonFromMasterOutput({
+      output,
+      userId: user.id,
+      profileId: profile_id,
+      calculationId: calc.id,
+      chartVersionId,
+      chartVersion: 1,
+      inputHash,
+      settingsHash,
+      settingsForHash,
+      normalized: {
         birth_date_iso: normalized.birth_date_iso,
         birth_time_known: normalized.birth_time_known,
         birth_time_precision: normalized.birth_time_precision,
@@ -232,19 +228,10 @@ export async function POST(req: NextRequest) {
         timezone_status: normalized.timezone_status,
         coordinate_confidence: normalized.coordinate_confidence,
       },
-      calculation_settings: settingsForHash,
-      astronomical_data: output,
-      prediction_ready_summaries: output.prediction_ready_context,
-      confidence_and_warnings: {
-        confidence: { overall: output.confidence },
-        warnings: output.warnings,
-      },
-      audit: {
-        sources: [String((output as { external_engine_metadata?: { ephemeris_engine?: string } }).external_engine_metadata?.ephemeris_engine ?? 'swiss_ephemeris')],
-        engine_modules: ['master_calculator'],
-        notes: [],
-      },
-    }
+      engineVersion: getRuntimeEngineVersion(),
+      ephemerisVersion: getRuntimeEphemerisVersion(),
+      schemaVersion: SCHEMA_VERSION,
+    })
 
     const { error: chartErr } = await service
       .from('chart_json_versions')

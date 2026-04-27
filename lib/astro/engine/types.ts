@@ -66,7 +66,7 @@ export type Panchang = {
   status: CalcStatus
   calculated_at: string
   date_local: string
-  vara: Vara
+  vara: Vara | null
   tithi: Tithi | null
   nakshatra: Nakshatra | null
   yoga: PanchangYoga | null
