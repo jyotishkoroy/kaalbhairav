@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": "22.x"
+  },
   "name": "kaalbhairav",
   "version": "0.1.0",
   "private": true,
