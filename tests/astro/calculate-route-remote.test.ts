@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { remoteCall } = vi.hoisted(() => ({
-  remoteCall: vi.fn(async () => ({
-    schema_version: '29.0.0',
-    calculation_status: 'calculated',
-  })),
-}))
+const { remoteCall, supabaseState } = vi.hoisted(() => {
+  const state = {
+    chartVersionLookup: { data: null as null | { chart_version: number }, error: null as null | { message: string } },
+    chartVersionInserts: [] as Array<Record<string, unknown>>,
+  }
+
+  return {
+    remoteCall: vi.fn(async () => ({
+      schema_version: '29.0.0',
+      calculation_status: 'calculated',
+    })),
+    supabaseState: state,
+  }
+})
 
 vi.mock('../../lib/astro/calculations/master', () => {
   throw new Error('local calculator should not be imported in remote mode')
@@ -54,34 +62,99 @@ vi.mock('../../lib/supabase/server', () => ({
   })),
   createServiceClient: vi.fn(() => ({
     from: vi.fn((table: string) => {
-      const payload = table === 'birth_profiles'
-        ? { data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' } }
-        : { data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' } }
-
-      const query = {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn(async () => payload),
-            maybeSingle: vi.fn(async () => payload),
-            order: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                maybeSingle: vi.fn(async () => payload),
+      if (table === 'birth_profiles') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn(async () => ({
+                data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                error: null,
               })),
             })),
+          })),
+        }
+      }
+
+      if (table === 'astrology_settings') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn(async () => ({
+                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' },
+                error: null,
+              })),
+            })),
+          })),
+        }
+      }
+
+      if (table === 'chart_json_versions') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => supabaseState.chartVersionLookup),
+                })),
+              })),
+            })),
+          })),
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            supabaseState.chartVersionInserts.push(payload)
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({
+                  data: { id: 'chart-version-row-1' },
+                  error: null,
+                })),
+              })),
+            }
+          }),
+        }
+      }
+
+      if (table === 'chart_calculations') {
+        return {
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(async () => ({ data: { id: 'calc-row-1' }, error: null })),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(async () => ({ data: null, error: null })),
+          })),
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    order: vi.fn(() => ({
+                      limit: vi.fn(() => ({
+                        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        }
+      }
+
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn(async () => ({ data: null, error: null })),
           })),
         })),
         insert: vi.fn(() => ({
           select: vi.fn(() => ({
-            single: vi.fn(async () => ({ data: { id: 'calc-row-1' }, error: null })),
+            single: vi.fn(async () => ({ data: { id: 'unknown-row' }, error: null })),
           })),
         })),
         update: vi.fn(() => ({
           eq: vi.fn(async () => ({ data: null, error: null })),
         })),
-      }
-
-      return {
-        ...query,
       }
     }),
   })),
@@ -93,6 +166,12 @@ beforeEach(() => {
   process.env.ASTRO_V1_API_ENABLED = 'true'
   process.env.ASTRO_ENGINE_BACKEND = 'remote'
   process.env.ASTRO_ENGINE_SERVICE_URL = 'http://engine.test'
+  supabaseState.chartVersionLookup = { data: null, error: null }
+  supabaseState.chartVersionInserts = []
+  remoteCall.mockResolvedValue({
+    schema_version: '29.0.0',
+    calculation_status: 'calculated',
+  })
 })
 
 describe('calculate route remote mode', () => {
@@ -105,5 +184,59 @@ describe('calculate route remote mode', () => {
     const response = await POST(request as never)
     expect(response.status).toBe(200)
     expect(remoteCall).toHaveBeenCalledTimes(1)
+  })
+
+  it('inserts chart_version 1 when no prior chart versions exist', async () => {
+    supabaseState.chartVersionLookup = { data: null, error: null }
+
+    const request = new Request('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: '123e4567-e89b-12d3-a456-426614174000' }),
+    })
+
+    const response = await POST(request as never)
+    expect(response.status).toBe(200)
+    expect(supabaseState.chartVersionInserts[0]).toMatchObject({
+      chart_version: 1,
+    })
+
+    const body = await response.json()
+    expect(body.debug_saved_chart_json).toBeDefined()
+  })
+
+  it('inserts the next chart version when a prior version exists', async () => {
+    supabaseState.chartVersionLookup = { data: { chart_version: 1 }, error: null }
+
+    const request = new Request('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: '123e4567-e89b-12d3-a456-426614174000' }),
+    })
+
+    const response = await POST(request as never)
+    expect(response.status).toBe(200)
+    expect(supabaseState.chartVersionInserts[0]).toMatchObject({
+      chart_version: 2,
+    })
+
+    const body = await response.json()
+    expect(body.debug_saved_chart_json).toBeDefined()
+  })
+
+  it('returns rejected output when chart version lookup fails', async () => {
+    supabaseState.chartVersionLookup = { data: null, error: { message: 'lookup failed' } }
+
+    const request = new Request('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: '123e4567-e89b-12d3-a456-426614174000' }),
+    })
+
+    const response = await POST(request as never)
+    expect(response.status).toBe(500)
+    const body = await response.json()
+    expect(body).toMatchObject({
+      schema_version: '2.0.0',
+      calculation_status: 'rejected',
+    })
+    expect(body.rejection_reason).toContain('chart_version_lookup_failed')
   })
 })

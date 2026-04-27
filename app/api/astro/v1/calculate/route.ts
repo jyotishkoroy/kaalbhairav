@@ -16,6 +16,27 @@ import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+async function getNextChartVersion(args: {
+  service: Awaited<ReturnType<typeof createServiceClient>>
+  profileId: string
+}): Promise<number> {
+  const { data, error } = await args.service
+    .from('chart_json_versions')
+    .select('chart_version')
+    .eq('profile_id', args.profileId)
+    .order('chart_version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`chart_version_lookup_failed: ${error.message}`)
+  }
+
+  const latest = typeof data?.chart_version === 'number' ? data.chart_version : 0
+
+  return latest + 1
+}
+
 async function persistCalculatedOutput(args: {
   service: Awaited<ReturnType<typeof createServiceClient>>
   userId: string
@@ -23,6 +44,7 @@ async function persistCalculatedOutput(args: {
   calcId: string
   inputHash: string
   settingsHash: string
+  chartVersion: number
   chartJson: ReturnType<typeof buildProfileChartJsonFromMasterOutput>
   output: MasterAstroCalculationOutput
   runtimeEngineVersion: string
@@ -38,7 +60,7 @@ async function persistCalculatedOutput(args: {
       user_id: args.userId,
       profile_id: args.profileId,
       calculation_id: args.calcId,
-      chart_version: 1,
+      chart_version: args.chartVersion,
       input_hash: args.inputHash,
       settings_hash: args.settingsHash,
       engine_version: args.runtimeEngineVersion,
@@ -268,20 +290,24 @@ export async function POST(req: NextRequest) {
         },
         { status: 422 },
       )
-    }
+  }
 
-    const chartVersionId = randomUUID()
-    const chartJson = buildProfileChartJsonFromMasterOutput({
-      output,
-      userId: user.id,
-      profileId: profile_id,
-      calculationId: calc.id,
-      chartVersionId,
-      chartVersion: 1,
-      inputHash,
-      settingsHash,
-      settingsForHash,
-      normalized: {
+  const chartVersionId = randomUUID()
+  const nextChartVersion = await getNextChartVersion({
+    service,
+    profileId: profile_id,
+  })
+  const chartJson = buildProfileChartJsonFromMasterOutput({
+    output,
+    userId: user.id,
+    profileId: profile_id,
+    calculationId: calc.id,
+    chartVersionId,
+    chartVersion: nextChartVersion,
+    inputHash,
+    settingsHash,
+    settingsForHash,
+    normalized: {
         birth_date_iso: normalized.birth_date_iso,
         birth_time_known: normalized.birth_time_known,
         birth_time_precision: normalized.birth_time_precision,
@@ -300,6 +326,7 @@ export async function POST(req: NextRequest) {
       calcId: calc.id,
       inputHash,
       settingsHash,
+      chartVersion: nextChartVersion,
       chartJson,
       output,
       runtimeEngineVersion: getRuntimeEngineVersion(),
