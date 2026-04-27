@@ -283,19 +283,23 @@ function adaptDailyTransits(output: MasterAstroCalculationOutput): DailyTransitD
     const rawSummary = displayString(row.summary) ?? displayString(row.label) ?? displayString(row.value)
     const resolvedSummary = rawSummary ?? (planet && sign && house ? `${planet} in ${sign}, House ${house}` : planet && sign ? `${planet} in ${sign}` : sign ? `Transit in ${sign}` : planet ?? null)
     if (!resolvedSummary) return []
-    return [{ planet: planet ?? 'Transit', sign: sign ?? 'Unknown', house: house ?? null, nakshatra: nakshatra ?? null, retrograde, summary: resolvedSummary }]
+    return [{ planet: planet ?? '', sign: sign ?? 'Unknown', house: house ?? null, nakshatra: nakshatra ?? null, retrograde, summary: resolvedSummary }]
   })
+  const hasPlanetSignRows = rows.some((row) => isMeaningfulText(row.planet) && isMeaningfulText(row.sign))
   const hasUsefulFields = rows.length > 0
     || typeof record.current_utc === 'string'
     || isMeaningfulText(displayString(record.current_moon_rashi))
     || isMeaningfulText(displayString(record.current_moon_nakshatra))
     || isMeaningfulText(displayString(record.current_tithi))
     || record.transit_relation_to_natal != null
-  const fullyQualifiedRows = rows.filter((row) => isMeaningfulText(row.planet) && isMeaningfulText(row.sign) && row.house != null)
   const warnings = filterStringArray(record.warnings)
   if (!rows.length && hasUsefulFields) warnings.push('Daily transit source exists but no displayable transit rows were found.')
   return {
-    status: fullyQualifiedRows.length > 0 ? 'real' : rows.length > 0 || hasUsefulFields ? 'partial' : 'not_available',
+    status: hasPlanetSignRows
+      ? 'real'
+      : source
+        ? 'partial'
+        : 'not_available',
     calculated_at: typeof record.calculated_at === 'string' ? record.calculated_at : (typeof record.current_utc === 'string' ? record.current_utc : nowISO()),
     rows,
     transits: (toArray(record.transits).length > 0 ? toArray(record.transits) : transitSource) as TransitPlanet[],

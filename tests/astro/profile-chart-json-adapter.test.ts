@@ -180,6 +180,57 @@ describe('profile chart json adapter', () => {
     expect(rowsOf(expanded.daily_transits)[0]?.summary).toBe('Transit in Aries')
   })
 
+  it('marks daily transits real when at least one row has planet and sign', () => {
+    const expanded = buildProfileExpandedSectionsFromMasterOutput({
+      daily_transits: {
+        current_utc: '2026-04-27T00:00:00.000Z',
+        transit_planets: [
+          {
+            name: 'Sun',
+            sign: 'Aries',
+            nakshatra: 'Ashwini',
+            is_retrograde: false,
+          },
+        ],
+        warnings: [],
+      },
+    } as never)
+
+    expect(expanded.daily_transits?.status).toBe('real')
+    expect(rowsOf(expanded.daily_transits)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          planet: 'Sun',
+          sign: 'Aries',
+          summary: 'Sun in Aries',
+        }),
+      ]),
+    )
+  })
+
+  it('keeps daily transits partial when rows lack planet names', () => {
+    const expanded = buildProfileExpandedSectionsFromMasterOutput({
+      daily_transits: {
+        current_utc: '2026-04-27T00:00:00.000Z',
+        transit_planets: [
+          {
+            sign: 'Aries',
+            nakshatra: 'Ashwini',
+          },
+        ],
+        warnings: [],
+      },
+    } as never)
+
+    expect(expanded.daily_transits?.status).toBe('partial')
+  })
+
+  it('keeps daily transits not_available when no transit source exists', () => {
+    const expanded = buildProfileExpandedSectionsFromMasterOutput({} as never)
+
+    expect(expanded.daily_transits?.status).toBe('not_available')
+  })
+
   it('maps daily transit rows with planet sign and house into useful summaries', () => {
     const expanded = buildProfileExpandedSectionsFromMasterOutput({
       calculation_status: 'calculated',
