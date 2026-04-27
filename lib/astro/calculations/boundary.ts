@@ -27,3 +27,9 @@ export function nearYogaBoundary(yogaAngle: number): boolean {
   const pos = normalize360(yogaAngle) % span
   return Math.min(pos, span - pos) <= BOUNDARY_THRESHOLD_DEGREES
 }
+
+export function nearNavamsaBoundary(sidereal: number): boolean {
+  const span = 30 / 9
+  const pos = normalize360(sidereal) % span
+  return Math.min(pos, span - pos) <= BOUNDARY_THRESHOLD_DEGREES
+}

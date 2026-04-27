@@ -154,7 +154,6 @@ export function buildPredictionContext(chart: ChartJson, topic: string = 'genera
   return {
     do_not_recalculate: true,
     chart_identity: {
-      profile_id: chart.metadata.profile_id,
       chart_version_id: chart.metadata.chart_version_id,
       schema_version: chart.metadata.schema_version,
       engine_version: chart.metadata.engine_version,

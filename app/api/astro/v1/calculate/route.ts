@@ -1,23 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { calculateRequestSchema } from '@/lib/astro/schemas/calculate'
 import { decryptJson } from '@/lib/astro/encryption'
 import { normalizeBirthInput } from '@/lib/astro/normalize'
 import { sha256Canonical } from '@/lib/astro/hashing'
-import { runEngine } from '@/lib/astro/engine'
 import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from '@/lib/astro/engine/version'
-import { buildChartJson } from '@/lib/astro/chart-json'
-import { buildPredictionContext } from '@/lib/astro/prediction-context'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
 import type { BirthProfileInput, AstrologySettings } from '@/lib/astro/types'
-import type { PlanetName, ZodiacSign } from '@/lib/astro/engine/types'
-import { calculateDailyTransits } from '@/lib/astro/calculations/transits'
-import { calculatePanchang } from '@/lib/astro/calculations/panchang'
-import { calculateCurrentTiming } from '@/lib/astro/calculations/timing'
-import { calculateNavamsa } from '@/lib/astro/calculations/navamsa'
-import { calculateAspects } from '@/lib/astro/calculations/aspects'
-import { calculateLifeAreaSignatures } from '@/lib/astro/calculations/life-areas'
+import { calculateMasterAstroOutput } from '@/lib/astro/calculations/master'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -26,6 +17,7 @@ export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
   }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
@@ -35,8 +27,8 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_input', issues: parsed.error.issues }, { status: 400 })
   }
-  const { profile_id, force_recalc } = parsed.data
 
+  const { profile_id, force_recalc } = parsed.data
   const service = createServiceClient()
 
   const { data: profile } = await service
@@ -46,9 +38,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
-  if (profile.user_id !== user.id) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-  }
+  if (profile.user_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   const { data: settings } = await service
     .from('astrology_settings')
@@ -61,8 +51,7 @@ export async function POST(req: NextRequest) {
   let decryptedInput: BirthProfileInput
   try {
     decryptedInput = decryptJson<BirthProfileInput>(profile.encrypted_birth_data)
-  } catch (e) {
-    console.error('decrypt_failed')
+  } catch {
     return NextResponse.json({ error: 'decrypt_failed' }, { status: 500 })
   }
 
@@ -100,12 +89,21 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (cached?.current_chart_version_id) {
+      const { data: latestChart } = await service
+      .from('chart_json_versions')
+      .select('chart_json')
+      .eq('id', cached.current_chart_version_id)
+      .maybeSingle()
+
+      if (latestChart?.chart_json) {
+        const cachedChart = latestChart.chart_json as { astronomical_data?: unknown } & Record<string, unknown>
+        return NextResponse.json(cachedChart.astronomical_data ?? cachedChart)
+      }
+
       return NextResponse.json({
-        calculation_id: cached.id,
-        chart_version_id: cached.current_chart_version_id,
-        reused_cache: true,
-        calculation_status: process.env.ASTRO_ENGINE_MODE === 'real' ? 'real' : 'stub',
-        warnings: [],
+        calculation_status: 'partial',
+        schema_version: '29.0.0',
+        rejection_reason: undefined,
       })
     }
   }
@@ -132,121 +130,60 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const engineResult = runEngine(normalized, settingsForHash)
-
-    const engineMode = process.env.ASTRO_ENGINE_MODE ?? 'stub'
-    const nowUtc = new Date().toISOString()
-
-    // Extract typed data from engine result for expanded section calculations
-    const planetsRaw = engineResult.planets as Record<string, {
-      sidereal_longitude: number; sign: string; sign_index: number; is_retrograde?: boolean
-    } | undefined>
-    const lagnaRaw = engineResult.lagna as { sidereal_longitude: number; sign_index: number } | null
-    const housesRaw = engineResult.houses as Record<string, { sign: string; sign_index: number }>
-    const d1Raw = engineResult.d1_chart as { placements?: Record<string, { house: number; sign: string }> } | null
-    const dashasRaw = engineResult.dashas as {
-      sequence?: Array<{ lord: string; start: string; end: string }>
-    } | null
-
-    const PLANET_KEY_MAP: Record<string, PlanetName> = {
-      sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus', mars: 'Mars',
-      jupiter: 'Jupiter', saturn: 'Saturn', rahu: 'Rahu', ketu: 'Ketu',
-    }
-
-    const planetsSidereal = Object.entries(planetsRaw)
-      .filter(([k, v]) => PLANET_KEY_MAP[k] && v)
-      .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], longitude_deg: v!.sidereal_longitude }))
-
-    const houseSignsRaw = Array.from({ length: 12 }, (_, i) => {
-      const h = housesRaw[`house_${i + 1}`]
-      return h?.sign ?? ''
-    })
-    const houseSignsArray: ZodiacSign[] = houseSignsRaw.every((s) => s !== '')
-      ? (houseSignsRaw as ZodiacSign[])
-      : []
-
-    const planetHousesForAspects = d1Raw?.placements
-      ? Object.entries(d1Raw.placements)
-          .filter(([k]) => PLANET_KEY_MAP[k])
-          .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house }))
-      : []
-
-    const planetHousesForLifeAreas = d1Raw?.placements
-      ? Object.entries(d1Raw.placements)
-          .filter(([k]) => PLANET_KEY_MAP[k])
-          .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house, sign: v.sign as ZodiacSign }))
-      : []
-
-    const dashaSequence = dashasRaw?.sequence
-      ? dashasRaw.sequence.map((d) => ({ lord: d.lord, start_date: d.start, end_date: d.end }))
-      : null
-
-    const [dailyTransits, panchangResult, currentTiming, navamsa, aspects, lifeAreas] =
-      await Promise.all([
-        calculateDailyTransits({
-          natal_house_signs: houseSignsArray,
-          now_utc: nowUtc,
-          ayanamsa: settingsForHash.ayanamsa,
-          engine_mode: engineMode,
-        }),
-        calculatePanchang({
-          now_utc: nowUtc,
-          observer_timezone: normalized.timezone,
-          observer_latitude: normalized.latitude_rounded,
-          observer_longitude: normalized.longitude_rounded,
-          ayanamsa: settingsForHash.ayanamsa,
-          engine_mode: engineMode,
-        }),
-        calculateCurrentTiming({
-          dasha_sequence: dashaSequence,
-          now_utc: nowUtc,
-          observer_latitude: normalized.latitude_rounded,
-          observer_longitude: normalized.longitude_rounded,
-          ayanamsa: settingsForHash.ayanamsa,
-          engine_mode: engineMode,
-        }),
-        calculateNavamsa({
-          planets_sidereal: planetsSidereal,
-          lagna_sidereal_deg: lagnaRaw?.sidereal_longitude ?? null,
-          engine_mode: engineMode,
-        }),
-        calculateAspects({
-          planet_houses: planetHousesForAspects,
-          engine_mode: engineMode,
-        }),
-        calculateLifeAreaSignatures({
-          house_signs: houseSignsArray,
-          planet_houses: planetHousesForLifeAreas,
-          engine_mode: engineMode,
-        }),
-      ])
-
-    const newChartId = randomUUID()
-    const finalChartJson = buildChartJson({
-      user_id: user.id,
-      profile_id,
-      calculation_id: calc.id,
-      chart_version_id: newChartId,
-      chart_version: 1,
-      input_hash: inputHash,
-      settings_hash: settingsHash,
+    const output = await calculateMasterAstroOutput({
+      input: decryptedInput,
       normalized,
       settings: settingsForHash,
-      engine: engineResult,
-      expanded_sections: {
-        daily_transits: dailyTransits,
-        panchang: panchangResult,
-        current_timing: currentTiming,
-        navamsa_d9: navamsa,
-        basic_aspects: aspects,
-        life_area_signatures: lifeAreas,
+      runtime: {
+        user_id: user.id,
+        profile_id,
+        current_utc: new Date().toISOString(),
+        production: process.env.NODE_ENV === 'production',
       },
     })
+
+    const chartVersionId = randomUUID()
+    const chartJson = {
+      metadata: {
+        user_id: user.id,
+        profile_id,
+        calculation_id: calc.id,
+        chart_version_id: chartVersionId,
+        input_hash: inputHash,
+        settings_hash: settingsHash,
+        engine_version: getRuntimeEngineVersion(),
+        ephemeris_version: getRuntimeEphemerisVersion(),
+        schema_version: SCHEMA_VERSION,
+        chart_version: 1,
+        computed_at: new Date().toISOString(),
+        calculation_status: output.calculation_status,
+      },
+      normalized_input: {
+        birth_date_iso: normalized.birth_date_iso,
+        birth_time_known: normalized.birth_time_known,
+        birth_time_precision: normalized.birth_time_precision,
+        timezone: normalized.timezone,
+        timezone_status: normalized.timezone_status,
+        coordinate_confidence: normalized.coordinate_confidence,
+      },
+      calculation_settings: settingsForHash,
+      astronomical_data: output,
+      prediction_ready_summaries: output.prediction_ready_context,
+      confidence_and_warnings: {
+        confidence: { overall: output.confidence },
+        warnings: output.warnings,
+      },
+      audit: {
+        sources: [String((output as { external_engine_metadata?: { ephemeris_engine?: string } }).external_engine_metadata?.ephemeris_engine ?? 'swiss_ephemeris')],
+        engine_modules: ['master_calculator'],
+        notes: [],
+      },
+    }
 
     const { error: chartErr } = await service
       .from('chart_json_versions')
       .insert({
-        id: newChartId,
+        id: chartVersionId,
         user_id: user.id,
         profile_id,
         calculation_id: calc.id,
@@ -256,25 +193,24 @@ export async function POST(req: NextRequest) {
         engine_version: getRuntimeEngineVersion(),
         ephemeris_version: getRuntimeEphemerisVersion(),
         schema_version: SCHEMA_VERSION,
-        chart_json: finalChartJson,
+        chart_json: chartJson,
       })
 
     if (chartErr) throw new Error('chart_insert_failed')
 
-    const ctx = buildPredictionContext(finalChartJson, 'general')
     await service.from('prediction_ready_summaries').insert({
       user_id: user.id,
       profile_id,
-      chart_version_id: newChartId,
+      chart_version_id: chartVersionId,
       topic: 'general',
-      prediction_context: ctx,
+      prediction_context: output.prediction_ready_context,
     })
 
     await service
       .from('chart_calculations')
       .update({
         status: 'completed',
-        current_chart_version_id: newChartId,
+        current_chart_version_id: chartVersionId,
         completed_at: new Date().toISOString(),
       })
       .eq('id', calc.id)
@@ -283,26 +219,23 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       profile_id,
       calculation_id: calc.id,
-      chart_version_id: newChartId,
+      chart_version_id: chartVersionId,
       event: 'calculation_completed',
-      detail: { engine_version: getRuntimeEngineVersion(), status: engineResult.calculation_status },
+      detail: { engine_version: getRuntimeEngineVersion(), status: output.calculation_status },
     })
 
     return NextResponse.json({
+      ...output,
       calculation_id: calc.id,
-      chart_version_id: newChartId,
+      chart_version_id: chartVersionId,
       reused_cache: false,
-      calculation_status: engineResult.calculation_status,
-      warnings: engineResult.warnings,
     })
-
-  } catch (e) {
-    console.error('calculation_failed')
+  } catch (error) {
     await service
       .from('chart_calculations')
       .update({
         status: 'failed',
-        error_message: e instanceof Error ? e.message : 'unknown',
+        error_message: error instanceof Error ? error.message : 'unknown',
         completed_at: new Date().toISOString(),
       })
       .eq('id', calc.id)

@@ -27,9 +27,8 @@ export function convertBirthTimeToUTC(params: {
   const { birth_date, birth_time, birth_time_known, birth_time_precision, timezone, disambiguation } = params
   const uncertainty = PRECISION_UNCERTAINTY[birth_time_precision] ?? 86400
 
-  // Validate timezone exists in Luxon/IANA
-  const tzCheck = DateTime.now().setZone(timezone)
-  if (tzCheck.zoneName === null || tzCheck.zoneName === 'UTC' && timezone !== 'UTC') {
+  const tzCheck = DateTime.now().setZone(timezone, { keepLocalTime: true })
+  if (!tzCheck.isValid || tzCheck.zoneName !== timezone) {
     return {
       birth_local_wall_time: `${birth_date}T12:00:00`,
       timezone,
@@ -46,7 +45,6 @@ export function convertBirthTimeToUTC(params: {
   const normalizedTime = timeStr.length === 5 ? `${timeStr}:00` : timeStr
   const localWall = `${birth_date}T${normalizedTime}`
 
-  // Parse in the given timezone with Luxon — detects nonexistent and ambiguous times
   const dt = DateTime.fromISO(localWall, { zone: timezone })
 
   if (!dt.isValid) {
@@ -61,21 +59,17 @@ export function convertBirthTimeToUTC(params: {
     }
   }
 
-  // Luxon doesn't natively expose DST ambiguity/nonexistence the same way Temporal does.
-  // We detect it by checking if keepLocalTime gives a different result than the parsed offset.
-  // Check for nonexistent time: if the local time "doesn't exist" due to spring-forward,
-  // Luxon will still parse it but jump forward. We detect this by comparing the round-trip.
   const roundTrip = dt.toISO()!
   const reparsed = DateTime.fromISO(roundTrip, { zone: timezone })
   const localFromReparsed = reparsed.toFormat('yyyy-MM-dd\'T\'HH:mm:ss')
 
   let tzStatus: BirthTimeResult['timezone_status'] = 'valid'
   let tzDisambig: TimezoneDisambiguation = 'not_needed'
-  let isNonexistent = false
+  const possibleOffsets = typeof (dt as { getPossibleOffsets?: () => DateTime[] }).getPossibleOffsets === 'function'
+    ? (dt as { getPossibleOffsets: () => DateTime[] }).getPossibleOffsets()
+    : [dt]
 
-  // If the local time doesn't round-trip to itself, it was nonexistent (spring-forward)
   if (localFromReparsed !== localWall) {
-    // Default policy: reject nonexistent local times
     if (!disambiguation) {
       return {
         birth_local_wall_time: localWall,
@@ -87,40 +81,43 @@ export function convertBirthTimeToUTC(params: {
         birth_time_uncertainty_seconds: uncertainty,
       }
     }
-    isNonexistent = true
+    tzStatus = 'nonexistent'
+    tzDisambig = 'rejected'
+  } else if (possibleOffsets.length > 1) {
     tzStatus = 'ambiguous'
-    tzDisambig = disambiguation
-  }
-
-  // Check for ambiguous time (fall-back): try to detect by attempting both offsets
-  // Luxon always picks earlier offset for ambiguous times; if we asked for 'later', adjust
-  const offsetMinutes = dt.offset
-  const birthUtcStr = dt.toUTC().toISO()!
-
-  if (disambiguation === 'later' && !isNonexistent) {
-    // For ambiguous fall-back with 'later', add 60 min to find the later occurrence
-    // This is a best-effort approach since Luxon doesn't expose ambiguity natively
-    const laterDt = dt.plus({ hours: 1 })
-    const laterUtc = laterDt.toUTC().toISO()!
-    const laterLocalCheck = DateTime.fromISO(laterUtc, { zone: timezone }).toFormat('yyyy-MM-dd\'T\'HH:mm:ss')
-    if (laterLocalCheck === localWall) {
+    if (disambiguation === 'earlier' || disambiguation === 'later') {
+      tzDisambig = disambiguation
+    } else {
       return {
         birth_local_wall_time: localWall,
         timezone,
-        birth_utc: laterUtc,
-        utc_offset_minutes: laterDt.offset,
+        birth_utc: '',
+        utc_offset_minutes: 0,
         timezone_status: 'ambiguous',
-        timezone_disambiguation: 'later',
+        timezone_disambiguation: 'rejected',
         birth_time_uncertainty_seconds: uncertainty,
       }
+    }
+  }
+
+  if (tzStatus === 'ambiguous' && disambiguation === 'later') {
+    const later = possibleOffsets[possibleOffsets.length - 1] ?? dt
+    return {
+      birth_local_wall_time: localWall,
+      timezone,
+      birth_utc: later.toUTC().toISO()!,
+      utc_offset_minutes: later.offset,
+      timezone_status: 'ambiguous',
+      timezone_disambiguation: 'later',
+      birth_time_uncertainty_seconds: uncertainty,
     }
   }
 
   return {
     birth_local_wall_time: localWall,
     timezone,
-    birth_utc: birthUtcStr,
-    utc_offset_minutes: offsetMinutes,
+    birth_utc: dt.toUTC().toISO()!,
+    utc_offset_minutes: dt.offset,
     timezone_status: tzStatus,
     timezone_disambiguation: tzDisambig,
     birth_time_uncertainty_seconds: birth_time_known ? uncertainty : 86400,

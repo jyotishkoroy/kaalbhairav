@@ -5,26 +5,23 @@ import { sweJulday } from '../engine/swiss'
 import { calculateSign } from './sign'
 import { calculateNakshatra } from './nakshatra'
 import { normalize360 } from './math'
-import { nearTithiBoundary, nearYogaBoundary } from './boundary'
-import { YOGA_NAMES, TITHI_NAMES, VARA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants'
+import { nearYogaBoundary } from './boundary'
+import { YOGA_NAMES, VARA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants'
+import { calculateTithi, type TithiResult } from './tithi'
+import { calculateAyanamsa } from './ayanamsa'
+import { calculateAllPlanets } from './planets'
+import { assertEphemerisRange } from '../engine/diagnostics'
 import type { NakshatraPlacement } from './nakshatra'
 import type { SignPlacement } from './sign'
-
-export type TithiResult = {
-  moon_sun_angle: number
-  tithi_index: number
-  tithi_number: number
-  paksha: 'Shukla' | 'Krishna'
-  tithi_name: string
-  tithi_fraction_elapsed: number
-  tithi_fraction_remaining: number
-  near_tithi_boundary: boolean
-  convention: 'sidereal_lahiri'
-}
 
 export type PanchangResult = {
   panchang_local_date: string
   calculation_instant_utc: string
+  sunrise_convention: {
+    convention: 'local_sunrise_to_local_sunrise'
+    sunrise_basis: 'local_civil_date'
+    evaluated_at_sunrise: boolean
+  }
   sunrise_utc: string | null
   sunset_utc: string | null
   sunrise_local: string | null
@@ -45,28 +42,25 @@ export type PanchangResult = {
   } | null
   vara: string | null
   moon_rashi: SignPlacement | null
+  sunrise_moon_rashi: SignPlacement | null
+  sunrise_sun_position: { sidereal_longitude: number } | null
+  sunrise_moon_position: { sidereal_longitude: number } | null
+  sunrise_tithi: TithiResult | null
+  sunrise_nakshatra: NakshatraPlacement | null
+  sunrise_yoga: {
+    yoga_index: number
+    yoga_name: string
+    yoga_fraction_elapsed: number
+    near_yoga_boundary: boolean
+  } | null
+  sunrise_karana: {
+    karana_half_tithi_index: number
+    karana_name: string
+    karana_fraction_elapsed: number
+    near_karana_boundary: boolean
+  } | null
+  status: 'calculated' | 'partial' | 'unavailable'
   warnings: string[]
-}
-
-export function calculateTithi(moonSidereal: number, sunSidereal: number): TithiResult {
-  const moon_sun_angle = normalize360(moonSidereal - sunSidereal)
-  const tithi_index = Math.floor(moon_sun_angle / 12)
-  const tithi_number = tithi_index + 1
-  const position_in_tithi = moon_sun_angle % 12
-  const tithi_fraction_elapsed = position_in_tithi / 12
-  const tithi_fraction_remaining = 1 - tithi_fraction_elapsed
-  const paksha: 'Shukla' | 'Krishna' = tithi_number <= 15 ? 'Shukla' : 'Krishna'
-  return {
-    moon_sun_angle,
-    tithi_index,
-    tithi_number: Math.min(tithi_number, 30),
-    paksha,
-    tithi_name: TITHI_NAMES[tithi_number] ?? 'Unknown',
-    tithi_fraction_elapsed,
-    tithi_fraction_remaining,
-    near_tithi_boundary: nearTithiBoundary(moon_sun_angle),
-    convention: 'sidereal_lahiri',
-  }
 }
 
 function jdToISO(jd: number): string {
@@ -80,50 +74,14 @@ export function calculatePanchangResult(params: {
   timezone: string
   latitude: number
   longitude: number
-  moonSidereal: number
-  sunSidereal: number
   altitude?: number
 }): PanchangResult {
-  const { calculationInstantUtc, localDate, timezone, latitude, longitude, moonSidereal, sunSidereal, altitude = 0 } = params
+  const { calculationInstantUtc, localDate, timezone, latitude, longitude, altitude = 0 } = params
   const warnings: string[] = []
-
-  // Tithi
-  const tithi = calculateTithi(moonSidereal, sunSidereal)
-
-  // Nakshatra (Moon)
-  const nakshatra = calculateNakshatra(moonSidereal)
-
-  // Yoga = (sun + moon) / (360/27)
-  const yoga_angle = normalize360(sunSidereal + moonSidereal)
-  const yoga_span = 360 / 27
-  const yoga_index = Math.floor(yoga_angle / yoga_span)
-  const yoga_fraction_elapsed = (yoga_angle % yoga_span) / yoga_span
-  const near_yoga_boundary = nearYogaBoundary(yoga_angle)
-  const yoga = {
-    yoga_index,
-    yoga_name: YOGA_NAMES[yoga_index] ?? 'Unknown',
-    yoga_fraction_elapsed,
-    near_yoga_boundary,
-  }
-
-  // Karana
-  const moon_sun_angle = normalize360(moonSidereal - sunSidereal)
-  const karana_half_tithi_index = Math.floor(moon_sun_angle / 6)
-  const karana_fraction_elapsed = (moon_sun_angle % 6) / 6
-  const near_karana_boundary = Math.min(moon_sun_angle % 6, 6 - (moon_sun_angle % 6)) <= BOUNDARY_THRESHOLD_DEGREES
-  let karana_name = 'Unknown'
-  try { karana_name = karanaNameByHalfTithiIndex(karana_half_tithi_index) } catch { /* */ }
-  const karana = { karana_half_tithi_index, karana_name, karana_fraction_elapsed, near_karana_boundary }
-
-  // Vara (weekday at local sunrise)
-  const localDate_ = new Date(calculationInstantUtc)
-  const vara = VARA_NAMES[localDate_.getUTCDay()] ?? null
-
-  // Moon rashi
-  const moon_rashi = calculateSign(moonSidereal)
+  const jdStart = calculateJulianDay(calculationInstantUtc, sweJulday).jd_ut
+  assertEphemerisRange(jdStart)
 
   // Sunrise / sunset via Swiss Ephemeris
-  const jdStart = calculateJulianDay(calculationInstantUtc, sweJulday).jd_ut
   let sunrise_utc: string | null = null
   let sunset_utc: string | null = null
 
@@ -149,6 +107,64 @@ export function calculatePanchangResult(params: {
     warnings.push(`Sunset unavailable: ${String(e)}`)
   }
 
+  const currentAyanamsa = calculateAyanamsa(jdStart).value_degrees
+  const currentPlanets = calculateAllPlanets(jdStart, currentAyanamsa, 'mean_node')
+  const moonSidereal = currentPlanets.Moon?.sidereal_longitude ?? 0
+  const sunSidereal = currentPlanets.Sun?.sidereal_longitude ?? 0
+
+  let sunriseMoonSidereal = moonSidereal
+  let sunriseSunSidereal = sunSidereal
+  let sunriseMoonPosition: { sidereal_longitude: number } | null = null
+  let sunriseSunPosition: { sidereal_longitude: number } | null = null
+  if (sunrise_utc) {
+    try {
+      const sunriseJd = calculateJulianDay(sunrise_utc, sweJulday).jd_ut
+      assertEphemerisRange(sunriseJd)
+      const sunriseAyanamsa = calculateAyanamsa(sunriseJd).value_degrees
+      const sunrisePlanets = calculateAllPlanets(sunriseJd, sunriseAyanamsa, 'mean_node')
+      sunriseMoonSidereal = sunrisePlanets.Moon?.sidereal_longitude ?? sunriseMoonSidereal
+      sunriseSunSidereal = sunrisePlanets.Sun?.sidereal_longitude ?? sunriseSunSidereal
+      sunriseMoonPosition = sunrisePlanets.Moon ? { sidereal_longitude: sunrisePlanets.Moon.sidereal_longitude } : null
+      sunriseSunPosition = sunrisePlanets.Sun ? { sidereal_longitude: sunrisePlanets.Sun.sidereal_longitude } : null
+    } catch (e) {
+      warnings.push(`Sunrise planetary positions unavailable: ${String(e)}`)
+    }
+  }
+
+  const sunrise_tithi = calculateTithi(sunriseMoonSidereal, sunriseSunSidereal)
+  const nakshatra = calculateNakshatra(sunriseMoonSidereal)
+
+  const yoga_angle = normalize360(sunriseSunSidereal + sunriseMoonSidereal)
+  const yoga_span = 360 / 27
+  const yoga_index = Math.floor(yoga_angle / yoga_span)
+  const yoga_fraction_elapsed = (yoga_angle % yoga_span) / yoga_span
+  const near_yoga_boundary = nearYogaBoundary(yoga_angle)
+  const yoga = {
+    yoga_index,
+    yoga_name: YOGA_NAMES[yoga_index] ?? 'Unknown',
+    yoga_fraction_elapsed,
+    near_yoga_boundary,
+  }
+
+  const moon_sun_angle = normalize360(sunriseMoonSidereal - sunriseSunSidereal)
+  const karana_half_tithi_index = Math.floor(moon_sun_angle / 6)
+  const karana_fraction_elapsed = (moon_sun_angle % 6) / 6
+  const near_karana_boundary = Math.min(moon_sun_angle % 6, 6 - (moon_sun_angle % 6)) <= BOUNDARY_THRESHOLD_DEGREES
+  let karana_name = 'Unknown'
+  try { karana_name = karanaNameByHalfTithiIndex(karana_half_tithi_index) } catch { /* */ }
+  const karana = { karana_half_tithi_index, karana_name, karana_fraction_elapsed, near_karana_boundary }
+
+  const moon_rashi = calculateSign(sunriseMoonSidereal)
+
+  const sunrise_nakshatra = calculateNakshatra(sunriseMoonSidereal)
+  const sunrise_yoga = yoga
+  const sunrise_karana = karana
+  let vara: string | null = null
+  if (sunrise_utc) {
+    const sunriseDate = new Date(sunrise_utc)
+    vara = VARA_NAMES[sunriseDate.getUTCDay()] ?? null
+  }
+
   let sunrise_local: string | null = null
   let sunset_local: string | null = null
   try {
@@ -165,16 +181,29 @@ export function calculatePanchangResult(params: {
   return {
     panchang_local_date: localDate,
     calculation_instant_utc: calculationInstantUtc,
+    sunrise_convention: {
+      convention: 'local_sunrise_to_local_sunrise',
+      sunrise_basis: 'local_civil_date',
+      evaluated_at_sunrise: true,
+    },
     sunrise_utc,
     sunset_utc,
     sunrise_local,
     sunset_local,
-    tithi,
+    tithi: sunrise_tithi,
     nakshatra,
     yoga,
     karana,
     vara,
     moon_rashi,
+    sunrise_moon_rashi: calculateSign(sunriseMoonSidereal),
+    sunrise_sun_position: sunriseSunPosition,
+    sunrise_moon_position: sunriseMoonPosition,
+    sunrise_tithi,
+    sunrise_nakshatra,
+    sunrise_yoga,
+    sunrise_karana,
+    status: sunrise_utc && sunrise_local && sunriseSunPosition && sunriseMoonPosition ? 'calculated' : sunrise_utc || sunset_utc ? 'partial' : 'unavailable',
     warnings,
   }
 }

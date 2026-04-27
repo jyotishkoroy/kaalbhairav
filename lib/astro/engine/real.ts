@@ -15,7 +15,8 @@ import { calculateWholeSignHouses } from '../calculations/houses'
 import { calculateD1Chart } from '../calculations/d1'
 import { calculateNavamsaChart } from '../calculations/navamsa'
 import { calculateVimshottari } from '../calculations/vimshottari'
-import { calculatePanchangResult, calculateTithi } from '../calculations/panchang'
+import { calculatePanchangResult } from '../calculations/panchang'
+import { calculateTithi } from '../calculations/tithi'
 import { calculateGrahaDrishti } from '../calculations/aspects'
 import { calculateYogas } from '../calculations/yogas'
 import { calculateDoshas } from '../calculations/doshas'
@@ -117,7 +118,6 @@ export function runEngineReal(
   // ── Phase 10: Panchang ──────────────────────────────────────────────────
   let panchang = null
   try {
-    const sunPos = planets['Sun']
     const localDate = birthTimeResult.birth_local_wall_time.split('T')[0]
     panchang = calculatePanchangResult({
       calculationInstantUtc: birthTimeResult.birth_utc,
@@ -125,8 +125,6 @@ export function runEngineReal(
       timezone: normalized.timezone,
       latitude: normalized.latitude_full,
       longitude: normalized.longitude_full,
-      moonSidereal: moonPos?.sidereal_longitude ?? 0,
-      sunSidereal: sunPos?.sidereal_longitude ?? 0,
     })
   } catch {
     // Panchang failure is non-fatal

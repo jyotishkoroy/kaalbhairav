@@ -102,7 +102,6 @@ export type ChartJson = {
 export type PredictionContext = {
   do_not_recalculate: true
   chart_identity: {
-    profile_id: UUID
     chart_version_id: UUID
     schema_version: string
     engine_version: string

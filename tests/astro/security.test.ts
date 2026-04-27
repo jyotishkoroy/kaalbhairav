@@ -77,6 +77,23 @@ function buildStubPredictionContext() {
   return buildPredictionContext(chartJson, 'general')
 }
 
+function findForbiddenKeyPath(value: unknown, forbidden: Set<string>, path: string[] = []): string | null {
+  if (!value || typeof value !== 'object') return null
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      const found = findForbiddenKeyPath(value[i], forbidden, [...path, String(i)])
+      if (found) return found
+    }
+    return null
+  }
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (forbidden.has(key)) return [...path, key].join('.')
+    const found = findForbiddenKeyPath(nested, forbidden, [...path, key])
+    if (found) return found
+  }
+  return null
+}
+
 afterEach(() => {
   process.env = { ...originalEnv }
 })
@@ -175,6 +192,29 @@ describe('Astro V1 security hardening', () => {
     for (const sensitiveValue of rawSensitiveValues) {
       expect(serialized).not.toContain(sensitiveValue)
     }
+  })
+
+  it('recursively excludes forbidden raw birth keys from prediction_context', () => {
+    const predictionContext = buildStubPredictionContext()
+    const forbiddenKeys = new Set([
+      'birth_year',
+      'birth_date',
+      'birth_time',
+      'birth_time_precision',
+      'birth_place',
+      'birth_place_name',
+      'latitude',
+      'longitude',
+      'encrypted_birth_data',
+      'ciphertext',
+      'display_name',
+      'data_consent_version',
+      'profile_id',
+      'user_id',
+    ])
+
+    const hit = findForbiddenKeyPath(predictionContext, forbiddenKeys)
+    expect(hit).toBeNull()
   })
 
   it('does not persist forbidden raw birth data in chart_json normalized input', () => {

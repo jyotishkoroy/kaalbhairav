@@ -272,21 +272,37 @@ export function sweJulday(year: number, month: number, day: number, hourDecimalU
 }
 
 export function calcPlanet(jd: number, planetId: number): SwephCalcResult {
+  const range = getEphemerisRange()
+  if (jd < range.supported_start_jd || jd > range.supported_end_jd) {
+    throw new Error(`JD ${jd.toFixed(2)} outside supported ephemeris range ${range.supported_start_jd}..${range.supported_end_jd}`)
+  }
   return getSweph().calc_ut(jd, planetId, SEFLG_SWIEPH | SEFLG_SPEED)
 }
 
 export function getLahiriAyanamsa(jd: number): number {
+  const range = getEphemerisRange()
+  if (jd < range.supported_start_jd || jd > range.supported_end_jd) {
+    throw new Error(`JD ${jd.toFixed(2)} outside supported ephemeris range ${range.supported_start_jd}..${range.supported_end_jd}`)
+  }
   return getSweph().get_ayanamsa_ut(jd)
 }
 
 // houses_ex with Placidus ('P'). Returns data.points[0] as ascendant.
 export function getAscendant(jd: number, lat: number, lon: number): SwephHousesResult {
+  const range = getEphemerisRange()
+  if (jd < range.supported_start_jd || jd > range.supported_end_jd) {
+    throw new Error(`JD ${jd.toFixed(2)} outside supported ephemeris range ${range.supported_start_jd}..${range.supported_end_jd}`)
+  }
   return getSweph().houses_ex(jd, 0, lat, lon, 'P')
 }
 
 export function getSunriseOrSet(
   jdStart: number, lat: number, lon: number, altitude: number, flag: number,
 ): SwephRiseTransResult {
+  const range = getEphemerisRange()
+  if (jdStart < range.supported_start_jd || jdStart > range.supported_end_jd) {
+    throw new Error(`JD ${jdStart.toFixed(2)} outside supported ephemeris range ${range.supported_start_jd}..${range.supported_end_jd}`)
+  }
   const geopos: [number, number, number] = [lon, lat, altitude]
   return getSweph().rise_trans(jdStart, SE_SUN, '', SEFLG_SWIEPH, flag, geopos, 1013.25, 15)
 }

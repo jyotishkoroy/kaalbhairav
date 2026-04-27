@@ -1,6 +1,6 @@
 import { RASHI_MAP, NAVAMSA_START } from './constants'
 import { normalize360 } from './math'
-import { nearNakshatraBoundary } from './boundary'
+import { nearNavamsaBoundary } from './boundary'
 import type { PlanetPosition } from './planets'
 import type { LagnaResult } from './lagna'
 import type { NavamsaD9, ZodiacSign, PlanetName, NavamsaPlanet } from '../engine/types'
@@ -52,7 +52,7 @@ export function calculateNavamsaChart(
       ? ((navamsa_sign_index - navamsaLagna + 12) % 12) + 1
       : null
     const bw: string[] = []
-    if (nearNakshatraBoundary(pos.sidereal_longitude)) bw.push(`${name} near navamsa boundary`)
+    if (nearNavamsaBoundary(pos.sidereal_longitude)) bw.push(`${name} near navamsa boundary`)
     return {
       body: name,
       d1_sign_index: pos.sign_index,
