@@ -6,31 +6,11 @@ import type {
   DailyTransits,
   Panchang,
   CurrentTimingContext,
-  NavamsaD9,
-  BasicAspects,
-  LifeAreaSignatures,
-  PlanetName,
-  ZodiacSign,
 } from '@/lib/astro/engine/types'
-import { calculateNavamsa } from '@/lib/astro/calculations/navamsa'
-import { calculateAspects } from '@/lib/astro/calculations/aspects'
-import { calculateLifeAreaSignatures } from '@/lib/astro/calculations/life-areas'
 import { buildProfileExpandedSectionsFromStoredChartJson, formatProfileChartStatus } from '@/lib/astro/profile-chart-json-adapter'
 
 type Props = {
   params: Promise<{ profileId: string }>
-}
-
-const PLANET_KEY_MAP: Record<string, PlanetName> = {
-  sun: 'Sun',
-  moon: 'Moon',
-  mercury: 'Mercury',
-  venus: 'Venus',
-  mars: 'Mars',
-  jupiter: 'Jupiter',
-  saturn: 'Saturn',
-  rahu: 'Rahu',
-  ketu: 'Ketu',
 }
 
 export default async function ProfilePage({ params }: Props) {
@@ -75,65 +55,15 @@ export default async function ProfilePage({ params }: Props) {
     : null
   const chartMetadata = (chartMeta?.metadata as Record<string, unknown> | undefined) ?? undefined
   const storedCalcStatus = chartMetadata?.calculation_status as string | undefined
-  const engineMode = storedCalcStatus === 'real' || storedCalcStatus === 'calculated' ? 'real' : 'stub'
-
-  const planetsRaw = chartMeta?.planets as Record<string, {
-    sidereal_longitude: number; sign: string; sign_index: number; is_retrograde?: boolean
-  } | undefined> | undefined
-  const lagnaRaw = chartMeta?.lagna as { sidereal_longitude: number; sign_index: number } | undefined
-  const housesRaw = chartMeta?.houses as Record<string, { sign: string }> | undefined
-  const d1Raw = chartMeta?.d1_chart as { placements?: Record<string, { house: number; sign: string }> } | undefined
-
-  const planetsSidereal = planetsRaw
-    ? Object.entries(planetsRaw)
-        .filter(([k, v]) => PLANET_KEY_MAP[k] && v)
-        .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], longitude_deg: v!.sidereal_longitude }))
-    : []
-
-  const houseSignsRaw = housesRaw
-    ? Array.from({ length: 12 }, (_, i) => housesRaw[`house_${i + 1}`]?.sign ?? '')
-    : []
-  const houseSignsArray: ZodiacSign[] = houseSignsRaw.length === 12 && houseSignsRaw.every((s) => s !== '')
-    ? (houseSignsRaw as ZodiacSign[])
-    : []
-
-  const planetHousesForAspects = d1Raw?.placements
-    ? Object.entries(d1Raw.placements)
-        .filter(([k]) => PLANET_KEY_MAP[k])
-        .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house }))
-    : []
-
-  const planetHousesForLifeAreas = d1Raw?.placements
-    ? Object.entries(d1Raw.placements)
-        .filter(([k]) => PLANET_KEY_MAP[k])
-        .map(([k, v]) => ({ planet: PLANET_KEY_MAP[k], house: v.house, sign: v.sign as ZodiacSign }))
-    : []
-
-  const [navamsa, aspects, lifeAreas] = await Promise.all([
-    calculateNavamsa({
-      planets_sidereal: planetsSidereal,
-      lagna_sidereal_deg: lagnaRaw?.sidereal_longitude ?? null,
-      engine_mode: engineMode,
-    }),
-    calculateAspects({
-      planet_houses: planetHousesForAspects,
-      engine_mode: engineMode,
-    }),
-    calculateLifeAreaSignatures({
-      house_signs: houseSignsArray,
-      planet_houses: planetHousesForLifeAreas,
-      engine_mode: engineMode,
-    }),
-  ])
 
   const expandedSections = buildProfileExpandedSectionsFromStoredChartJson(chartMeta)
   const dailyTransits = expandedSections?.daily_transits as DailyTransits | undefined
   const panchang = expandedSections?.panchang as Panchang | undefined
   const currentTiming = expandedSections?.current_timing as CurrentTimingContext | undefined
+  const navamsa = expandedSections?.navamsa_d9
+  const aspects = expandedSections?.planetary_aspects ?? expandedSections?.basic_aspects
+  const lifeAreas = expandedSections?.life_area_signatures
   const storedExpandedRecord = chartMeta?.expanded_sections as Record<string, unknown> | undefined
-  const fallbackExpandedRecord = (!storedExpandedRecord && chartMeta?.astronomical_data)
-    ? (buildProfileExpandedSectionsFromStoredChartJson(chartMeta) as Record<string, unknown> | null)
-    : null
 
   if (process.env.NODE_ENV !== 'production') {
     console.log('[astro-profile-debug]', {
@@ -141,25 +71,13 @@ export default async function ProfilePage({ params }: Props) {
       chartVersionId: chartVersion?.id ?? null,
       hasChartMeta: !!chartMeta,
       hasExpandedSections: !!chartMeta?.expanded_sections,
-      dailyStatus: storedExpandedRecord?.daily_transits
-        ? (storedExpandedRecord.daily_transits as { status?: string }).status ?? null
-        : null,
-      panchangStatus: storedExpandedRecord?.panchang
-        ? (storedExpandedRecord.panchang as { status?: string }).status ?? null
-        : null,
-      currentTimingStatus: storedExpandedRecord?.current_timing
-        ? (storedExpandedRecord.current_timing as { status?: string }).status ?? null
-        : null,
+      dailyStatus: storedExpandedRecord?.daily_transits ? (storedExpandedRecord.daily_transits as { status?: string }).status ?? null : null,
+      panchangStatus: storedExpandedRecord?.panchang ? (storedExpandedRecord.panchang as { status?: string }).status ?? null : null,
+      currentTimingStatus: storedExpandedRecord?.current_timing ? (storedExpandedRecord.current_timing as { status?: string }).status ?? null : null,
+      navamsaStatus: storedExpandedRecord?.navamsa_d9 ? (storedExpandedRecord.navamsa_d9 as { status?: string }).status ?? null : null,
+      aspectsStatus: storedExpandedRecord?.basic_aspects ? (storedExpandedRecord.basic_aspects as { status?: string }).status ?? null : null,
+      lifeAreasStatus: storedExpandedRecord?.life_area_signatures ? (storedExpandedRecord.life_area_signatures as { status?: string }).status ?? null : null,
       hasAstronomicalData: !!chartMeta?.astronomical_data,
-      fallbackDailyStatus: fallbackExpandedRecord?.daily_transits
-        ? (fallbackExpandedRecord.daily_transits as { status?: string }).status ?? null
-        : null,
-      fallbackPanchangStatus: fallbackExpandedRecord?.panchang
-        ? (fallbackExpandedRecord.panchang as { status?: string }).status ?? null
-        : null,
-      fallbackCurrentTimingStatus: fallbackExpandedRecord?.current_timing
-        ? (fallbackExpandedRecord.current_timing as { status?: string }).status ?? null
-        : null,
     })
   }
 
@@ -288,25 +206,27 @@ export default async function ProfilePage({ params }: Props) {
           ))}
         </SectionCard>
 
-        <SectionCard title="Navamsa (D9)" status={navamsa.status}>
-          {navamsa.navamsa_lagna && (
-            <p className="font-medium text-white/80 text-sm mb-2">Navamsa Lagna: {navamsa.navamsa_lagna}</p>
+        <SectionCard title="Navamsa (D9)" status={navamsa?.status}>
+          {navamsa && 'navamsa_lagna' in navamsa && (navamsa as { navamsa_lagna?: string | null }).navamsa_lagna && (
+            <p className="font-medium text-white/80 text-sm mb-2">Navamsa Lagna: {(navamsa as { navamsa_lagna: string }).navamsa_lagna}</p>
           )}
-          <div className="grid grid-cols-3 gap-1">
-            {navamsa.planets.map((p) => (
-              <p key={p.planet} className="text-xs text-white/70">
-                {p.planet}: {p.navamsa_sign} (H{p.navamsa_house})
-              </p>
-            ))}
-          </div>
-          {navamsa.warnings.map((w, i) => (
+          {'planets' in (navamsa ?? {}) && Array.isArray((navamsa as { planets?: Array<{ planet: string; navamsa_sign: string; navamsa_house: number }> }).planets) && (
+            <div className="grid grid-cols-3 gap-1">
+              {(navamsa as { planets: Array<{ planet: string; navamsa_sign: string; navamsa_house: number }> }).planets.map((p) => (
+                <p key={p.planet} className="text-xs text-white/70">
+                  {p.planet}: {p.navamsa_sign} (H{p.navamsa_house})
+                </p>
+              ))}
+            </div>
+          )}
+          {Array.isArray((navamsa as { warnings?: string[] } | undefined)?.warnings) && ((navamsa as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          ))}
+          )))}
         </SectionCard>
 
-        <SectionCard title="Planetary Aspects (Drishti)" status={aspects.status}>
+        <SectionCard title="Planetary Aspects (Drishti)" status={aspects?.status}>
           <div className="space-y-1 text-sm text-white/70">
-            {aspects.aspects
+            {Array.isArray((aspects as { aspects?: Array<{ aspected_planet: string | null; aspecting_planet: string; aspect_type: string; strength: string }> } | undefined)?.aspects) && (aspects as { aspects: Array<{ aspected_planet: string | null; aspecting_planet: string; aspect_type: string; strength: string }> }).aspects
               .filter((a) => a.aspected_planet !== null)
               .slice(0, 12)
               .map((a, i) => (
@@ -314,20 +234,20 @@ export default async function ProfilePage({ params }: Props) {
                   {a.aspecting_planet} - {a.aspected_planet} ({a.aspect_type.replace(/_/g, ' ')}, {a.strength})
                 </p>
               ))}
-            {aspects.aspects.filter((a) => a.aspected_planet !== null).length > 12 && (
+            {Array.isArray((aspects as { aspects?: Array<{ aspected_planet: string | null }> } | undefined)?.aspects) && (aspects as { aspects: Array<{ aspected_planet: string | null }> }).aspects.filter((a) => a.aspected_planet !== null).length > 12 && (
               <p className="text-white/30 text-xs">
-                +{aspects.aspects.filter((a) => a.aspected_planet !== null).length - 12} more
+                +{(aspects as { aspects: Array<{ aspected_planet: string | null }> }).aspects.filter((a) => a.aspected_planet !== null).length - 12} more
               </p>
             )}
           </div>
-          {aspects.warnings.map((w, i) => (
+          {Array.isArray((aspects as { warnings?: string[] } | undefined)?.warnings) && ((aspects as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          ))}
+          )))}
         </SectionCard>
 
-        <SectionCard title="Life-Area Signatures" status={lifeAreas.status}>
+        <SectionCard title="Life-Area Signatures" status={lifeAreas?.status}>
           <div className="space-y-1 text-sm text-white/70">
-            {lifeAreas.signatures.map((s) => (
+            {Array.isArray((lifeAreas as { signatures?: Array<{ area: string; house_number: number; house_sign: string | null; lord: string | null; lord_placement_house: number | null; strength_note?: string | null }> } | undefined)?.signatures) && (lifeAreas as { signatures: Array<{ area: string; house_number: number; house_sign: string | null; lord: string | null; lord_placement_house: number | null; strength_note?: string | null }> }).signatures.map((s) => (
               <div key={s.area} className="flex justify-between gap-2">
                 <span className="text-white/50 capitalize w-40 shrink-0">{s.area.replace(/_/g, ' ')}</span>
                 <span className="text-xs">H{s.house_number} {s.house_sign} · lord {s.lord} in H{s.lord_placement_house}</span>
@@ -335,9 +255,9 @@ export default async function ProfilePage({ params }: Props) {
               </div>
             ))}
           </div>
-          {lifeAreas.warnings.map((w, i) => (
+          {Array.isArray((lifeAreas as { warnings?: string[] } | undefined)?.warnings) && ((lifeAreas as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
-          ))}
+          )))}
         </SectionCard>
       </div>
     </main>

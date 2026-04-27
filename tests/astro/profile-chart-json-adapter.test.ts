@@ -53,6 +53,31 @@ function makeMasterOutput(overrides: Record<string, unknown> = {}) {
       sunrise_moon_rashi: 'Aries',
       warnings: [],
     },
+    navamsa_d9: {
+      status: 'real',
+      calculated_at: '2026-01-01T00:00:00.000Z',
+      navamsa_lagna: 'Aries',
+      planets: [
+        { planet: 'Sun', navamsa_sign: 'Aries', navamsa_house: 1 },
+      ],
+      warnings: [],
+    },
+    planetary_aspects_drishti: {
+      status: 'real',
+      calculated_at: '2026-01-01T00:00:00.000Z',
+      aspects: [
+        { aspecting_planet: 'Sun', aspected_planet: 'Moon', aspected_house: null, aspect_type: 'graha_drishti_7th', strength: 'full' },
+      ],
+      warnings: [],
+    },
+    life_area_signatures: {
+      status: 'real',
+      calculated_at: '2026-01-01T00:00:00.000Z',
+      signatures: [
+        { area: 'self', house_number: 1, house_sign: 'Aries', lord: 'Mars', lord_placement_house: 1, lord_placement_sign: 'Aries', occupying_planets: ['Sun'], strength_note: 'lord in own sign' },
+      ],
+      warnings: [],
+    },
     vimshottari_dasha: {
       moon_nakshatra_index: 0,
       moon_nakshatra: 'Ashwini',
@@ -86,16 +111,22 @@ describe('profile chart json adapter', () => {
     expect(expanded.daily_transits?.status).toBe('real')
     expect(expanded.panchang?.status).toBe('real')
     expect(expanded.current_timing?.status).toBe('real')
+    expect(expanded.navamsa_d9?.status).toBe('real')
+    expect(expanded.planetary_aspects?.status).toBe('real')
+    expect(expanded.life_area_signatures?.status).toBe('real')
   })
 
   it('marks missing calculated sections as not available', () => {
     const expanded = buildProfileExpandedSectionsFromMasterOutput(
-      makeMasterOutput({ daily_transits: null, panchang: null, vimshottari_dasha: null }) as never,
+      makeMasterOutput({ daily_transits: null, panchang: null, navamsa_d9: null, planetary_aspects_drishti: null, life_area_signatures: null, vimshottari_dasha: null }) as never,
     )
 
     expect(expanded.daily_transits?.status).toBe('not_available')
     expect(expanded.panchang?.status).toBe('not_available')
     expect(expanded.current_timing?.status).toBe('not_available')
+    expect(expanded.navamsa_d9?.status).toBe('not_available')
+    expect(expanded.planetary_aspects?.status).toBe('not_available')
+    expect(expanded.life_area_signatures?.status).toBe('not_available')
   })
 
   it('maps calculated panchang status to real and computes dasha percent', () => {
@@ -119,5 +150,32 @@ describe('profile chart json adapter', () => {
     expect(expanded?.daily_transits?.status).toBe('real')
     expect(expanded?.panchang?.status).toBe('real')
     expect(expanded?.current_timing?.status).toBe('real')
+    expect(expanded?.navamsa_d9?.status).toBe('real')
+    expect(expanded?.planetary_aspects?.status).toBe('real')
+    expect(expanded?.life_area_signatures?.status).toBe('real')
+  })
+
+  it('supports alternate source field names for derived sections', () => {
+    const expanded = buildProfileExpandedSectionsFromMasterOutput({
+      calculation_status: 'calculated',
+      planets: { Sun: { sidereal_longitude: 10 } },
+      lagna: { sign: 'Aries' },
+      houses: { house_1: { sign: 'Aries' } },
+      d1_chart: { placements: { sun: { house: 1, sign: 'Aries' } } },
+      transits: { calculated_at: '2026-01-01T00:00:00.000Z', transits: [{ planet: 'Sun' }] },
+      panchang: { status: 'real', calculation_instant_utc: '2026-01-01T00:00:00.000Z', panchang_local_date: '2026-01-01' },
+      navamsa: { status: 'real', planets: [], warnings: [] },
+      aspects: { status: 'real', aspects: [], warnings: [] },
+      life_areas: { status: 'real', signatures: [], warnings: [] },
+      vimshottari_dasha: {
+        current_dasha: { mahadasha: { lord: 'Ketu', start_date: '2025-01-01', end_date: '2032-01-01' } },
+      },
+    } as never)
+
+    expect(expanded.daily_transits?.status).toBe('real')
+    expect(expanded.panchang?.status).toBe('real')
+    expect(expanded.navamsa_d9?.status).toBe('real')
+    expect(expanded.planetary_aspects?.status).toBe('real')
+    expect(expanded.life_area_signatures?.status).toBe('real')
   })
 })

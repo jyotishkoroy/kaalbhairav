@@ -334,6 +334,35 @@ export async function POST(req: NextRequest) {
       schemaVersion: SCHEMA_VERSION,
     })
 
+    if (process.env.NODE_ENV !== 'production') {
+      const rawAstronomicalData = output.astronomical_data && typeof output.astronomical_data === 'object'
+        ? output.astronomical_data as Record<string, unknown>
+        : {}
+      console.log('[astro-calculate-debug]', {
+        chartSchema: chartJson.metadata.schema_version,
+        engineVersion: chartJson.metadata.engine_version,
+        rootKeys: Object.keys(chartJson),
+        expandedKeys: Object.keys(chartJson.expanded_sections ?? {}),
+        astronomicalKeys: Object.keys(rawAstronomicalData),
+        hasRootPlanets: !!chartJson.planets,
+        hasRootLagna: !!chartJson.lagna,
+        hasRootHouses: !!chartJson.houses,
+        hasRootD1: !!chartJson.d1_chart,
+        hasRawDailyTransits: !!rawAstronomicalData.daily_transits,
+        hasRawPanchang: !!rawAstronomicalData.panchang,
+        hasRawNavamsa: !!rawAstronomicalData.navamsa_d9,
+        hasRawAspects: !!rawAstronomicalData.planetary_aspects_drishti,
+        hasRawLifeAreas: !!rawAstronomicalData.life_area_signatures,
+        hasRawVimshottari: !!rawAstronomicalData.vimshottari_dasha,
+        dailyStatus: chartJson.expanded_sections?.daily_transits?.status,
+        panchangStatus: chartJson.expanded_sections?.panchang?.status,
+        currentTimingStatus: chartJson.expanded_sections?.current_timing?.status,
+        navamsaStatus: chartJson.expanded_sections?.navamsa_d9?.status,
+        aspectsStatus: chartJson.expanded_sections?.planetary_aspects?.status ?? chartJson.expanded_sections?.basic_aspects?.status,
+        lifeAreasStatus: chartJson.expanded_sections?.life_area_signatures?.status,
+      })
+    }
+
     return NextResponse.json({
       ...output,
       calculation_id: calc.id,

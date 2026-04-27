@@ -1,3 +1,7 @@
+import type { SignPlacement } from '../calculations/sign.ts'
+import type { NakshatraPlacement } from '../calculations/nakshatra.ts'
+import type { TithiResult } from '../calculations/tithi.ts'
+
 // ── Shared primitives ──────────────────────────────────────────────────────
 
 export type CalcStatus = 'real' | 'partial' | 'stub' | 'not_available' | 'error'
@@ -36,6 +40,11 @@ export type DailyTransits = {
   status: CalcStatus
   calculated_at: string
   transits: TransitPlanet[]
+  transit_planets?: TransitPlanet[]
+  current_moon_rashi?: SignPlacement | null
+  current_moon_nakshatra?: NakshatraPlacement | null
+  current_tithi?: TithiResult | null
+  transit_relation_to_natal?: Array<unknown>
   warnings: string[]
 }
 
@@ -65,7 +74,7 @@ export type Vara = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 
 export type Panchang = {
   status: CalcStatus
   calculated_at: string
-  date_local: string
+  date_local: string | null
   vara: Vara | null
   tithi: Tithi | null
   nakshatra: Nakshatra | null
@@ -73,6 +82,10 @@ export type Panchang = {
   karana: PanchangKarana | null
   sunrise_utc: string | null
   sunset_utc: string | null
+  sunrise_local?: string | null
+  sunset_local?: string | null
+  moon_rashi?: SignPlacement | null
+  sunrise_moon_rashi?: SignPlacement | null
   warnings: string[]
 }
 
@@ -172,6 +185,7 @@ export type AstroExpandedSections = {
   panchang?: Panchang
   current_timing?: CurrentTimingContext
   navamsa_d9?: NavamsaD9
+  planetary_aspects?: BasicAspects
   basic_aspects?: BasicAspects
   life_area_signatures?: LifeAreaSignatures
 }

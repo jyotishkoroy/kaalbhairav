@@ -24,8 +24,8 @@ function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 }
 
-function asVara(value: unknown): Panchang['vara'] {
-  return typeof value === 'string' ? (value as Panchang['vara']) : 'Sunday'
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
 }
 
 function asNakshatra(value: unknown): Panchang['nakshatra'] {
@@ -65,19 +65,24 @@ export function formatProfileChartStatus(status: unknown): string {
 }
 
 function adaptPlanets(output: MasterAstroCalculationOutput): Record<string, unknown> {
-  return toRecord((output as MaybeObject)?.planetary_positions)
+  return toRecord((output as MaybeObject)?.planetary_positions ?? (output as MaybeObject)?.planets)
 }
 
 function adaptHouses(output: MasterAstroCalculationOutput): Record<string, unknown> {
-  return toRecord((output as MaybeObject)?.whole_sign_houses)
+  return toRecord((output as MaybeObject)?.whole_sign_houses ?? (output as MaybeObject)?.houses)
 }
 
 function adaptD1Chart(output: MasterAstroCalculationOutput): Record<string, unknown> {
-  return toRecord((output as MaybeObject)?.d1_rashi_chart)
+  return toRecord((output as MaybeObject)?.d1_rashi_chart ?? (output as MaybeObject)?.d1_chart)
 }
 
 function adaptDailyTransits(output: MasterAstroCalculationOutput): DailyTransits {
-  const source = (output as MaybeObject)?.daily_transits as Record<string, unknown> | undefined
+  const source =
+    (output as MaybeObject)?.daily_transits ??
+    (output as MaybeObject)?.transits ??
+    ((output as MaybeObject)?.astronomical_data ? toRecord((output as MaybeObject)?.astronomical_data).daily_transits : undefined) ??
+    ((output as MaybeObject)?.prediction_ready_context ? toRecord((output as MaybeObject)?.prediction_ready_context).daily_transits : undefined)
+  const record = toRecord(source)
   if (!source) {
     return {
       status: 'not_available',
@@ -87,26 +92,41 @@ function adaptDailyTransits(output: MasterAstroCalculationOutput): DailyTransits
     }
   }
 
-  const transits = Array.isArray(source.transits)
-    ? source.transits
-    : Array.isArray(source.transit_planets)
-      ? source.transit_planets
-      : []
+  const transits = toArray(record.transits).length > 0
+    ? toArray(record.transits)
+    : toArray(record.transit_planets)
+  const hasUsefulFields = transits.length > 0
+    || typeof record.current_utc === 'string'
+    || record.current_moon_rashi != null
+    || record.current_moon_nakshatra != null
+    || record.current_tithi != null
+    || record.transit_relation_to_natal != null
+  const explicitStatus = typeof record.status === 'string' ? mapStatus(record.status) : null
   return {
-    status: mapStatus(typeof source.status === 'string' ? source.status : undefined) as DailyTransits['status'],
-    calculated_at: typeof source.current_utc === 'string' ? source.current_utc : (typeof source.calculated_at === 'string' ? source.calculated_at : nowISO()),
-    transits: transits as TransitPlanet[],
-    warnings: filterStringArray(source.warnings),
+    status: hasUsefulFields ? (explicitStatus ?? 'real') : 'not_available',
+    calculated_at: typeof record.calculated_at === 'string' ? record.calculated_at : (typeof record.current_utc === 'string' ? record.current_utc : nowISO()),
+    transits: (transits as TransitPlanet[]),
+    transit_planets: (toArray(record.transit_planets).length > 0 ? toArray(record.transit_planets) : transits) as TransitPlanet[],
+    current_moon_rashi: (record.current_moon_rashi as DailyTransits['current_moon_rashi']) ?? null,
+    current_moon_nakshatra: (record.current_moon_nakshatra as DailyTransits['current_moon_nakshatra']) ?? null,
+    current_tithi: (record.current_tithi as DailyTransits['current_tithi']) ?? null,
+    transit_relation_to_natal: toArray(record.transit_relation_to_natal),
+    warnings: filterStringArray(record.warnings),
   }
 }
 
 function adaptPanchang(output: MasterAstroCalculationOutput): Panchang {
-  const source = (output as MaybeObject)?.panchang as Record<string, unknown> | undefined
+  const source =
+    (output as MaybeObject)?.panchang ??
+    (output as MaybeObject)?.panchaang ??
+    ((output as MaybeObject)?.astronomical_data ? toRecord((output as MaybeObject)?.astronomical_data).panchang : undefined) ??
+    ((output as MaybeObject)?.prediction_ready_context ? toRecord((output as MaybeObject)?.prediction_ready_context).panchang : undefined)
+  const record = toRecord(source)
   if (!source) {
     return {
       status: 'not_available',
       calculated_at: nowISO(),
-      date_local: '',
+      date_local: null,
       vara: null,
       tithi: null,
       nakshatra: null,
@@ -118,18 +138,23 @@ function adaptPanchang(output: MasterAstroCalculationOutput): Panchang {
     }
   }
 
+  const status = mapStatus(typeof record.status === 'string' ? record.status : (record.calculation_status as string | undefined)) as Panchang['status']
   return {
-    status: mapStatus(typeof source.status === 'string' ? source.status : (source.calculation_status as string | undefined)) as Panchang['status'],
-    calculated_at: typeof source.calculation_instant_utc === 'string' ? source.calculation_instant_utc : (typeof source.calculated_at === 'string' ? source.calculated_at : nowISO()),
-    date_local: typeof source.panchang_local_date === 'string' ? source.panchang_local_date : (typeof source.date_local === 'string' ? source.date_local : ''),
-    vara: asVara(source.vara),
-    tithi: (source.tithi as Panchang['tithi']) ?? null,
-    nakshatra: asNakshatra(source.nakshatra),
-    yoga: asYoga(source.yoga),
-    karana: asKarana(source.karana),
-    sunrise_utc: typeof source.sunrise_utc === 'string' ? source.sunrise_utc : null,
-    sunset_utc: typeof source.sunset_utc === 'string' ? source.sunset_utc : null,
-    warnings: filterStringArray(source.warnings),
+    status,
+    calculated_at: typeof record.calculation_instant_utc === 'string' ? record.calculation_instant_utc : (typeof record.calculated_at === 'string' ? record.calculated_at : nowISO()),
+    date_local: typeof record.panchang_local_date === 'string' ? record.panchang_local_date : (typeof record.date_local === 'string' ? record.date_local : null),
+    vara: (record.vara as Panchang['vara']) ?? null,
+    tithi: (record.tithi as Panchang['tithi']) ?? null,
+    nakshatra: asNakshatra(record.nakshatra),
+    yoga: asYoga(record.yoga),
+    karana: asKarana(record.karana),
+    sunrise_utc: typeof record.sunrise_utc === 'string' ? record.sunrise_utc : null,
+    sunset_utc: typeof record.sunset_utc === 'string' ? record.sunset_utc : null,
+    sunrise_local: typeof record.sunrise_local === 'string' ? record.sunrise_local : null,
+    sunset_local: typeof record.sunset_local === 'string' ? record.sunset_local : null,
+    moon_rashi: (record.moon_rashi as Panchang['moon_rashi']) ?? null,
+    sunrise_moon_rashi: (record.sunrise_moon_rashi as Panchang['sunrise_moon_rashi']) ?? null,
+    warnings: filterStringArray(record.warnings),
   }
 }
 
@@ -172,11 +197,68 @@ function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput)
   }
 }
 
+function adaptNavamsa(output: MasterAstroCalculationOutput): Record<string, unknown> {
+  const source =
+    (output as MaybeObject)?.navamsa_d9 ??
+    (output as MaybeObject)?.navamsa ??
+    ((output as MaybeObject)?.divisional_charts ? toRecord((output as MaybeObject)?.divisional_charts).d9 : undefined) ??
+    (output as MaybeObject)?.d9
+  const record = toRecord(source)
+  if (!source) {
+    return { status: 'not_available', calculated_at: nowISO(), warnings: ['Navamsa was not returned by the calculator.'] }
+  }
+  return {
+    status: 'real',
+    calculated_at: typeof record.calculated_at === 'string' ? record.calculated_at : nowISO(),
+    ...record,
+  }
+}
+
+function adaptAspects(output: MasterAstroCalculationOutput): Record<string, unknown> {
+  const source =
+    (output as MaybeObject)?.planetary_aspects_drishti ??
+    (output as MaybeObject)?.planetary_aspects ??
+    (output as MaybeObject)?.aspects ??
+    (output as MaybeObject)?.drishti
+  const record = toRecord(source)
+  if (!source) {
+    return { status: 'not_available', calculated_at: nowISO(), aspects: [], warnings: ['Aspects were not returned by the calculator.'] }
+  }
+  return {
+    status: 'real',
+    calculated_at: typeof record.calculated_at === 'string' ? record.calculated_at : nowISO(),
+    aspects: Array.isArray(record.aspects) ? record.aspects : record,
+    warnings: filterStringArray(record.warnings),
+  }
+}
+
+function adaptLifeAreas(output: MasterAstroCalculationOutput): Record<string, unknown> {
+  const source =
+    (output as MaybeObject)?.life_area_signatures ??
+    (output as MaybeObject)?.life_areas ??
+    ((output as MaybeObject)?.prediction_ready_context ? toRecord((output as MaybeObject)?.prediction_ready_context).life_area_signatures : undefined)
+  const record = toRecord(source)
+  if (!source) {
+    return { status: 'not_available', calculated_at: nowISO(), signatures: [], warnings: ['Life-area signatures were not returned by the calculator.'] }
+  }
+  return {
+    status: 'real',
+    calculated_at: typeof record.calculated_at === 'string' ? record.calculated_at : nowISO(),
+    signatures: Array.isArray(record.signatures) ? record.signatures : record,
+    warnings: filterStringArray(record.warnings),
+  }
+}
+
 export function buildProfileExpandedSectionsFromMasterOutput(output: MasterAstroCalculationOutput): AstroExpandedSections {
+  const aspects = adaptAspects(output) as AstroExpandedSections['planetary_aspects']
   return {
     daily_transits: adaptDailyTransits(output),
     panchang: adaptPanchang(output),
     current_timing: adaptCurrentTimingFromVimshottari(output),
+    navamsa_d9: adaptNavamsa(output) as AstroExpandedSections['navamsa_d9'],
+    planetary_aspects: aspects,
+    basic_aspects: aspects,
+    life_area_signatures: adaptLifeAreas(output) as AstroExpandedSections['life_area_signatures'],
   }
 }
 
