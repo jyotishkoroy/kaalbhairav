@@ -1,0 +1,9 @@
+services:
+  astro-engine:
+    build:
+      context: ../..
+      dockerfile: services/astro-engine/Dockerfile
+    environment:
+      PORT: "3000"
+    ports:
+      - "3000:3000"

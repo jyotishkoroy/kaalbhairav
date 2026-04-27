@@ -7,8 +7,10 @@ import { normalizeBirthInput } from '@/lib/astro/normalize'
 import { sha256Canonical } from '@/lib/astro/hashing'
 import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from '@/lib/astro/engine/version'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
+import { calculateMasterAstroOutputRemote } from '@/lib/astro/engine/remote'
+import { isRemoteAstroEngineConfigured } from '@/lib/astro/engine/backend'
 import type { BirthProfileInput, AstrologySettings } from '@/lib/astro/types'
-import { calculateMasterAstroOutput, type MasterAstroCalculationOutput } from '@/lib/astro/calculations/master'
+import type { MasterAstroCalculationOutput } from '@/lib/astro/schemas/master'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -75,6 +77,39 @@ export async function POST(req: NextRequest) {
   }
   const settingsHash = sha256Canonical(settingsForHash)
 
+  const runtime = {
+    user_id: user.id,
+    profile_id,
+    current_utc: new Date().toISOString(),
+    production: process.env.NODE_ENV === 'production',
+  }
+
+  if (isRemoteAstroEngineConfigured()) {
+    const output = await calculateMasterAstroOutputRemote({
+      input: decryptedInput,
+      normalized,
+      settings: settingsForHash,
+      runtime,
+    })
+
+    if (output.calculation_status === 'rejected') {
+      return NextResponse.json(
+        {
+          ...output,
+          calculation_id: randomUUID(),
+          reused_cache: false,
+        },
+        { status: 422 },
+      )
+    }
+
+    return NextResponse.json({
+      ...output,
+      calculation_id: randomUUID(),
+      reused_cache: false,
+    })
+  }
+
   if (!force_recalc) {
     const { data: cached } = await service
       .from('chart_calculations')
@@ -137,16 +172,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const { calculateMasterAstroOutput } = await import('@/lib/astro/calculations/master')
     const output = await calculateMasterAstroOutput({
       input: decryptedInput,
       normalized,
       settings: settingsForHash,
-      runtime: {
-        user_id: user.id,
-        profile_id,
-        current_utc: new Date().toISOString(),
-        production: process.env.NODE_ENV === 'production',
-      },
+      runtime,
     })
 
     if (output.calculation_status === 'rejected') {

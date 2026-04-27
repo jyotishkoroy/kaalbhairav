@@ -1,0 +1,11 @@
+{
+  "name": "astro-engine-service",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "20.x || 22.x"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/server.ts"
+  }
+}

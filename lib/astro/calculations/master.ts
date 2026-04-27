@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master'
 import type { AstrologySettings, BirthProfileInput } from '../types'
 import type { NormalizedBirthInput } from '../normalize'
 import { getSweVersion, isMoshierFallback, isSwissEphemerisAvailable, sweJulday } from '../engine/swiss'
@@ -24,16 +24,6 @@ import { calculateLifeAreas } from './life-areas'
 import { calculateTransits } from './transits'
 import { calculateConfidence } from './confidence'
 import { collectWarnings } from './warnings'
-
-export const masterAstroOutputSchema = z.object({
-  schema_version: z.string(),
-  calculation_status: z.enum(['calculated', 'partial', 'rejected']),
-  rejection_reason: z.string().optional(),
-}).passthrough()
-
-export type MasterAstroCalculationOutput = z.infer<typeof masterAstroOutputSchema> & {
-  [key: string]: unknown
-}
 
 const FORBIDDEN_PREDICTION_KEYS = new Set([
   'birth_date',
