@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { RecalculateButton } from './RecalculateButton'
 import type {
   DailyTransits,
@@ -159,28 +160,41 @@ export default async function ProfilePage({ params }: Props) {
 
       <div className="space-y-4">
         <SectionCard title="Daily Transits" status={dailyTransits?.status}>
-          {Array.isArray((dailyTransits as { transits?: Array<{ planet: string; sign: string; house_transited: number; retrograde?: boolean }> } | undefined)?.transits) && (dailyTransits as { transits: Array<{ planet: string; sign: string; house_transited: number; retrograde?: boolean }> }).transits.map((t) => (
-            <p key={t.planet} className="text-sm text-white/70">
-              {t.planet}: {t.sign} - House {t.house_transited}
-              {t.retrograde ? ' (R)' : ''}
-            </p>
-          ))}
+          {renderDisplayRows(
+            (dailyTransits as { rows?: Array<{ summary: string; planet?: string; sign?: string; house?: string | number | null; nakshatra?: string | null; retrograde?: boolean | null }> } | undefined)?.rows,
+            {
+              emptyMessage: 'Transit data is available, but no displayable transit rows were found.',
+              renderRow: (row) => (
+                <div key={`${row.planet}-${row.sign}-${row.house ?? 'na'}-${row.summary}`} className="space-y-0.5">
+                  <p>{String(row.summary)}</p>
+                  {(row.nakshatra || row.retrograde != null) && (
+                    <p className="text-xs text-white/40">
+                      {row.nakshatra ? `Nakshatra: ${row.nakshatra}` : ''}
+                      {row.nakshatra && row.retrograde != null ? ' · ' : ''}
+                      {row.retrograde != null ? `Retrograde: ${row.retrograde ? 'yes' : 'no'}` : ''}
+                    </p>
+                  )}
+                </div>
+              ),
+            },
+          )}
           {Array.isArray(dailyTransits?.warnings) && dailyTransits.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
 
         <SectionCard title="Panchang" status={panchang?.status}>
-          {panchang && (
-            <div className="space-y-1 text-sm text-white/70">
-              {panchang.vara && <p>Vara: {panchang.vara}</p>}
-              {panchang.tithi && (
-                <p>Tithi: {panchang.tithi.name} ({panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} Paksha)</p>
-              )}
-              {panchang.nakshatra && <p>Nakshatra: {panchang.nakshatra}</p>}
-              {panchang.yoga && <p>Yoga: {panchang.yoga}</p>}
-              {panchang.karana && <p>Karana: {panchang.karana}</p>}
-            </div>
+          {renderDisplayRows(
+            (panchang as { rows?: Array<{ label: string; value: string }> } | undefined)?.rows,
+            {
+              emptyMessage: 'Panchang data is available, but no displayable fields were found.',
+              renderRow: (row) => (
+                <div key={String(row.label)} className="grid grid-cols-[120px_1fr] gap-3 text-sm text-white/70">
+                  <span className="text-white/45">{String(row.label)}</span>
+                  <span>{String(row.value)}</span>
+                </div>
+              ),
+            },
           )}
           {Array.isArray(panchang?.warnings) && panchang.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
@@ -207,17 +221,15 @@ export default async function ProfilePage({ params }: Props) {
         </SectionCard>
 
         <SectionCard title="Navamsa (D9)" status={navamsa?.status}>
-          {navamsa && 'navamsa_lagna' in navamsa && (navamsa as { navamsa_lagna?: string | null }).navamsa_lagna && (
-            <p className="font-medium text-white/80 text-sm mb-2">Navamsa Lagna: {(navamsa as { navamsa_lagna: string }).navamsa_lagna}</p>
+          {navamsa && 'lagna' in navamsa && (navamsa as { lagna?: string | null }).lagna && (
+            <p className="font-medium text-white/80 text-sm mb-2">Navamsa Lagna: {(navamsa as { lagna: string }).lagna}</p>
           )}
-          {'planets' in (navamsa ?? {}) && Array.isArray((navamsa as { planets?: Array<{ planet: string; navamsa_sign: string; navamsa_house: number }> }).planets) && (
-            <div className="grid grid-cols-3 gap-1">
-              {(navamsa as { planets: Array<{ planet: string; navamsa_sign: string; navamsa_house: number }> }).planets.map((p) => (
-                <p key={p.planet} className="text-xs text-white/70">
-                  {p.planet}: {p.navamsa_sign} (H{p.navamsa_house})
-                </p>
-              ))}
-            </div>
+          {renderDisplayRows(
+            (navamsa as { rows?: Array<{ summary: string }> } | undefined)?.rows,
+            {
+              emptyMessage: 'Navamsa data is available, but no displayable placements were found.',
+              renderRow: (row) => <p key={String(row.summary)}>{String(row.summary)}</p>,
+            },
           )}
           {Array.isArray((navamsa as { warnings?: string[] } | undefined)?.warnings) && (navamsa as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
@@ -225,38 +237,26 @@ export default async function ProfilePage({ params }: Props) {
         </SectionCard>
 
         <SectionCard title="Planetary Aspects (Drishti)" status={aspects?.status}>
-          <div className="space-y-1 text-sm text-white/70">
-            {Array.isArray((aspects as { aspects?: Array<{ aspected_planet: string | null; aspecting_planet: string; aspect_type: string; strength: string }> } | undefined)?.aspects) && (aspects as { aspects: Array<{ aspected_planet: string | null; aspecting_planet: string; aspect_type: string; strength: string }> }).aspects
-              .filter((a) => a.aspected_planet !== null)
-              .slice(0, 12)
-              .map((a, i) => (
-                <p key={i}>
-                  {formatLabel(a.aspecting_planet)} - {formatLabel(a.aspected_planet)} ({formatLabel(a.aspect_type)}, {formatLabel(a.strength)})
-                </p>
-              ))}
-            {Array.isArray((aspects as { aspects?: Array<{ aspected_planet: string | null }> } | undefined)?.aspects) && (aspects as { aspects: Array<{ aspected_planet: string | null }> }).aspects.filter((a) => a.aspected_planet !== null).length > 12 && (
-              <p className="text-white/30 text-xs">
-                +{(aspects as { aspects: Array<{ aspected_planet: string | null }> }).aspects.filter((a) => a.aspected_planet !== null).length - 12} more
-              </p>
-            )}
-          </div>
+          {renderDisplayRows(
+            (aspects as { rows?: Array<{ summary: string }> } | undefined)?.rows,
+            {
+              emptyMessage: 'Aspect data is available, but no displayable aspect rows were found.',
+              renderRow: (row) => <p key={String(row.summary)}>{String(row.summary)}</p>,
+            },
+          )}
           {Array.isArray((aspects as { warnings?: string[] } | undefined)?.warnings) && (aspects as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
         </SectionCard>
 
         <SectionCard title="Life-Area Signatures" status={lifeAreas?.status}>
-          <div className="space-y-1 text-sm text-white/70">
-            {Array.isArray((lifeAreas as { signatures?: Array<{ area: string; house_number: number; house_sign: string | null; lord: string | null; lord_placement_house: number | null; strength_note?: string | null }> } | undefined)?.signatures) && (lifeAreas as { signatures: Array<{ area: string; house_number: number; house_sign: string | null; lord: string | null; lord_placement_house: number | null; strength_note?: string | null }> }).signatures.map((s) => (
-              <div key={formatLabel(s.area)} className="flex justify-between gap-2">
-                <span className="text-white/50 capitalize w-40 shrink-0">{formatLabel(s.area)}</span>
-                <span className="text-xs">
-                  H{formatLabel(s.house_number)} {formatLabel(s.house_sign)} · lord {formatLabel(s.lord)} in H{formatLabel(s.lord_placement_house)}
-                </span>
-                {s.strength_note && <span className="text-green-400/70 text-xs">{formatLabel(s.strength_note)}</span>}
-              </div>
-            ))}
-          </div>
+          {renderDisplayRows(
+            (lifeAreas as { rows?: Array<{ summary: string }> } | undefined)?.rows,
+            {
+              emptyMessage: 'Life-area data is available, but no displayable rows were found.',
+              renderRow: (row) => <p key={String(row.summary)}>{String(row.summary)}</p>,
+            },
+          )}
           {Array.isArray((lifeAreas as { warnings?: string[] } | undefined)?.warnings) && (lifeAreas as { warnings: string[] }).warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
@@ -266,39 +266,6 @@ export default async function ProfilePage({ params }: Props) {
   )
 }
 
-function formatLabel(value: unknown): string {
-  if (value == null) return '—'
-
-  if (typeof value === 'string') {
-    return value.replace(/_/g, ' ')
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-
-  if (typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    const candidate =
-      record.name ??
-      record.label ??
-      record.value ??
-      record.sign ??
-      record.planet ??
-      record.house ??
-      record.area ??
-      record.type ??
-      null
-
-    if (typeof candidate === 'string') return candidate.replace(/_/g, ' ')
-    if (typeof candidate === 'number' || typeof candidate === 'boolean') return String(candidate)
-
-    return '—'
-  }
-
-  return String(value)
-}
-
 function SectionCard({
   title,
   status,
@@ -306,7 +273,7 @@ function SectionCard({
 }: {
   title: string
   status: string | undefined
-  children: React.ReactNode
+  children: ReactNode
 }) {
   const isUnavailable = !status || status === 'stub' || status === 'not_available'
   return (
@@ -334,4 +301,18 @@ function SectionCard({
       )}
     </section>
   )
+}
+
+function renderDisplayRows(
+  rows: Array<Record<string, unknown>> | undefined,
+  options: {
+    emptyMessage: string
+    renderRow: (row: Record<string, unknown>) => ReactNode
+  },
+) {
+  const displayRows = Array.isArray(rows) ? rows : []
+  if (!displayRows.length) {
+    return <p className="text-white/30 text-sm">{options.emptyMessage}</p>
+  }
+  return <div className="space-y-1">{displayRows.map(options.renderRow)}</div>
 }
