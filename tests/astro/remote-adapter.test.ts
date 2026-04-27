@@ -95,4 +95,42 @@ describe('remote astro adapter', () => {
     expect(result.calculation_status).toBe('rejected')
     expect(result.rejection_reason).toBe('remote_astro_engine_unavailable')
   })
+
+  it('preserves sanitized validation detail for remote 400 responses', async () => {
+    process.env.ASTRO_ENGINE_SERVICE_URL = 'http://engine.test'
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      error: 'invalid_input',
+      issues: [
+        {
+          path: ['input', 'birth_date'],
+          message: 'Required',
+          input: '1990-06-14',
+        },
+        {
+          path: ['runtime', 'user_id'],
+          message: 'Required',
+          input: 'user-test',
+        },
+      ],
+    }), { status: 400 })) as never
+
+    const result = await calculateMasterAstroOutputRemote(baseArgs)
+
+    expect(result.calculation_status).toBe('rejected')
+    expect(result.rejection_reason).toBe('remote_astro_engine_http_400')
+    expect(JSON.stringify(result)).not.toContain('1990-06-14')
+    expect(JSON.stringify(result)).not.toContain('user-test')
+    const warning = (result.warnings ?? []) as Array<Record<string, unknown>>
+    expect(warning[0]).toMatchObject({
+      warning_code: 'REMOTE_ENGINE_HTTP_400',
+      severity: 'high',
+      evidence: {
+        status: 400,
+        issues: [
+          { path: ['input', 'birth_date'], message: 'Required' },
+          { path: ['runtime', 'user_id'], message: 'Required' },
+        ],
+      },
+    })
+  })
 })

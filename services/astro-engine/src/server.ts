@@ -1,4 +1,4 @@
-import { createServer } from 'node:http'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { calculateAstroEngine } from './calculate'
 import { astroEngineCalculationRequestSchema, astroEngineServiceResponseSchema } from '../../../lib/astro/schemas/engine-request'
 import { normalizeBirthInput } from '../../../lib/astro/normalize'
@@ -9,43 +9,77 @@ const port = Number(process.env.PORT ?? 3000)
 const apiKey = process.env.ASTRO_ENGINE_SERVICE_API_KEY?.trim() ?? ''
 const startupValidation = runStartupValidation()
 
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+function logRequest(details: {
+  method: string | undefined
+  path: string
+  status: number
+  has_input: boolean
+  has_normalized: boolean
+  has_settings: boolean
+  has_runtime: boolean
+}) {
+  console.info('astro_engine_request', details)
+}
 
-  if (req.method === 'GET' && url.pathname === '/health') {
-    res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, startup_validation_passed: startupValidation.passed }))
+function hasOwnField(value: unknown, key: string) {
+  return Boolean(value && typeof value === 'object' && key in value)
+}
+
+export async function handleAstroEngineRequest(req: IncomingMessage, res: ServerResponse) {
+  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+  const path = url.pathname
+  const method = req.method
+
+  let requestBody: unknown = null
+
+  const sendJson = (status: number, payload: unknown) => {
+    logRequest({
+      method,
+      path,
+      status,
+      has_input: hasOwnField(requestBody, 'input'),
+      has_normalized: hasOwnField(requestBody, 'normalized'),
+      has_settings: hasOwnField(requestBody, 'settings'),
+      has_runtime: hasOwnField(requestBody, 'runtime'),
+    })
+    res.writeHead(status, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(payload))
+  }
+
+  if (method === 'GET' && path === '/health') {
+    sendJson(200, { ok: true, startup_validation_passed: startupValidation.passed })
     return
   }
 
-  if (req.method !== 'POST' || url.pathname !== '/astro/v1/calculate') {
-    res.writeHead(404, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ error: 'not_found' }))
+  if (method !== 'POST' || path !== '/astro/v1/calculate') {
+    sendJson(404, { error: 'not_found' })
     return
   }
 
   if (!astroV1ApiEnabled()) {
-    res.writeHead(503, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ error: 'astro_v1_disabled' }))
+    sendJson(503, { error: 'astro_v1_disabled' })
     return
   }
 
   if (apiKey) {
     const auth = req.headers.authorization ?? ''
     if (auth !== `Bearer ${apiKey}`) {
-      res.writeHead(401, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error: 'unauthorized' }))
+      sendJson(401, { error: 'unauthorized' })
       return
     }
   }
 
   let raw = ''
   for await (const chunk of req) raw += chunk
-  const body = JSON.parse(raw || '{}')
-  const parsed = astroEngineCalculationRequestSchema.safeParse(body)
+  try {
+    requestBody = JSON.parse(raw || '{}')
+  } catch {
+    sendJson(400, { error: 'invalid_json' })
+    return
+  }
+  const parsed = astroEngineCalculationRequestSchema.safeParse(requestBody)
   if (!parsed.success) {
-    res.writeHead(400, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ error: 'invalid_input', issues: parsed.error.issues }))
+    sendJson(400, { error: 'invalid_input', issues: parsed.error.issues })
     return
   }
 
@@ -55,37 +89,39 @@ const server = createServer(async (req, res) => {
       calculation_status: 'rejected',
       rejection_reason: 'Swiss Ephemeris startup validation failed',
     })
-    res.writeHead(422, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(output))
+    sendJson(422, output)
     return
   }
 
   try {
-    const input = body.input
+    const input = parsed.data.input
     const normalized = normalizeBirthInput(input)
     const output = await calculateAstroEngine({
       input,
       normalized,
-      settings: body.settings,
-      runtime: body.runtime,
+      settings: parsed.data.settings,
+      runtime: parsed.data.runtime,
     })
 
     if (output.calculation_status === 'rejected') {
-      res.writeHead(422, { 'content-type': 'application/json' })
-      res.end(JSON.stringify(output))
+      sendJson(422, output)
       return
     }
 
-    res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(output))
+    sendJson(200, output)
   } catch {
-    res.writeHead(422, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(astroEngineServiceResponseSchema.parse({
+    sendJson(422, astroEngineServiceResponseSchema.parse({
       schema_version: '29.0.0',
       calculation_status: 'rejected',
       rejection_reason: 'calculation_failed',
-    })))
+    }))
   }
-})
+}
 
-server.listen(port)
+const server = createServer(handleAstroEngineRequest)
+
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(port)
+}
+
+export { server }

@@ -61,6 +61,21 @@ function buildRejectedOutput(reason: string): MasterAstroCalculationOutput {
   })
 }
 
+function sanitizeValidationIssues(issues: unknown): Array<{ path: string[]; message: string }> {
+  if (!Array.isArray(issues)) return []
+
+  return issues.flatMap((issue) => {
+    if (!issue || typeof issue !== 'object') return []
+
+    const rawIssue = issue as { path?: unknown; message?: unknown }
+    const path = Array.isArray(rawIssue.path) ? rawIssue.path.map((segment) => String(segment)) : []
+    const message = typeof rawIssue.message === 'string' ? rawIssue.message : ''
+    if (!message) return []
+
+    return [{ path, message }]
+  })
+}
+
 export async function calculateMasterAstroOutputRemote(
   args: RemoteAstroCalculationArgs,
 ): Promise<MasterAstroCalculationOutput> {
@@ -87,6 +102,27 @@ export async function calculateMasterAstroOutputRemote(
     return masterAstroOutputSchema.parse({
       ...(payload ?? {}),
       calculation_status: 'rejected',
+    })
+  }
+
+  if (response.status === 400) {
+    const issues = sanitizeValidationIssues((payload as { issues?: unknown } | null)?.issues)
+    return masterAstroOutputSchema.parse({
+      schema_version: '29.0.0',
+      calculation_status: 'rejected',
+      rejection_reason: 'remote_astro_engine_http_400',
+      warnings: [
+        {
+          warning_code: 'REMOTE_ENGINE_HTTP_400',
+          severity: 'high',
+          affected_calculations: ['all'],
+          explanation: 'Remote astro engine rejected the request payload.',
+          evidence: {
+            status: 400,
+            issues,
+          },
+        },
+      ],
     })
   }
 
