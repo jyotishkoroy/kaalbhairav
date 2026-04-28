@@ -43,3 +43,9 @@ next-env.d.ts
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Python astro engine local artifacts
+services/astro-engine/python/.venv/
+services/astro-engine/python/**/__pycache__/
+services/astro-engine/python/**/*.pyc
+services/astro-engine/python/output/
