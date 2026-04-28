@@ -106,6 +106,39 @@ function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : []
 }
 
+function isAvailableSection(value: unknown): value is {
+  status?: string
+  rows?: unknown[]
+  items?: unknown[]
+  data?: unknown
+  warnings?: unknown[]
+  source?: string
+} {
+  return !!value && typeof value === 'object' && (value as { status?: unknown }).status === 'available'
+}
+
+function normalizeAvailableSection(value: unknown) {
+  if (!isAvailableSection(value)) return null
+
+  const section = value as {
+    status?: string
+    rows?: unknown[]
+    items?: unknown[]
+    data?: unknown
+    warnings?: unknown[]
+    source?: string
+  }
+
+  return {
+    status: 'available' as const,
+    source: section.source ?? 'python_astro_calculation_engine',
+    data: section.data ?? null,
+    rows: Array.isArray(section.rows) ? section.rows : [],
+    items: Array.isArray(section.items) ? section.items : [],
+    warnings: Array.isArray(section.warnings) ? section.warnings : [],
+  }
+}
+
 function isMeaningfulText(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '' && value.trim() !== '—'
 }
@@ -369,7 +402,10 @@ function adaptPanchang(output: MasterAstroCalculationOutput): PanchangDisplay {
 }
 
 function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput): CurrentTimingContext {
-  const source = (output as MaybeObject)?.vimshottari_dasha as Record<string, unknown> | undefined
+  const rawSource = (output as MaybeObject)?.vimshottari_dasha as Record<string, unknown> | undefined
+  const source = rawSource?.data && typeof rawSource.data === 'object'
+    ? { ...rawSource, ...(rawSource.data as Record<string, unknown>) }
+    : rawSource
   const currentDasha = source ? toRecord(source.current_dasha) : {}
   const hasCurrentDasha = !!(currentDasha.mahadasha || currentDasha.antardasha || currentDasha.pratyantardasha)
 
@@ -609,19 +645,40 @@ function adaptLifeAreas(output: MasterAstroCalculationOutput): LifeAreaDisplay {
 }
 
 export function buildProfileExpandedSectionsFromMasterOutput(output: MasterAstroCalculationOutput): AstroExpandedSections {
+  const record = output as Record<string, unknown>
+  const rawPanchang = normalizeAvailableSection(record.panchang)
+  const rawVimshottariDasha = normalizeAvailableSection(record.vimshottari_dasha)
+  const rawNavamsaD9 = normalizeAvailableSection(record.navamsa_d9)
+  const rawAshtakvarga = normalizeAvailableSection(record.ashtakvarga)
+  const rawSadeSati = normalizeAvailableSection(record.sade_sati)
+  const rawKalsarpaDosh = normalizeAvailableSection(record.kalsarpa_dosh)
+  const rawManglikDosh = normalizeAvailableSection(record.manglik_dosha)
+  const rawAvkahadaChakra = normalizeAvailableSection(record.avkahada_chakra)
+  const rawFavourablePoints = normalizeAvailableSection(record.favourable_points)
+  const rawGhatak = normalizeAvailableSection(record.ghatak)
+  const rawShadbala = normalizeAvailableSection(record.shadbala)
   const daily_transits = adaptDailyTransits(output) as AstroExpandedSections['daily_transits']
-  const panchang = adaptPanchang(output) as AstroExpandedSections['panchang']
-  const navamsa_d9 = adaptNavamsa(output) as unknown as AstroExpandedSections['navamsa_d9']
+  const panchang = (rawPanchang ?? adaptPanchang(output)) as AstroExpandedSections['panchang']
+  const navamsa_d9 = (rawNavamsaD9 ?? adaptNavamsa(output)) as unknown as AstroExpandedSections['navamsa_d9']
   const aspects = adaptAspects(output) as unknown as AstroExpandedSections['planetary_aspects']
   const life_area_signatures = adaptLifeAreas(output) as unknown as AstroExpandedSections['life_area_signatures']
   return {
     daily_transits,
     panchang,
     current_timing: adaptCurrentTimingFromVimshottari(output),
+    vimshottari_dasha: rawVimshottariDasha ?? undefined,
     navamsa_d9,
     planetary_aspects: aspects,
     basic_aspects: aspects,
     life_area_signatures,
+    ashtakvarga: rawAshtakvarga ?? undefined,
+    sade_sati: rawSadeSati ?? undefined,
+    kalsarpa_dosh: rawKalsarpaDosh ?? undefined,
+    manglik_dosha: rawManglikDosh ?? undefined,
+    avkahada_chakra: rawAvkahadaChakra ?? undefined,
+    favourable_points: rawFavourablePoints ?? undefined,
+    ghatak: rawGhatak ?? undefined,
+    shadbala: rawShadbala ?? undefined,
   }
 }
 

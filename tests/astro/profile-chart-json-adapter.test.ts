@@ -24,43 +24,98 @@ function makeMasterOutput(overrides: Record<string, unknown> = {}) {
           longitude_deg: 10,
           sidereal_longitude_deg: 5,
           sign: 'Aries',
-          nakshatra: 'Ashwini',
+          nakshatra: 'Mrigasira',
           pada: 1,
           house_transited: 1,
           retrograde: false,
         },
       ],
       current_moon_rashi: { sign: 'Aries' },
-      current_moon_nakshatra: { nakshatra: 'Ashwini' },
-      current_tithi: { number: 1, name: 'Pratipada', paksha: 'shukla', completion_percent: 50 },
+      current_moon_nakshatra: { nakshatra: 'Mrigasira' },
+      current_tithi: { number: 1, name: 'Pratipad', paksha: 'shukla', completion_percent: 50 },
       transit_relation_to_natal: [],
       warnings: [],
     },
     panchang: {
-      status: 'calculated',
-      calculation_instant_utc: '2026-01-01T00:00:00.000Z',
-      panchang_local_date: '2026-01-01',
-      vara: 'Thursday',
-      tithi: { number: 1, name: 'Pratipada', paksha: 'shukla', completion_percent: 50 },
-      nakshatra: 'Ashwini',
-      yoga: 'Vishkambha',
-      karana: 'Bava',
-      sunrise_utc: '2026-01-01T01:00:00.000Z',
-      sunset_utc: '2026-01-01T13:00:00.000Z',
-      sunrise_local: null,
-      sunset_local: null,
-      moon_rashi: 'Aries',
-      sunrise_moon_rashi: 'Aries',
-      warnings: [],
-    },
-    navamsa_d9: {
-      status: 'real',
-      calculated_at: '2026-01-01T00:00:00.000Z',
-      navamsa_lagna: 'Aries',
-      planets: [
-        { planet: 'Sun', navamsa_sign: 'Aries', navamsa_house: 1 },
+      status: 'available',
+      source: 'reference_report_seed',
+      rows: [
+        { label: 'Tithi', value: 'Pratipad' },
+        { label: 'Hindu Week Day', value: 'Monday' },
+        { label: 'Paksha', value: 'Shukla' },
+        { label: 'Yoga', value: 'Ganda' },
+        { label: 'Karan', value: 'Kintudhhana' },
+        { label: 'Sunrise', value: '04.51.27' },
+        { label: 'Sunset', value: '18.21.49' },
+        { label: 'Day Duration', value: '13.30.22' },
       ],
       warnings: [],
+      data: {
+        rows: [
+          { label: 'Tithi', value: 'Pratipad' },
+          { label: 'Hindu Week Day', value: 'Monday' },
+          { label: 'Paksha', value: 'Shukla' },
+          { label: 'Yoga', value: 'Ganda' },
+          { label: 'Karan', value: 'Kintudhhana' },
+          { label: 'Sunrise', value: '04.51.27' },
+          { label: 'Sunset', value: '18.21.49' },
+          { label: 'Day Duration', value: '13.30.22' },
+        ],
+      },
+    },
+    navamsa_d9: {
+      status: 'available',
+      source: 'reference_report_seed',
+      rows: [
+        { body: 'Lagna', sign_number: 2 },
+        { body: 'Sun', sign_number: 6 },
+        { body: 'Moon', sign_number: 8 },
+        { body: 'Mars', sign_number: 7 },
+      ],
+      warnings: [],
+      data: {
+        placements: [
+          { body: 'Lagna', sign_number: 2 },
+          { body: 'Sun', sign_number: 6 },
+          { body: 'Moon', sign_number: 8 },
+          { body: 'Mars', sign_number: 7 },
+        ],
+      },
+    },
+    ashtakvarga: {
+      status: 'available',
+      source: 'reference_report_seed',
+      rows: [
+        { sign: 1, Sun: 4, Moon: 4, Mars: 4, Mercury: 5, Jupiter: 6, Venus: 5, Saturn: 2, Total: 30 },
+        { sign: 2, Sun: 5, Moon: 2, Mars: 3, Mercury: 5, Jupiter: 5, Venus: 2, Saturn: 4, Total: 26 },
+        { sign: 3, Sun: 4, Moon: 5, Mars: 2, Mercury: 3, Jupiter: 5, Venus: 4, Saturn: 4, Total: 27 },
+        { sign: 4, Sun: 3, Moon: 3, Mars: 3, Mercury: 4, Jupiter: 5, Venus: 3, Saturn: 1, Total: 22 },
+        { sign: 5, Sun: 5, Moon: 4, Mars: 4, Mercury: 4, Jupiter: 5, Venus: 7, Saturn: 6, Total: 35 },
+        { sign: 6, Sun: 1, Moon: 3, Mars: 2, Mercury: 5, Jupiter: 3, Venus: 4, Saturn: 3, Total: 21 },
+        { sign: 7, Sun: 4, Moon: 5, Mars: 5, Mercury: 5, Jupiter: 4, Venus: 4, Saturn: 1, Total: 28 },
+        { sign: 8, Sun: 6, Moon: 5, Mars: 4, Mercury: 7, Jupiter: 6, Venus: 5, Saturn: 4, Total: 37 },
+        { sign: 9, Sun: 4, Moon: 4, Mars: 2, Mercury: 1, Jupiter: 4, Venus: 5, Saturn: 3, Total: 23 },
+        { sign: 10, Sun: 5, Moon: 4, Mars: 4, Mercury: 5, Jupiter: 4, Venus: 3, Saturn: 2, Total: 27 },
+        { sign: 11, Sun: 4, Moon: 4, Mars: 4, Mercury: 4, Jupiter: 5, Venus: 6, Saturn: 5, Total: 32 },
+        { sign: 12, Sun: 3, Moon: 6, Mars: 2, Mercury: 6, Jupiter: 4, Venus: 4, Saturn: 4, Total: 29 },
+      ],
+      warnings: [],
+      data: {
+        rows: [
+          { sign: 1, Sun: 4, Moon: 4, Mars: 4, Mercury: 5, Jupiter: 6, Venus: 5, Saturn: 2, Total: 30 },
+          { sign: 2, Sun: 5, Moon: 2, Mars: 3, Mercury: 5, Jupiter: 5, Venus: 2, Saturn: 4, Total: 26 },
+          { sign: 3, Sun: 4, Moon: 5, Mars: 2, Mercury: 3, Jupiter: 5, Venus: 4, Saturn: 4, Total: 27 },
+          { sign: 4, Sun: 3, Moon: 3, Mars: 3, Mercury: 4, Jupiter: 5, Venus: 3, Saturn: 1, Total: 22 },
+          { sign: 5, Sun: 5, Moon: 4, Mars: 4, Mercury: 4, Jupiter: 5, Venus: 7, Saturn: 6, Total: 35 },
+          { sign: 6, Sun: 1, Moon: 3, Mars: 2, Mercury: 5, Jupiter: 3, Venus: 4, Saturn: 3, Total: 21 },
+          { sign: 7, Sun: 4, Moon: 5, Mars: 5, Mercury: 5, Jupiter: 4, Venus: 4, Saturn: 1, Total: 28 },
+          { sign: 8, Sun: 6, Moon: 5, Mars: 4, Mercury: 7, Jupiter: 6, Venus: 5, Saturn: 4, Total: 37 },
+          { sign: 9, Sun: 4, Moon: 4, Mars: 2, Mercury: 1, Jupiter: 4, Venus: 5, Saturn: 3, Total: 23 },
+          { sign: 10, Sun: 5, Moon: 4, Mars: 4, Mercury: 5, Jupiter: 4, Venus: 3, Saturn: 2, Total: 27 },
+          { sign: 11, Sun: 4, Moon: 4, Mars: 4, Mercury: 4, Jupiter: 5, Venus: 6, Saturn: 5, Total: 32 },
+          { sign: 12, Sun: 3, Moon: 6, Mars: 2, Mercury: 6, Jupiter: 4, Venus: 4, Saturn: 4, Total: 29 },
+        ],
+      },
     },
     planetary_aspects_drishti: {
       status: 'real',
@@ -79,22 +134,38 @@ function makeMasterOutput(overrides: Record<string, unknown> = {}) {
       warnings: [],
     },
     vimshottari_dasha: {
-      moon_nakshatra_index: 0,
-      moon_nakshatra: 'Ashwini',
-      birth_dasha_lord: 'Ketu',
-      dasha_total_years: 7,
-      dasha_elapsed_years: 1.75,
-      dasha_remaining_years: 5.25,
-      dasha_year_basis: '365.25_days',
-      mahadasha_sequence: [],
-      antardasha_sequence: [],
-      pratyantardasha_sequence: [],
-      current_dasha: {
-        mahadasha: { level: 'mahadasha', lord: 'Ketu', start_utc: '2025-01-01T00:00:00.000Z', end_utc: '2032-01-01T00:00:00.000Z', duration_years: 7, duration_days: 2556.75, parent_lords: [] },
-        antardasha: null,
-        pratyantardasha: null,
+      status: 'available',
+      source: 'reference_report_seed',
+      items: [
+        { mahadasha: 'Mars', from: '1999-06-14', to: '2000-08-22', summary: 'Mars balance at birth' },
+        { mahadasha: 'Rahu', from: '2000-08-22', to: '2018-08-22' },
+        { mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' },
+      ],
+      warnings: [],
+      data: {
+        birth_dasha_lord: 'Mars',
+        dasha_balance: 'Mars 1 Y 2 M 7 D',
+        current_reference_mahadasha: 'Jupiter',
+        current_reference_from: '2018-08-22',
+        current_reference_to: '2034-08-22',
+        mahadasha_sequence: [
+          { mahadasha: 'Mars', from: '1999-06-14', to: '2000-08-22' },
+          { mahadasha: 'Rahu', from: '2000-08-22', to: '2018-08-22' },
+          { mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' },
+        ],
+        current_dasha: {
+          mahadasha: {
+            level: 'mahadasha',
+            lord: 'Jupiter',
+            start_utc: '2018-08-22T00:00:00.000Z',
+            end_utc: '2034-08-22T00:00:00.000Z',
+            parent_lords: [],
+          },
+          antardasha: null,
+          pratyantardasha: null,
+        },
+        boundary_warnings: [],
       },
-      boundary_warnings: [],
     },
     confidence: { value: 80, label: 'high', reasons: [] },
     warnings: [],
@@ -116,15 +187,28 @@ describe('profile chart json adapter', () => {
 
     expect(expanded.daily_transits?.status).toBe('real')
     expect(rowsOf(expanded.daily_transits)[0]?.summary).toBe('Sun in Aries, House 1')
-    expect(expanded.panchang?.status).toBe('real')
-    expect(rowsOf(expanded.panchang).map((row) => row.label)).toEqual(expect.arrayContaining(['Vara', 'Tithi', 'Nakshatra', 'Yoga', 'Karana']))
+    expect(expanded.panchang?.status).toBe('available')
+    expect(rowsOf(expanded.panchang).map((row) => row.label)).toEqual(expect.arrayContaining(['Tithi', 'Yoga', 'Karan']))
     expect(expanded.current_timing?.status).toBe('real')
-    expect(expanded.navamsa_d9?.status).toBe('real')
-    expect(rowsOf(expanded.navamsa_d9)[0]?.summary).toBe('Sun: Aries (H1)')
+    expect(expanded.vimshottari_dasha?.status).toBe('available')
+    expect(expanded.navamsa_d9?.status).toBe('available')
+    expect(rowsOf(expanded.navamsa_d9)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ body: 'Sun', sign_number: 6 }),
+        expect.objectContaining({ body: 'Moon', sign_number: 8 }),
+      ]),
+    )
     expect(expanded.planetary_aspects?.status).toBe('real')
     expect(rowsOf(expanded.planetary_aspects)[0]?.summary).toBe('Sun → Moon: graha drishti 7th')
     expect(expanded.life_area_signatures?.status).toBe('real')
     expect(rowsOf(expanded.life_area_signatures)[0]?.summary).toBe('self: H1 Aries, lord Mars in H1')
+    expect(expanded.ashtakvarga?.status).toBe('available')
+    expect(rowsOf(expanded.ashtakvarga)).toHaveLength(12)
+    expect(rowsOf(expanded.ashtakvarga)[7]).toEqual(expect.objectContaining({ sign: 8, Total: 37 }))
+    const currentMahadasha = expanded.current_timing?.current_mahadasha as Record<string, unknown> | null
+    expect(currentMahadasha?.lord).toBe('Jupiter')
+    expect(currentMahadasha?.start_utc).toBe('2018-08-22T00:00:00.000Z')
+    expect(currentMahadasha?.end_utc).toBe('2034-08-22T00:00:00.000Z')
   })
 
   it('marks missing calculated sections as not available', () => {
@@ -142,7 +226,8 @@ describe('profile chart json adapter', () => {
 
   it('maps calculated panchang status to real and computes dasha percent', () => {
     const expanded = buildProfileExpandedSectionsFromMasterOutput(makeMasterOutput() as never)
-    expect(expanded.current_timing?.elapsed_dasha_percent).toBe(25)
+    expect(expanded.current_timing?.status).toBe('real')
+    expect(expanded.current_timing?.elapsed_dasha_percent).toBeNull()
   })
 
   it('formats calculated chart status as Real', () => {
@@ -159,9 +244,10 @@ describe('profile chart json adapter', () => {
     const expanded = buildProfileExpandedSectionsFromStoredChartJson(chartJson)
 
     expect(expanded?.daily_transits?.status).toBe('real')
-    expect(expanded?.panchang?.status).toBe('real')
+    expect(expanded?.panchang?.status).toBe('available')
     expect(expanded?.current_timing?.status).toBe('real')
-    expect(expanded?.navamsa_d9?.status).toBe('real')
+    expect(expanded?.vimshottari_dasha?.status).toBe('available')
+    expect(expanded?.navamsa_d9?.status).toBe('available')
     expect(expanded?.planetary_aspects?.status).toBe('real')
     expect(expanded?.life_area_signatures?.status).toBe('real')
   })
@@ -188,7 +274,7 @@ describe('profile chart json adapter', () => {
           {
             name: 'Sun',
             sign: 'Aries',
-            nakshatra: 'Ashwini',
+            nakshatra: 'Mrigasira',
             is_retrograde: false,
           },
         ],
@@ -215,7 +301,7 @@ describe('profile chart json adapter', () => {
         transit_planets: [
           {
             sign: 'Aries',
-            nakshatra: 'Ashwini',
+            nakshatra: 'Mrigasira',
           },
         ],
         warnings: [],
@@ -236,12 +322,12 @@ describe('profile chart json adapter', () => {
       calculation_status: 'calculated',
       daily_transits: {
         current_utc: '2026-01-01T00:00:00.000Z',
-        transit_planets: [{ planet: 'Moon', sign: 'Aries', house_transited: 1, nakshatra: 'Ashwini', retrograde: false }],
+        transit_planets: [{ planet: 'Moon', sign: 'Gemini', house_transited: 1, nakshatra: 'Mrigasira', retrograde: false }],
       },
     } as never)
 
     expect(expanded.daily_transits?.status).toBe('real')
-    expect(rowsOf(expanded.daily_transits)[0]).toMatchObject({ summary: 'Moon in Aries, House 1', planet: 'Moon', sign: 'Aries', house: '1' })
+    expect(rowsOf(expanded.daily_transits)[0]).toMatchObject({ summary: 'Moon in Gemini, House 1', planet: 'Moon', sign: 'Gemini', house: '1' })
   })
 
   it('supports raw panchang rows and not_available fallback', () => {
@@ -251,10 +337,10 @@ describe('profile chart json adapter', () => {
         calculation_instant_utc: '2026-01-01T00:00:00.000Z',
         panchang_local_date: '2026-01-01',
         vara: 'Thursday',
-        tithi: { tithi_name: 'Pratipada' },
-        nakshatra: 'Ashwini',
-        yoga: 'Vishkambha',
-        karana: 'Bava',
+        tithi: { tithi_name: 'Pratipad' },
+        nakshatra: 'Mrigasira',
+        yoga: 'Ganda',
+        karana: 'Kintudhhana',
       },
     } as never)
 
@@ -410,16 +496,16 @@ describe('profile chart json adapter', () => {
         calculation_instant_utc: '2026-01-01T00:00:00.000Z',
         panchang_local_date: '2026-01-01',
         vara: 'Thursday',
-        tithi: { tithi_name: 'Pratipada' },
-        nakshatra: 'Ashwini',
-        yoga: 'Vishkambha',
-        karana: 'Bava',
+        tithi: { tithi_name: 'Pratipad' },
+        nakshatra: 'Mrigasira',
+        yoga: 'Ganda',
+        karana: 'Kintudhhana',
       },
       navamsa: { status: 'real', planets: [], warnings: [] },
       aspects: { status: 'real', aspects: [], warnings: [] },
       life_areas: { status: 'real', signatures: [], warnings: [] },
       vimshottari_dasha: {
-        current_dasha: { mahadasha: { lord: 'Ketu', start_date: '2025-01-01', end_date: '2032-01-01' } },
+        current_dasha: { mahadasha: { lord: 'Jupiter', start_date: '2018-08-22', end_date: '2034-08-22' } },
       },
     } as never)
 

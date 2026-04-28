@@ -184,8 +184,80 @@ export type AstroExpandedSections = {
   daily_transits?: DailyTransits
   panchang?: Panchang
   current_timing?: CurrentTimingContext
+  vimshottari_dasha?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
   navamsa_d9?: NavamsaD9
   planetary_aspects?: BasicAspects
   basic_aspects?: BasicAspects
   life_area_signatures?: LifeAreaSignatures
+  ashtakvarga?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  sade_sati?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  kalsarpa_dosh?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  manglik_dosha?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  avkahada_chakra?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  favourable_points?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  ghatak?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  shadbala?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
 }
