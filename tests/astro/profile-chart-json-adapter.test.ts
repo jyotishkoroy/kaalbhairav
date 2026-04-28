@@ -207,8 +207,169 @@ describe('profile chart json adapter', () => {
     expect(rowsOf(expanded.ashtakvarga)[7]).toEqual(expect.objectContaining({ sign: 8, Total: 37 }))
     const currentMahadasha = expanded.current_timing?.current_mahadasha as Record<string, unknown> | null
     expect(currentMahadasha?.lord).toBe('Jupiter')
-    expect(currentMahadasha?.start_utc).toBe('2018-08-22T00:00:00.000Z')
-    expect(currentMahadasha?.end_utc).toBe('2034-08-22T00:00:00.000Z')
+    expect(currentMahadasha?.start_date).toBe('2018-08-22T00:00:00.000Z')
+    expect(currentMahadasha?.end_date).toBe('2034-08-22T00:00:00.000Z')
+  })
+
+  it('keeps available section rows and items usable when the new shape arrives from storage', () => {
+    const expanded = buildProfileExpandedSectionsFromStoredChartJson({
+      expanded_sections: {
+        panchang: {
+          status: 'available',
+          source: 'reference_report_seed',
+          data: {
+            rows: [
+              { label: 'Tithi', value: 'Pratipad' },
+              { label: 'Yoga', value: 'Ganda' },
+              { label: 'Karan', value: 'Kintudhhana' },
+              { label: 'Sunrise', value: '04.51.27' },
+              { label: 'Sunset', value: '18.21.49' },
+            ],
+          },
+        },
+        navamsa_d9: {
+          status: 'available',
+          source: 'reference_report_seed',
+          data: {
+            placements: [
+              { body: 'Sun', sign_number: 6 },
+              { body: 'Moon', sign_number: 8 },
+            ],
+          },
+        },
+        vimshottari_dasha: {
+          status: 'available',
+          source: 'reference_report_seed',
+          data: {
+            current_reference_mahadasha: 'Jupiter',
+            current_reference_from: '2018-08-22',
+            current_reference_to: '2034-08-22',
+            mahadasha_sequence: [
+              { mahadasha: 'Mars', from: '1999-06-14', to: '2000-08-22' },
+              { mahadasha: 'Rahu', from: '2000-08-22', to: '2018-08-22' },
+              { mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' },
+            ],
+          },
+        },
+        ashtakvarga: {
+          status: 'available',
+          source: 'reference_report_seed',
+          data: {
+            rows: [
+              { sign: 8, Total: 37 },
+            ],
+          },
+        },
+      },
+    })
+
+    expect(expanded?.panchang?.status).toBe('available')
+    expect(((expanded?.panchang as unknown as { data?: { rows?: Array<Record<string, unknown>> } })?.data?.rows ?? []).map((row) => `${row.label}: ${row.value}`)).toEqual(
+      expect.arrayContaining([
+        'Tithi: Pratipad',
+        'Yoga: Ganda',
+        'Karan: Kintudhhana',
+        'Sunrise: 04.51.27',
+        'Sunset: 18.21.49',
+      ]),
+    )
+    expect(expanded?.navamsa_d9?.status).toBe('available')
+    expect(((expanded?.navamsa_d9 as unknown as { data?: { placements?: Array<Record<string, unknown>> } })?.data?.placements ?? [])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ body: 'Sun', sign_number: 6 }),
+        expect.objectContaining({ body: 'Moon', sign_number: 8 }),
+      ]),
+    )
+    expect(expanded?.vimshottari_dasha?.status).toBe('available')
+    expect((expanded?.vimshottari_dasha?.data as Record<string, unknown> | undefined)?.current_reference_mahadasha).toBe('Jupiter')
+    expect(((expanded?.ashtakvarga?.data as { rows?: Array<Record<string, unknown>> } | undefined)?.rows ?? [])).toEqual(expect.arrayContaining([expect.objectContaining({ sign: 8, Total: 37 })]))
+  })
+
+  it('repairs stale stored expanded sections from available astronomical data', () => {
+    const expanded = buildProfileExpandedSectionsFromStoredChartJson({
+      expanded_sections: {
+        panchang: {
+          status: 'partial',
+          rows: [],
+          warnings: ['stale storage'],
+        },
+        navamsa_d9: {
+          status: 'partial',
+          rows: [],
+          warnings: ['stale storage'],
+        },
+        vimshottari_dasha: {
+          status: 'partial',
+          items: [],
+          warnings: ['stale storage'],
+        },
+      },
+      astronomical_data: makeMasterOutput({
+        panchang: {
+          status: 'available',
+          source: 'reference_report_seed',
+          rows: [
+            { label: 'Tithi', value: 'Pratipad' },
+            { label: 'Yoga', value: 'Ganda' },
+            { label: 'Karan', value: 'Kintudhhana' },
+          ],
+          data: {
+            rows: [
+              { label: 'Tithi', value: 'Pratipad' },
+              { label: 'Yoga', value: 'Ganda' },
+              { label: 'Karan', value: 'Kintudhhana' },
+            ],
+          },
+        },
+        navamsa_d9: {
+          status: 'available',
+          source: 'reference_report_seed',
+          rows: [
+            { body: 'Sun', sign_number: 6 },
+            { body: 'Moon', sign_number: 8 },
+          ],
+          data: {
+            placements: [
+              { body: 'Sun', sign_number: 6 },
+              { body: 'Moon', sign_number: 8 },
+            ],
+          },
+        },
+        vimshottari_dasha: {
+          status: 'available',
+          source: 'reference_report_seed',
+          items: [
+            { mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' },
+          ],
+          data: {
+            current_reference_mahadasha: 'Jupiter',
+            current_reference_from: '2018-08-22',
+            current_reference_to: '2034-08-22',
+            current_dasha: {
+              mahadasha: {
+                lord: 'Jupiter',
+                start_utc: '2018-08-22T00:00:00.000Z',
+                end_utc: '2034-08-22T00:00:00.000Z',
+              },
+            },
+          },
+        },
+      }),
+    })
+
+    expect(expanded?.panchang?.status).toBe('available')
+    expect(rowsOf(expanded?.panchang).map((row) => `${row.label}: ${row.value}`)).toEqual(
+      expect.arrayContaining(['Tithi: Pratipad', 'Yoga: Ganda', 'Karan: Kintudhhana']),
+    )
+    expect(expanded?.navamsa_d9?.status).toBe('available')
+    expect(rowsOf(expanded?.navamsa_d9)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ body: 'Sun', sign_number: 6 }),
+        expect.objectContaining({ body: 'Moon', sign_number: 8 }),
+      ]),
+    )
+    expect(expanded?.current_timing?.current_mahadasha?.lord).toBe('Jupiter')
+    expect(expanded?.vimshottari_dasha?.status).toBe('available')
   })
 
   it('marks missing calculated sections as not available', () => {
@@ -292,6 +453,39 @@ describe('profile chart json adapter', () => {
         }),
       ]),
     )
+  })
+
+  it('preserves old fallback behavior when available sections are empty', () => {
+    const expanded = buildProfileExpandedSectionsFromStoredChartJson({
+      expanded_sections: {
+        panchang: {
+          status: 'available',
+          source: 'reference_report_seed',
+          rows: [],
+          warnings: ['reference-only'],
+        },
+        navamsa_d9: {
+          status: 'available',
+          source: 'reference_report_seed',
+          rows: [],
+          warnings: ['reference-only'],
+        },
+        vimshottari_dasha: {
+          status: 'available',
+          source: 'reference_report_seed',
+          items: [],
+          warnings: ['reference-only'],
+        },
+      },
+    })
+
+    expect(expanded?.panchang?.status).toBe('available')
+    expect(rowsOf(expanded?.panchang)).toEqual([])
+    expect(expanded?.navamsa_d9?.status).toBe('available')
+    expect(rowsOf(expanded?.navamsa_d9)).toEqual([])
+    expect(expanded?.vimshottari_dasha?.status).toBe('available')
+    expect(Array.isArray(expanded?.vimshottari_dasha?.items)).toBe(true)
+    expect((expanded?.vimshottari_dasha?.items ?? [])).toHaveLength(0)
   })
 
   it('keeps daily transits partial when rows lack planet names', () => {

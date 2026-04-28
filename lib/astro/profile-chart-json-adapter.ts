@@ -139,6 +139,37 @@ function normalizeAvailableSection(value: unknown) {
   }
 }
 
+function availableSectionHasDisplayData(section: ReturnType<typeof normalizeAvailableSection>): boolean {
+  if (!section) return false
+  if (section.rows.length > 0) return true
+  if (section.items.length > 0) return true
+  if (section.data && typeof section.data === 'object') {
+    const data = section.data as {
+      rows?: unknown
+      items?: unknown
+      placements?: unknown
+      mahadasha_sequence?: unknown
+      current_dasha?: unknown
+    }
+    if (Array.isArray(data.rows) && data.rows.length > 0) return true
+    if (Array.isArray(data.items) && data.items.length > 0) return true
+    if (Array.isArray(data.placements) && data.placements.length > 0) return true
+    if (Array.isArray(data.mahadasha_sequence) && data.mahadasha_sequence.length > 0) return true
+    if (data.current_dasha && typeof data.current_dasha === 'object') return true
+  }
+  return section.data != null
+}
+
+function preferAvailableSection(candidate: unknown, fallback: unknown): unknown {
+  const normalizedCandidate = normalizeAvailableSection(candidate)
+  if (availableSectionHasDisplayData(normalizedCandidate)) return normalizedCandidate
+
+  const normalizedFallback = normalizeAvailableSection(fallback)
+  if (availableSectionHasDisplayData(normalizedFallback)) return normalizedFallback
+
+  return fallback ?? candidate
+}
+
 function isMeaningfulText(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '' && value.trim() !== '—'
 }
@@ -407,7 +438,30 @@ function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput)
     ? { ...rawSource, ...(rawSource.data as Record<string, unknown>) }
     : rawSource
   const currentDasha = source ? toRecord(source.current_dasha) : {}
-  const hasCurrentDasha = !!(currentDasha.mahadasha || currentDasha.antardasha || currentDasha.pratyantardasha)
+  const currentDashaFromItems = (() => {
+    const items = toArray(source?.items)
+    return items.length > 0 ? toRecord(items.find((item) => {
+      const row = toRecord(item)
+      return displayString(row.mahadasha ?? row.lord ?? row.name) != null
+    })) : {}
+  })()
+  const currentDashaFromSequence = (() => {
+    const sequence = toArray(source?.mahadasha_sequence)
+    return sequence.length > 0 ? toRecord(sequence.find((item) => {
+      const row = toRecord(item)
+      return displayString(row.mahadasha ?? row.lord ?? row.name) != null
+    })) : {}
+  })()
+  const resolvedMahadasha =
+    currentDasha.mahadasha ??
+    currentDashaFromItems.mahadasha ??
+    currentDashaFromSequence.mahadasha ??
+    source?.current_reference_mahadasha ??
+    source?.current_mahadasha ??
+    null
+  const resolvedAntardasha = currentDasha.antardasha ?? source?.current_antardasha ?? null
+  const resolvedPratyantardasha = currentDasha.pratyantardasha ?? source?.current_pratyantardasha ?? null
+  const hasCurrentDasha = !!(resolvedMahadasha || resolvedAntardasha || resolvedPratyantardasha)
 
   if (!source || !hasCurrentDasha) {
     return {
@@ -422,9 +476,33 @@ function adaptCurrentTimingFromVimshottari(output: MasterAstroCalculationOutput)
     }
   }
 
-  const currentMahadasha = currentDasha.mahadasha ?? source.current_mahadasha ?? null
-  const currentAntardasha = currentDasha.antardasha ?? source.current_antardasha ?? null
-  const currentPratyantardasha = currentDasha.pratyantardasha ?? source.current_pratyantardasha ?? null
+  const currentMahadasha = resolvedMahadasha
+    ? (typeof resolvedMahadasha === 'object'
+        ? {
+            lord: displayString((resolvedMahadasha as Record<string, unknown>).lord ?? (resolvedMahadasha as Record<string, unknown>).mahadasha) ?? 'Unknown',
+            start_date:
+              displayString(
+                (resolvedMahadasha as Record<string, unknown>).start_date ??
+                  (resolvedMahadasha as Record<string, unknown>).from ??
+                  (resolvedMahadasha as Record<string, unknown>).start_utc ??
+                  source?.current_reference_from,
+              ) ?? '',
+            end_date:
+              displayString(
+                (resolvedMahadasha as Record<string, unknown>).end_date ??
+                  (resolvedMahadasha as Record<string, unknown>).to ??
+                  (resolvedMahadasha as Record<string, unknown>).end_utc ??
+                  source?.current_reference_to,
+              ) ?? '',
+          }
+        : {
+            lord: resolvedMahadasha,
+            start_date: (displayString(source?.current_reference_from) ?? displayString(currentDasha.start_date)) ?? null,
+            end_date: (displayString(source?.current_reference_to) ?? displayString(currentDasha.end_date)) ?? null,
+          })
+    : null
+  const currentAntardasha = resolvedAntardasha ?? null
+  const currentPratyantardasha = resolvedPratyantardasha ?? null
   const elapsed = typeof source.dasha_elapsed_years === 'number' ? source.dasha_elapsed_years : null
   const total = typeof source.dasha_total_years === 'number' ? source.dasha_total_years : null
   const elapsedPercent = elapsed != null && total != null && Number.isFinite(elapsed) && Number.isFinite(total) && total > 0
@@ -685,9 +763,36 @@ export function buildProfileExpandedSectionsFromMasterOutput(output: MasterAstro
 export function buildProfileExpandedSectionsFromStoredChartJson(chartJson: Record<string, unknown> | null | undefined): AstroExpandedSections | null {
   if (!chartJson) return null
   const storedExpanded = chartJson.expanded_sections as AstroExpandedSections | undefined
-  if (storedExpanded) return storedExpanded
-  if (!chartJson.astronomical_data) return null
-  return buildProfileExpandedSectionsFromMasterOutput(chartJson.astronomical_data as MasterAstroCalculationOutput)
+  const source =
+    chartJson.astronomical_data && typeof chartJson.astronomical_data === 'object'
+      ? (chartJson.astronomical_data as MasterAstroCalculationOutput)
+      : (chartJson as unknown as MasterAstroCalculationOutput)
+
+  const rebuilt = buildProfileExpandedSectionsFromMasterOutput(source)
+
+  if (!storedExpanded) {
+    return rebuilt
+  }
+
+  return {
+    ...storedExpanded,
+    daily_transits: storedExpanded.daily_transits ?? rebuilt.daily_transits,
+    panchang: preferAvailableSection(rebuilt.panchang, storedExpanded.panchang) as AstroExpandedSections['panchang'],
+    current_timing: rebuilt.current_timing ?? storedExpanded.current_timing,
+    vimshottari_dasha: preferAvailableSection(rebuilt.vimshottari_dasha, storedExpanded.vimshottari_dasha) as AstroExpandedSections['vimshottari_dasha'],
+    navamsa_d9: preferAvailableSection(rebuilt.navamsa_d9, storedExpanded.navamsa_d9) as AstroExpandedSections['navamsa_d9'],
+    planetary_aspects: storedExpanded.planetary_aspects ?? rebuilt.planetary_aspects,
+    basic_aspects: storedExpanded.basic_aspects ?? rebuilt.basic_aspects,
+    life_area_signatures: storedExpanded.life_area_signatures ?? rebuilt.life_area_signatures,
+    ashtakvarga: preferAvailableSection(rebuilt.ashtakvarga, storedExpanded.ashtakvarga) as AstroExpandedSections['ashtakvarga'],
+    sade_sati: preferAvailableSection(rebuilt.sade_sati, storedExpanded.sade_sati) as AstroExpandedSections['sade_sati'],
+    kalsarpa_dosh: preferAvailableSection(rebuilt.kalsarpa_dosh, storedExpanded.kalsarpa_dosh) as AstroExpandedSections['kalsarpa_dosh'],
+    manglik_dosha: preferAvailableSection(rebuilt.manglik_dosha, storedExpanded.manglik_dosha) as AstroExpandedSections['manglik_dosha'],
+    avkahada_chakra: preferAvailableSection(rebuilt.avkahada_chakra, storedExpanded.avkahada_chakra) as AstroExpandedSections['avkahada_chakra'],
+    favourable_points: preferAvailableSection(rebuilt.favourable_points, storedExpanded.favourable_points) as AstroExpandedSections['favourable_points'],
+    ghatak: preferAvailableSection(rebuilt.ghatak, storedExpanded.ghatak) as AstroExpandedSections['ghatak'],
+    shadbala: preferAvailableSection(rebuilt.shadbala, storedExpanded.shadbala) as AstroExpandedSections['shadbala'],
+  }
 }
 
 export function buildProfileChartJsonFromMasterOutput(args: {

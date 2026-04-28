@@ -61,6 +61,13 @@ export default async function ProfilePage({ params }: Props) {
   const dailyTransits = expandedSections?.daily_transits as DailyTransits | undefined
   const panchang = expandedSections?.panchang as Panchang | undefined
   const currentTiming = expandedSections?.current_timing as CurrentTimingContext | undefined
+  const vimshottariDasha = expandedSections?.vimshottari_dasha as Record<string, unknown> | undefined
+  const dashaStatus =
+    currentTiming?.status === 'real'
+      ? currentTiming.status
+      : typeof vimshottariDasha?.status === 'string'
+        ? String(vimshottariDasha.status)
+        : currentTiming?.status
   const navamsa = expandedSections?.navamsa_d9
   const aspects = expandedSections?.planetary_aspects ?? expandedSections?.basic_aspects
   const lifeAreas = expandedSections?.life_area_signatures
@@ -161,15 +168,15 @@ export default async function ProfilePage({ params }: Props) {
       <div className="space-y-4">
         <SectionCard title="Daily Transits" status={dailyTransits?.status}>
           {renderDisplayRows(
-            (dailyTransits as { rows?: Array<{ summary: string; planet?: string; sign?: string; house?: string | number | null; nakshatra?: string | null; retrograde?: boolean | null }> } | undefined)?.rows,
+            getSectionRows(dailyTransits),
             {
               emptyMessage: 'Transit data is available, but no displayable transit rows were found.',
               renderRow: (row) => (
-                <div key={`${row.planet}-${row.sign}-${row.house ?? 'na'}-${row.summary}`} className="space-y-0.5">
-                  <p>{String(row.summary)}</p>
+                <div key={`${String(row.planet ?? row.body ?? row.label ?? row.name ?? 'row')}-${String(row.sign ?? row.sign_number ?? row.value ?? 'na')}-${String(row.house ?? row.summary ?? 'na')}`} className="space-y-0.5">
+                  <p>{String(row.summary ?? row.value ?? row.label ?? row.name ?? row.body ?? '—')}</p>
                   {(row.nakshatra || row.retrograde != null) && (
                     <p className="text-xs text-white/40">
-                      {row.nakshatra ? `Nakshatra: ${row.nakshatra}` : ''}
+                      {row.nakshatra ? `Nakshatra: ${String(row.nakshatra)}` : ''}
                       {row.nakshatra && row.retrograde != null ? ' · ' : ''}
                       {row.retrograde != null ? `Retrograde: ${row.retrograde ? 'yes' : 'no'}` : ''}
                     </p>
@@ -185,13 +192,13 @@ export default async function ProfilePage({ params }: Props) {
 
         <SectionCard title="Panchang" status={panchang?.status}>
           {renderDisplayRows(
-            (panchang as { rows?: Array<{ label: string; value: string }> } | undefined)?.rows,
+            getSectionRows(panchang),
             {
               emptyMessage: 'Panchang data is available, but no displayable fields were found.',
               renderRow: (row) => (
-                <div key={String(row.label)} className="grid grid-cols-[120px_1fr] gap-3 text-sm text-white/70">
-                  <span className="text-white/45">{String(row.label)}</span>
-                  <span>{String(row.value)}</span>
+                <div key={String(row.label ?? row.key ?? row.name ?? row.summary ?? row.value)} className="grid grid-cols-[120px_1fr] gap-3 text-sm text-white/70">
+                  <span className="text-white/45">{String(row.label ?? row.key ?? row.name ?? 'Field')}</span>
+                  <span>{String(row.value ?? row.summary ?? '—')}</span>
                 </div>
               ),
             },
@@ -201,8 +208,8 @@ export default async function ProfilePage({ params }: Props) {
           ))}
         </SectionCard>
 
-        <SectionCard title="Current Timing (Dasha)" status={currentTiming?.status}>
-          {currentTiming && (
+        <SectionCard title="Current Timing (Dasha)" status={dashaStatus}>
+          {currentTiming?.status === 'real' && (
             <div className="space-y-1 text-sm text-white/70">
               {currentTiming.current_mahadasha && (
                 <p>Mahadasha: {currentTiming.current_mahadasha.lord} ({currentTiming.current_mahadasha.start_date} - {currentTiming.current_mahadasha.end_date})</p>
@@ -215,6 +222,11 @@ export default async function ProfilePage({ params }: Props) {
               )}
             </div>
           )}
+          {currentTiming?.status !== 'real' && (
+            <div className="space-y-1 text-sm text-white/70">
+              {renderDashaRows(vimshottariDasha)}
+            </div>
+          )}
           {Array.isArray(currentTiming?.warnings) && currentTiming.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-500/60 mt-1">{w}</p>
           ))}
@@ -225,10 +237,15 @@ export default async function ProfilePage({ params }: Props) {
             <p className="font-medium text-white/80 text-sm mb-2">Navamsa Lagna: {(navamsa as { lagna: string }).lagna}</p>
           )}
           {renderDisplayRows(
-            (navamsa as { rows?: Array<{ summary: string }> } | undefined)?.rows,
+            getSectionRows(navamsa),
             {
               emptyMessage: 'Navamsa data is available, but no displayable placements were found.',
-              renderRow: (row) => <p key={String(row.summary)}>{String(row.summary)}</p>,
+              renderRow: (row) => (
+                <div key={String(row.body ?? row.planet ?? row.name ?? row.summary ?? row.sign ?? 'row')} className="grid grid-cols-[120px_1fr] gap-3 text-sm text-white/70">
+                  <span className="text-white/45">{String(row.body ?? row.planet ?? row.name ?? 'Body')}</span>
+                  <span>{String(row.sign_number ?? row.sign ?? row.summary ?? '—')}</span>
+                </div>
+              ),
             },
           )}
           {Array.isArray((navamsa as { warnings?: string[] } | undefined)?.warnings) && (navamsa as { warnings: string[] }).warnings.map((w, i) => (
@@ -238,10 +255,10 @@ export default async function ProfilePage({ params }: Props) {
 
         <SectionCard title="Planetary Aspects (Drishti)" status={aspects?.status}>
           {renderDisplayRows(
-            (aspects as { rows?: Array<{ summary: string }> } | undefined)?.rows,
+            getSectionRows(aspects),
             {
               emptyMessage: 'Aspect data is available, but no displayable aspect rows were found.',
-              renderRow: (row) => <p key={String(row.summary)}>{String(row.summary)}</p>,
+              renderRow: (row) => <p key={String(row.summary ?? row.label ?? row.value ?? 'row')}>{String(row.summary ?? row.label ?? row.value ?? '—')}</p>,
             },
           )}
           {Array.isArray((aspects as { warnings?: string[] } | undefined)?.warnings) && (aspects as { warnings: string[] }).warnings.map((w, i) => (
@@ -251,10 +268,10 @@ export default async function ProfilePage({ params }: Props) {
 
         <SectionCard title="Life-Area Signatures" status={lifeAreas?.status}>
           {renderDisplayRows(
-            (lifeAreas as { rows?: Array<{ summary: string }> } | undefined)?.rows,
+            getSectionRows(lifeAreas),
             {
               emptyMessage: 'Life-area data is available, but no displayable rows were found.',
-              renderRow: (row) => <p key={String(row.summary)}>{String(row.summary)}</p>,
+              renderRow: (row) => <p key={String(row.summary ?? row.label ?? row.value ?? 'row')}>{String(row.summary ?? row.label ?? row.value ?? '—')}</p>,
             },
           )}
           {Array.isArray((lifeAreas as { warnings?: string[] } | undefined)?.warnings) && (lifeAreas as { warnings: string[] }).warnings.map((w, i) => (
@@ -282,7 +299,7 @@ function SectionCard({
         <h2 className="text-base font-semibold text-white/90">{title}</h2>
         <span
           className={`text-xs px-2 py-0.5 rounded ${
-            status === 'real'
+            status === 'real' || status === 'available'
               ? 'bg-green-900/40 text-green-400'
               : status === 'partial'
               ? 'bg-blue-900/40 text-blue-400'
@@ -315,4 +332,72 @@ function renderDisplayRows(
     return <p className="text-white/30 text-sm">{options.emptyMessage}</p>
   }
   return <div className="space-y-1">{displayRows.map(options.renderRow)}</div>
+}
+
+function getSectionRows(section: unknown): Array<Record<string, unknown>> {
+  if (!section || typeof section !== 'object') return []
+  const value = section as {
+    rows?: unknown
+    data?: unknown
+  }
+
+  if (Array.isArray(value.rows)) {
+    return value.rows.filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
+  }
+
+  if (value.data && typeof value.data === 'object') {
+    const data = value.data as { rows?: unknown; placements?: unknown }
+    if (Array.isArray(data.rows)) {
+      return data.rows.filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
+    }
+    if (Array.isArray(data.placements)) {
+      return data.placements.filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
+    }
+  }
+
+  return []
+}
+
+function getSectionItems(section: unknown): Array<Record<string, unknown>> {
+  if (!section || typeof section !== 'object') return []
+  const value = section as {
+    items?: unknown
+    data?: unknown
+  }
+
+  if (Array.isArray(value.items)) {
+    return value.items.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+  }
+
+  if (value.data && typeof value.data === 'object') {
+    const data = value.data as { items?: unknown; mahadasha_sequence?: unknown; current_dasha?: unknown }
+    if (Array.isArray(data.items)) {
+      return data.items.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    }
+    if (Array.isArray(data.mahadasha_sequence)) {
+      return data.mahadasha_sequence.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    }
+    if (data.current_dasha && typeof data.current_dasha === 'object') {
+      return [data.current_dasha as Record<string, unknown>]
+    }
+  }
+
+  return []
+}
+
+function renderDashaRows(section: unknown) {
+  const items = getSectionItems(section)
+  if (!items.length) return <p className="text-white/30 text-sm">No displayable dasha rows were found.</p>
+
+  return (
+    <>
+      {items.map((item, index) => {
+        const mahadasha = String(item.mahadasha ?? item.lord ?? item.name ?? 'Unknown')
+        const from = String(item.from ?? item.start_date ?? item.start_utc ?? '')
+        const to = String(item.to ?? item.end_date ?? item.end_utc ?? '')
+        const summary = item.summary ?? `${mahadasha}${from || to ? ` ${from}${to ? ' to ' + to : ''}` : ''}`
+        return <p key={`${mahadasha}-${from}-${to}-${index}`}>{String(summary)}</p>
+      })}
+    </>
+  )
 }
