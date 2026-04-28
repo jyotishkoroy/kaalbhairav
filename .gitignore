@@ -51,3 +51,6 @@ services/astro-engine/python/**/*.pyc
 services/astro-engine/python/output/
 
 # Swiss Ephemeris data files are intentionally committed for this project.
+
+# Local reference packages
+astro_package*.zip
