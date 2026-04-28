@@ -11,87 +11,12 @@ import { calculateMasterAstroOutputRemote } from '@/lib/astro/engine/remote'
 import { isRemoteAstroEngineConfigured } from '@/lib/astro/engine/backend'
 import type { BirthProfileInput, AstrologySettings } from '@/lib/astro/types'
 import type { MasterAstroCalculationOutput } from '@/lib/astro/schemas/master'
-import {
-  buildProfileChartJsonFromMasterOutput,
-  buildProfileExpandedSectionsFromStoredChartJson,
-} from '@/lib/astro/profile-chart-json-adapter'
+import type { ChartJson } from '@/lib/astro/types'
+import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
+import { mergeAvailableJyotishSectionsIntoChartJson } from '@/lib/astro/chart-json-persistence'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
-
-function isAvailableDisplaySection(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false
-  const section = value as {
-    status?: unknown
-    rows?: unknown
-    items?: unknown
-    data?: unknown
-  }
-
-  if (section.status !== 'available' && section.status !== 'real') return false
-  if (Array.isArray(section.rows) && section.rows.length > 0) return true
-  if (Array.isArray(section.items) && section.items.length > 0) return true
-  if (section.data && typeof section.data === 'object') {
-    const data = section.data as Record<string, unknown>
-    if (Array.isArray(data.rows) && data.rows.length > 0) return true
-    if (Array.isArray(data.items) && data.items.length > 0) return true
-  }
-  return false
-}
-
-function mergeAvailableJyotishSectionsIntoChartJson(
-  chartJson: ReturnType<typeof buildProfileChartJsonFromMasterOutput>,
-  engineOutput: MasterAstroCalculationOutput,
-): ReturnType<typeof buildProfileChartJsonFromMasterOutput> {
-  const merged: Record<string, unknown> = {
-    ...chartJson,
-  }
-
-  const sectionKeys = [
-    'panchang',
-    'vimshottari_dasha',
-    'navamsa_d9',
-    'ashtakvarga',
-    'sade_sati',
-    'kalsarpa_dosh',
-    'manglik_dosha',
-    'avkahada_chakra',
-    'favourable_points',
-    'ghatak',
-    'shadbala',
-  ]
-
-  // Merge reference-backed Jyotish sections from engine output
-  for (const key of sectionKeys) {
-    const value = (engineOutput as Record<string, unknown>)[key]
-    if (isAvailableDisplaySection(value)) {
-      merged[key] = value
-    }
-  }
-
-  // Update astronomical_data to include merged sections
-  const astronomicalData =
-    merged.astronomical_data && typeof merged.astronomical_data === 'object'
-      ? { ...(merged.astronomical_data as Record<string, unknown>) }
-      : {}
-
-  for (const key of sectionKeys) {
-    const value = merged[key]
-    if (isAvailableDisplaySection(value)) {
-      astronomicalData[key] = value
-    }
-  }
-
-  merged.astronomical_data = astronomicalData
-
-  // Rebuild expanded_sections from the merged chart JSON
-  const repairedExpandedSections = buildProfileExpandedSectionsFromStoredChartJson(merged as Record<string, unknown>)
-  if (repairedExpandedSections) {
-    merged.expanded_sections = repairedExpandedSections
-  }
-
-  return merged as ReturnType<typeof buildProfileChartJsonFromMasterOutput>
-}
 
 async function getNextChartVersion(args: {
   service: Awaited<ReturnType<typeof createServiceClient>>
@@ -122,7 +47,7 @@ async function persistCalculatedOutput(args: {
   inputHash: string
   settingsHash: string
   chartVersion: number
-  chartJson: ReturnType<typeof buildProfileChartJsonFromMasterOutput>
+  chartJson: ChartJson
   output: MasterAstroCalculationOutput
   runtimeEngineVersion: string
   runtimeEphemerisVersion: string
@@ -374,10 +299,10 @@ export async function POST(req: NextRequest) {
     service,
     profileId: profile_id,
   })
-  const chartJson = buildProfileChartJsonFromMasterOutput({
-    output,
-    userId: user.id,
-    profileId: profile_id,
+    const chartJson = buildProfileChartJsonFromMasterOutput({
+      output,
+      userId: user.id,
+      profileId: profile_id,
     calculationId: calc.id,
     chartVersionId,
     chartVersion: nextChartVersion,
@@ -396,8 +321,10 @@ export async function POST(req: NextRequest) {
       ephemerisVersion: getRuntimeEphemerisVersion(),
       schemaVersion: SCHEMA_VERSION,
     })
-    // Merge reference-backed Jyotish sections into chart_json before persisting
-    const mergedChartJson = mergeAvailableJyotishSectionsIntoChartJson(chartJson, output)
+  const mergedChartJson = mergeAvailableJyotishSectionsIntoChartJson(
+    chartJson as Record<string, unknown>,
+    output as unknown as Record<string, unknown>,
+  ) as ChartJson & Record<string, unknown>
 
     const persistedChartVersionId = await persistCalculatedOutput({
       service,
