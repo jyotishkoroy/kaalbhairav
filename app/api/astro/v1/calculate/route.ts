@@ -215,8 +215,12 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
       if (latestChart?.chart_json) {
-        const cachedChart = latestChart.chart_json as { astronomical_data?: unknown } & Record<string, unknown>
-        return NextResponse.json(cachedChart.astronomical_data ?? cachedChart)
+        const cachedChart = latestChart.chart_json as Record<string, unknown>
+        const cachedEngineOutput = (cachedChart.astronomical_data && typeof cachedChart.astronomical_data === 'object')
+          ? (cachedChart.astronomical_data as Record<string, unknown>)
+          : cachedChart
+        const mergedCachedChart = mergeAvailableJyotishSectionsIntoChartJson(cachedChart, cachedEngineOutput)
+        return NextResponse.json(mergedCachedChart)
       }
 
       return NextResponse.json({
@@ -294,22 +298,22 @@ export async function POST(req: NextRequest) {
       )
   }
 
-  const chartVersionId = randomUUID()
-  const nextChartVersion = await getNextChartVersion({
-    service,
-    profileId: profile_id,
-  })
+    const chartVersionId = randomUUID()
+    const nextChartVersion = await getNextChartVersion({
+      service,
+      profileId: profile_id,
+    })
     const chartJson = buildProfileChartJsonFromMasterOutput({
       output,
       userId: user.id,
       profileId: profile_id,
-    calculationId: calc.id,
-    chartVersionId,
-    chartVersion: nextChartVersion,
-    inputHash,
-    settingsHash,
-    settingsForHash,
-    normalized: {
+      calculationId: calc.id,
+      chartVersionId,
+      chartVersion: nextChartVersion,
+      inputHash,
+      settingsHash,
+      settingsForHash,
+      normalized: {
         birth_date_iso: normalized.birth_date_iso,
         birth_time_known: normalized.birth_time_known,
         birth_time_precision: normalized.birth_time_precision,
@@ -321,10 +325,14 @@ export async function POST(req: NextRequest) {
       ephemerisVersion: getRuntimeEphemerisVersion(),
       schemaVersion: SCHEMA_VERSION,
     })
-  const mergedChartJson = mergeAvailableJyotishSectionsIntoChartJson(
-    chartJson as Record<string, unknown>,
-    output as unknown as Record<string, unknown>,
-  ) as ChartJson & Record<string, unknown>
+    const mergedChartJson = mergeAvailableJyotishSectionsIntoChartJson(
+      chartJson as Record<string, unknown>,
+      output as unknown as Record<string, unknown>,
+    ) as ChartJson & Record<string, unknown>
+    const mergedApiResponse = mergeAvailableJyotishSectionsIntoChartJson(
+      { ...output } as Record<string, unknown>,
+      output as unknown as Record<string, unknown>,
+    ) as MasterAstroCalculationOutput & Record<string, unknown>
 
     const persistedChartVersionId = await persistCalculatedOutput({
       service,
@@ -375,7 +383,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      ...output,
+      ...mergedApiResponse,
       calculation_id: calc.id,
       chart_version_id: persistedChartVersionId,
       reused_cache: false,

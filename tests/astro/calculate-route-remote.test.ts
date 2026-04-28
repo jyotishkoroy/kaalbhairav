@@ -10,6 +10,42 @@ const { remoteCall, supabaseState } = vi.hoisted(() => {
     remoteCall: vi.fn(async () => ({
       schema_version: '29.0.0',
       calculation_status: 'calculated',
+      panchang: {
+        status: 'available',
+        rows: [
+          { label: 'Tithi', value: 'Pratipad' },
+          { label: 'Yoga', value: 'Ganda' },
+          { label: 'Karan', value: 'Kintudhhana' },
+        ],
+      },
+      vimshottari_dasha: {
+        status: 'available',
+        items: [{ mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' }],
+      },
+      navamsa_d9: {
+        status: 'available',
+        rows: [
+          { body: 'Sun', sign_number: 6 },
+          { body: 'Moon', sign_number: 8 },
+        ],
+      },
+      ashtakvarga: {
+        status: 'available',
+        rows: [{ sign: 8, Total: 37 }],
+      },
+      current_timing: {
+        status: 'real',
+        current_mahadasha: {
+          lord: 'Jupiter',
+          start_date: '2018-08-22T00:00:00.000Z',
+          end_date: '2034-08-22T00:00:00.000Z',
+        },
+      },
+      expanded_sections: {
+        panchang: { status: 'partial', rows: [] },
+        navamsa_d9: { status: 'partial', rows: [] },
+        current_timing: { status: 'not_available' },
+      },
     })),
     supabaseState: state,
   }
@@ -171,6 +207,42 @@ beforeEach(() => {
   remoteCall.mockResolvedValue({
     schema_version: '29.0.0',
     calculation_status: 'calculated',
+    panchang: {
+      status: 'available',
+      rows: [
+        { label: 'Tithi', value: 'Pratipad' },
+        { label: 'Yoga', value: 'Ganda' },
+        { label: 'Karan', value: 'Kintudhhana' },
+      ],
+    },
+    vimshottari_dasha: {
+      status: 'available',
+      items: [{ mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' }],
+    },
+    navamsa_d9: {
+      status: 'available',
+      rows: [
+        { body: 'Sun', sign_number: 6 },
+        { body: 'Moon', sign_number: 8 },
+      ],
+    },
+    ashtakvarga: {
+      status: 'available',
+      rows: [{ sign: 8, Total: 37 }],
+    },
+    current_timing: {
+      status: 'real',
+      current_mahadasha: {
+        lord: 'Jupiter',
+        start_date: '2018-08-22T00:00:00.000Z',
+        end_date: '2034-08-22T00:00:00.000Z',
+      },
+    },
+    expanded_sections: {
+      panchang: { status: 'partial', rows: [] },
+      navamsa_d9: { status: 'partial', rows: [] },
+      current_timing: { status: 'not_available' },
+    },
   })
 })
 
@@ -220,6 +292,35 @@ describe('calculate route remote mode', () => {
 
     const body = await response.json()
     expect(body.debug_saved_chart_json).toBeDefined()
+  })
+
+  it('returns merged jyotish sections in the public response and persisted chart json', async () => {
+    const request = new Request('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: '123e4567-e89b-12d3-a456-426614174000' }),
+    })
+
+    const response = await POST(request as never)
+    expect(response.status).toBe(200)
+
+    const body = await response.json()
+    expect(body.schema_version).toBe('29.0.0')
+    expect(body.panchang?.status).toBe('available')
+    expect(body.vimshottari_dasha?.status).toBe('available')
+    expect(body.navamsa_d9?.status).toBe('available')
+    expect(body.ashtakvarga?.status).toBe('available')
+    expect(body.expanded_sections?.panchang?.status).toBe('available')
+    expect(body.expanded_sections?.navamsa_d9?.status).toBe('available')
+    expect(body.expanded_sections?.current_timing?.current_mahadasha?.lord).toBe('Jupiter')
+
+    const persistedChartJson = supabaseState.chartVersionInserts[0]?.chart_json as Record<string, unknown> | undefined
+    expect(persistedChartJson?.panchang).toBeTruthy()
+    expect((persistedChartJson?.panchang as { status?: string } | undefined)?.status).toBe('available')
+    expect((persistedChartJson?.vimshottari_dasha as { status?: string } | undefined)?.status).toBe('available')
+    expect((persistedChartJson?.navamsa_d9 as { status?: string } | undefined)?.status).toBe('available')
+    expect((persistedChartJson?.ashtakvarga as { status?: string } | undefined)?.status).toBe('available')
+    expect((persistedChartJson?.expanded_sections as { panchang?: { status?: string } } | undefined)?.panchang?.status).toBe('available')
+    expect((persistedChartJson?.expanded_sections as { navamsa_d9?: { status?: string } } | undefined)?.navamsa_d9?.status).toBe('available')
   })
 
   it('returns rejected output when chart version lookup fails', async () => {
