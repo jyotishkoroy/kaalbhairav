@@ -49,3 +49,5 @@ services/astro-engine/python/.venv/
 services/astro-engine/python/**/__pycache__/
 services/astro-engine/python/**/*.pyc
 services/astro-engine/python/output/
+
+# Swiss Ephemeris data files are intentionally committed for this project.

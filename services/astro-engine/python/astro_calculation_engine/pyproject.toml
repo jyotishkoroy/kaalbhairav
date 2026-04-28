@@ -1,19 +1,16 @@
-[build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "astro-calculation-engine"
 version = "0.1.0"
-requires-python = ">=3.11"
+description = "Swiss-Ephemeris based astrology calculation engine with astro_package-compatible midpoint exports"
+requires-python = ">=3.10"
 dependencies = [
-  "pyswisseph",
-  "timezonefinder",
-  "python-dateutil",
+  "pyswisseph>=2.10.3.2",
+  "timezonefinder>=6.5.0",
+  "python-dateutil>=2.9.0",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "."}
+[project.scripts]
+astro-engine = "astro_engine.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
