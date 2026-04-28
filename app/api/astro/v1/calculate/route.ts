@@ -11,10 +11,87 @@ import { calculateMasterAstroOutputRemote } from '@/lib/astro/engine/remote'
 import { isRemoteAstroEngineConfigured } from '@/lib/astro/engine/backend'
 import type { BirthProfileInput, AstrologySettings } from '@/lib/astro/types'
 import type { MasterAstroCalculationOutput } from '@/lib/astro/schemas/master'
-import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
+import {
+  buildProfileChartJsonFromMasterOutput,
+  buildProfileExpandedSectionsFromStoredChartJson,
+} from '@/lib/astro/profile-chart-json-adapter'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+function isAvailableDisplaySection(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const section = value as {
+    status?: unknown
+    rows?: unknown
+    items?: unknown
+    data?: unknown
+  }
+
+  if (section.status !== 'available' && section.status !== 'real') return false
+  if (Array.isArray(section.rows) && section.rows.length > 0) return true
+  if (Array.isArray(section.items) && section.items.length > 0) return true
+  if (section.data && typeof section.data === 'object') {
+    const data = section.data as Record<string, unknown>
+    if (Array.isArray(data.rows) && data.rows.length > 0) return true
+    if (Array.isArray(data.items) && data.items.length > 0) return true
+  }
+  return false
+}
+
+function mergeAvailableJyotishSectionsIntoChartJson(
+  chartJson: ReturnType<typeof buildProfileChartJsonFromMasterOutput>,
+  engineOutput: MasterAstroCalculationOutput,
+): ReturnType<typeof buildProfileChartJsonFromMasterOutput> {
+  const merged: Record<string, unknown> = {
+    ...chartJson,
+  }
+
+  const sectionKeys = [
+    'panchang',
+    'vimshottari_dasha',
+    'navamsa_d9',
+    'ashtakvarga',
+    'sade_sati',
+    'kalsarpa_dosh',
+    'manglik_dosha',
+    'avkahada_chakra',
+    'favourable_points',
+    'ghatak',
+    'shadbala',
+  ]
+
+  // Merge reference-backed Jyotish sections from engine output
+  for (const key of sectionKeys) {
+    const value = (engineOutput as Record<string, unknown>)[key]
+    if (isAvailableDisplaySection(value)) {
+      merged[key] = value
+    }
+  }
+
+  // Update astronomical_data to include merged sections
+  const astronomicalData =
+    merged.astronomical_data && typeof merged.astronomical_data === 'object'
+      ? { ...(merged.astronomical_data as Record<string, unknown>) }
+      : {}
+
+  for (const key of sectionKeys) {
+    const value = merged[key]
+    if (isAvailableDisplaySection(value)) {
+      astronomicalData[key] = value
+    }
+  }
+
+  merged.astronomical_data = astronomicalData
+
+  // Rebuild expanded_sections from the merged chart JSON
+  const repairedExpandedSections = buildProfileExpandedSectionsFromStoredChartJson(merged as Record<string, unknown>)
+  if (repairedExpandedSections) {
+    merged.expanded_sections = repairedExpandedSections
+  }
+
+  return merged as ReturnType<typeof buildProfileChartJsonFromMasterOutput>
+}
 
 async function getNextChartVersion(args: {
   service: Awaited<ReturnType<typeof createServiceClient>>
@@ -319,6 +396,9 @@ export async function POST(req: NextRequest) {
       ephemerisVersion: getRuntimeEphemerisVersion(),
       schemaVersion: SCHEMA_VERSION,
     })
+    // Merge reference-backed Jyotish sections into chart_json before persisting
+    const mergedChartJson = mergeAvailableJyotishSectionsIntoChartJson(chartJson, output)
+
     const persistedChartVersionId = await persistCalculatedOutput({
       service,
       userId: user.id,
@@ -327,7 +407,7 @@ export async function POST(req: NextRequest) {
       inputHash,
       settingsHash,
       chartVersion: nextChartVersion,
-      chartJson,
+      chartJson: mergedChartJson,
       output,
       runtimeEngineVersion: getRuntimeEngineVersion(),
       runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
@@ -335,31 +415,35 @@ export async function POST(req: NextRequest) {
     })
 
     if (process.env.NODE_ENV !== 'production') {
-      const rawAstronomicalData = output.astronomical_data && typeof output.astronomical_data === 'object'
-        ? output.astronomical_data as Record<string, unknown>
+      const rawAstronomicalData = mergedChartJson.astronomical_data && typeof mergedChartJson.astronomical_data === 'object'
+        ? mergedChartJson.astronomical_data as Record<string, unknown>
         : {}
       console.log('[astro-calculate-debug]', {
-        chartSchema: chartJson.metadata.schema_version,
-        engineVersion: chartJson.metadata.engine_version,
-        rootKeys: Object.keys(chartJson),
-        expandedKeys: Object.keys(chartJson.expanded_sections ?? {}),
+        chartSchema: mergedChartJson.metadata.schema_version,
+        engineVersion: mergedChartJson.metadata.engine_version,
+        rootKeys: Object.keys(mergedChartJson),
+        expandedKeys: Object.keys(mergedChartJson.expanded_sections ?? {}),
         astronomicalKeys: Object.keys(rawAstronomicalData),
-        hasRootPlanets: !!chartJson.planets,
-        hasRootLagna: !!chartJson.lagna,
-        hasRootHouses: !!chartJson.houses,
-        hasRootD1: !!chartJson.d1_chart,
+        hasRootPlanets: !!mergedChartJson.planets,
+        hasRootLagna: !!mergedChartJson.lagna,
+        hasRootHouses: !!mergedChartJson.houses,
+        hasRootD1: !!mergedChartJson.d1_chart,
         hasRawDailyTransits: !!rawAstronomicalData.daily_transits,
         hasRawPanchang: !!rawAstronomicalData.panchang,
         hasRawNavamsa: !!rawAstronomicalData.navamsa_d9,
         hasRawAspects: !!rawAstronomicalData.planetary_aspects_drishti,
         hasRawLifeAreas: !!rawAstronomicalData.life_area_signatures,
         hasRawVimshottari: !!rawAstronomicalData.vimshottari_dasha,
-        dailyStatus: chartJson.expanded_sections?.daily_transits?.status,
-        panchangStatus: chartJson.expanded_sections?.panchang?.status,
-        currentTimingStatus: chartJson.expanded_sections?.current_timing?.status,
-        navamsaStatus: chartJson.expanded_sections?.navamsa_d9?.status,
-        aspectsStatus: chartJson.expanded_sections?.planetary_aspects?.status ?? chartJson.expanded_sections?.basic_aspects?.status,
-        lifeAreasStatus: chartJson.expanded_sections?.life_area_signatures?.status,
+        hasTopLevelPanchang: !!mergedChartJson.panchang,
+        hasTopLevelVimshottari: !!mergedChartJson.vimshottari_dasha,
+        hasTopLevelNavamsa: !!mergedChartJson.navamsa_d9,
+        hasTopLevelAshtakvarga: !!mergedChartJson.ashtakvarga,
+        dailyStatus: mergedChartJson.expanded_sections?.daily_transits?.status,
+        panchangStatus: mergedChartJson.expanded_sections?.panchang?.status,
+        currentTimingStatus: mergedChartJson.expanded_sections?.current_timing?.status,
+        navamsaStatus: mergedChartJson.expanded_sections?.navamsa_d9?.status,
+        aspectsStatus: mergedChartJson.expanded_sections?.planetary_aspects?.status ?? mergedChartJson.expanded_sections?.basic_aspects?.status,
+        lifeAreasStatus: mergedChartJson.expanded_sections?.life_area_signatures?.status,
       })
     }
 
@@ -369,10 +453,14 @@ export async function POST(req: NextRequest) {
       chart_version_id: persistedChartVersionId,
       reused_cache: false,
       debug_saved_chart_json: {
-        hasExpandedSections: !!chartJson.expanded_sections,
-        dailyStatus: chartJson.expanded_sections?.daily_transits?.status ?? null,
-        panchangStatus: chartJson.expanded_sections?.panchang?.status ?? null,
-        currentTimingStatus: chartJson.expanded_sections?.current_timing?.status ?? null,
+        hasExpandedSections: !!mergedChartJson.expanded_sections,
+        dailyStatus: mergedChartJson.expanded_sections?.daily_transits?.status ?? null,
+        panchangStatus: mergedChartJson.expanded_sections?.panchang?.status ?? null,
+        currentTimingStatus: mergedChartJson.expanded_sections?.current_timing?.status ?? null,
+        hasTopLevelPanchang: !!mergedChartJson.panchang,
+        hasTopLevelVimshottari: !!mergedChartJson.vimshottari_dasha,
+        hasTopLevelNavamsa: !!mergedChartJson.navamsa_d9,
+        hasTopLevelAshtakvarga: !!mergedChartJson.ashtakvarga,
         hasMasterDailyTransits: !!output.daily_transits,
         hasMasterPanchang: !!output.panchang,
         hasMasterVimshottari: !!output.vimshottari_dasha,

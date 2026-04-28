@@ -97,6 +97,16 @@ export type ChartJson = {
   }
   audit: { sources: string[]; engine_modules: string[]; notes: string[] }
   expanded_sections?: AstroExpandedSections
+  vimshottari_dasha?: Record<string, unknown>
+  navamsa_d9?: Record<string, unknown>
+  ashtakvarga?: Record<string, unknown>
+  sade_sati?: Record<string, unknown>
+  kalsarpa_dosh?: Record<string, unknown>
+  manglik_dosha?: Record<string, unknown>
+  avkahada_chakra?: Record<string, unknown>
+  favourable_points?: Record<string, unknown>
+  ghatak?: Record<string, unknown>
+  shadbala?: Record<string, unknown>
 }
 
 export type PredictionContext = {
