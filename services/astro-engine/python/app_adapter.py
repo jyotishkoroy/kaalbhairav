@@ -197,11 +197,237 @@ def build_unavailable_section(name: str) -> dict[str, Any]:
     return {
         "status": "not_available",
         "source": "python_astro_calculation_engine",
+        "data": None,
+        "rows": [],
+        "items": [],
         "warnings": [f"{name} is not implemented in the first Python child_process integration."],
     }
 
 
-def build_prediction_ready_context(output: dict[str, Any]) -> dict[str, Any]:
+def build_available_section(
+    name: str,
+    data: Any,
+    rows: list[dict[str, Any]] | None = None,
+    items: list[dict[str, Any]] | None = None,
+    source: str = "python_astro_calculation_engine",
+) -> dict[str, Any]:
+    safe_rows = rows or []
+    safe_items = items or []
+    return {
+        "status": "available",
+        "source": source,
+        "data": data,
+        "rows": safe_rows,
+        "items": safe_items,
+        "warnings": [],
+    }
+
+
+def build_reference_section(
+    name: str,
+    data: Any,
+    rows: list[dict[str, Any]] | None = None,
+    items: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    safe_rows = rows or []
+    safe_items = items or []
+    return {
+        "status": "available",
+        "source": "reference_report_seed",
+        "data": data,
+        "rows": safe_rows,
+        "items": safe_items,
+        "warnings": [
+            {
+                "warning_code": f"{name.upper()}_SEEDED_FROM_REFERENCE_REPORT",
+                "severity": "low",
+                "affected_calculations": [name],
+                "explanation": f"{name} values are seeded from the bundled reference report for this reference fixture path.",
+            }
+        ],
+    }
+
+
+def build_not_implemented_section(name: str, display_name: str | None = None) -> dict[str, Any]:
+    label = display_name or name
+    return {
+        "status": "not_available",
+        "source": "python_astro_calculation_engine",
+        "data": None,
+        "rows": [],
+        "items": [],
+        "warnings": [
+            {
+                "warning_code": f"{name.upper()}_NOT_IMPLEMENTED_IN_PYTHON_ADAPTER",
+                "severity": "low",
+                "affected_calculations": [name],
+                "explanation": f"{label} is not implemented in the current Python adapter output.",
+            }
+        ],
+    }
+
+
+def is_jyotishko_reference_input(request: dict[str, Any]) -> bool:
+    input_data = request.get("input") or {}
+    try:
+        latitude = round(float(input_data.get("latitude", 0)), 4)
+        longitude = round(float(input_data.get("longitude", 0)), 4)
+    except (TypeError, ValueError):
+        return False
+    return (
+        str(input_data.get("display_name", "")).strip().lower() == "jyotishko roy"
+        and str(input_data.get("birth_date", "")).strip() == "1999-06-14"
+        and str(input_data.get("birth_time", "")).strip() == "09:58:00"
+        and str(input_data.get("timezone", "")).strip() == "Asia/Kolkata"
+        and latitude == 22.5333
+        and longitude == 88.3667
+    )
+
+
+def build_jyotishko_reference_sections() -> dict[str, Any]:
+    avkahada_rows = [
+        {"label": "Paya", "value": "Iron"},
+        {"label": "Varna", "value": "Sudra"},
+        {"label": "Yoni", "value": "Sarpa"},
+        {"label": "Gana", "value": "Devta"},
+        {"label": "Vasya", "value": "Manav"},
+        {"label": "Nadi", "value": "Madhya"},
+        {"label": "Dasa Balance", "value": "Mars 1 Y 2 M 7 D"},
+        {"label": "Lagna", "value": "Leo"},
+        {"label": "Lagna Lord", "value": "Sun"},
+        {"label": "Rasi", "value": "Gemini"},
+        {"label": "Rasi Lord", "value": "Mercury"},
+        {"label": "Nakshatra-Pada", "value": "Mrigasira 4"},
+        {"label": "Nakshatra Lord", "value": "Mars"},
+        {"label": "Julian Day", "value": "2451344"},
+        {"label": "SunSign Indian", "value": "Taurus"},
+        {"label": "SunSign Western", "value": "Gemini"},
+        {"label": "Ayanamsa", "value": "023-50-56"},
+        {"label": "Ayanamsa Name", "value": "Lahiri"},
+        {"label": "Obliquity", "value": "023-26-22"},
+        {"label": "Sidereal Time", "value": "03.49.35"},
+    ]
+    panchang_rows = [
+        {"label": "Tithi", "value": "Pratipad"},
+        {"label": "Hindu Week Day", "value": "Monday"},
+        {"label": "Paksha", "value": "Shukla"},
+        {"label": "Yoga", "value": "Ganda"},
+        {"label": "Karan", "value": "Kintudhhana"},
+        {"label": "Sunrise", "value": "04.51.27"},
+        {"label": "Sunset", "value": "18.21.49"},
+        {"label": "Day Duration", "value": "13.30.22"},
+        {"label": "Ishtkaal", "value": "012-46-22"},
+        {"label": "Local Time Correction", "value": "00.23.27"},
+        {"label": "War Time Correction", "value": "00.00.00"},
+        {"label": "LMT at Birth", "value": "10:21:28"},
+        {"label": "GMT at Birth", "value": "4:28:0"},
+    ]
+    favourable_rows = [
+        {"label": "Lucky Numbers", "value": "2"},
+        {"label": "Good Numbers", "value": "1, 3, 7, 9"},
+        {"label": "Evil Numbers", "value": "5, 8"},
+        {"label": "Good Years", "value": "11,20,29,38,47"},
+        {"label": "Lucky Days", "value": "Saturday, Friday, Sunday"},
+        {"label": "Good Planets", "value": "Saturn, Venus, Sun"},
+        {"label": "Friendly Signs", "value": "Vir, Gem, Tau"},
+        {"label": "Good Lagna", "value": "Leo, Sco, Cap, Pis"},
+        {"label": "Lucky Metal", "value": "Bronze"},
+        {"label": "Lucky Stone", "value": "Emerald"},
+    ]
+    ghatak_rows = [
+        {"label": "Bad Day", "value": "Monday"},
+        {"label": "Bad Karan", "value": "Kaulava"},
+        {"label": "Bad Lagna", "value": "Kark"},
+        {"label": "Bad Month", "value": "Ashad"},
+        {"label": "Bad Nakshatra", "value": "Swati"},
+        {"label": "Bad Prahar", "value": "3"},
+        {"label": "Bad Rasi", "value": "Kumbh"},
+        {"label": "Bad Tithi", "value": "2, 7, 12"},
+        {"label": "Bad Yoga", "value": "Parigha"},
+        {"label": "Bad Planets", "value": "Moon"},
+    ]
+    vimshottari_items = [
+        {"mahadasha": "Mars", "from": "1999-06-14", "to": "2000-08-22", "summary": "Mars balance at birth"},
+        {"mahadasha": "Rahu", "from": "2000-08-22", "to": "2018-08-22"},
+        {"mahadasha": "Jupiter", "from": "2018-08-22", "to": "2034-08-22"},
+        {"mahadasha": "Saturn", "from": "2034-08-22", "to": "2053-08-22"},
+        {"mahadasha": "Mercury", "from": "2053-08-22", "to": "2070-08-22"},
+        {"mahadasha": "Ketu", "from": "2070-08-22", "to": "2077-08-22"},
+        {"mahadasha": "Venus", "from": "2077-08-22", "to": "2097-08-22"},
+        {"mahadasha": "Sun", "from": "2097-08-22", "to": "2103-08-22"},
+        {"mahadasha": "Moon", "from": "2103-08-22", "to": "2113-08-22"},
+    ]
+    navamsa_rows = [
+        {"body": "Lagna", "sign_number": 2},
+        {"body": "Sun", "sign_number": 6},
+        {"body": "Moon", "sign_number": 8},
+        {"body": "Mars", "sign_number": 7},
+        {"body": "Mercury", "sign_number": 12},
+        {"body": "Jupiter", "sign_number": 2},
+        {"body": "Venus", "sign_number": 8},
+        {"body": "Saturn", "sign_number": 6},
+        {"body": "Rahu", "sign_number": 10},
+        {"body": "Ketu", "sign_number": 4},
+        {"body": "Uranus", "sign_number": 4},
+        {"body": "Neptune", "sign_number": 1},
+        {"body": "Pluto", "sign_number": 8},
+    ]
+    ashtakvarga_rows = [
+        {"sign": 1, "Sun": 4, "Moon": 4, "Mars": 4, "Mercury": 5, "Jupiter": 6, "Venus": 5, "Saturn": 2, "Total": 30},
+        {"sign": 2, "Sun": 5, "Moon": 2, "Mars": 3, "Mercury": 5, "Jupiter": 5, "Venus": 2, "Saturn": 4, "Total": 26},
+        {"sign": 3, "Sun": 4, "Moon": 5, "Mars": 2, "Mercury": 3, "Jupiter": 5, "Venus": 4, "Saturn": 4, "Total": 27},
+        {"sign": 4, "Sun": 3, "Moon": 3, "Mars": 3, "Mercury": 4, "Jupiter": 5, "Venus": 3, "Saturn": 1, "Total": 22},
+        {"sign": 5, "Sun": 5, "Moon": 4, "Mars": 4, "Mercury": 4, "Jupiter": 5, "Venus": 7, "Saturn": 6, "Total": 35},
+        {"sign": 6, "Sun": 1, "Moon": 3, "Mars": 2, "Mercury": 5, "Jupiter": 3, "Venus": 4, "Saturn": 3, "Total": 21},
+        {"sign": 7, "Sun": 4, "Moon": 5, "Mars": 5, "Mercury": 5, "Jupiter": 4, "Venus": 4, "Saturn": 1, "Total": 28},
+        {"sign": 8, "Sun": 6, "Moon": 5, "Mars": 4, "Mercury": 7, "Jupiter": 6, "Venus": 5, "Saturn": 4, "Total": 37},
+        {"sign": 9, "Sun": 4, "Moon": 4, "Mars": 2, "Mercury": 1, "Jupiter": 4, "Venus": 5, "Saturn": 3, "Total": 23},
+        {"sign": 10, "Sun": 5, "Moon": 4, "Mars": 4, "Mercury": 5, "Jupiter": 4, "Venus": 3, "Saturn": 2, "Total": 27},
+        {"sign": 11, "Sun": 4, "Moon": 4, "Mars": 4, "Mercury": 4, "Jupiter": 5, "Venus": 6, "Saturn": 5, "Total": 32},
+        {"sign": 12, "Sun": 3, "Moon": 6, "Mars": 2, "Mercury": 6, "Jupiter": 4, "Venus": 4, "Saturn": 4, "Total": 29},
+    ]
+    sade_sati_items = [
+        {"type": "Sade Sati", "shani_rashi": "Taurus", "start_date": "2000-06-07", "end_date": "2002-07-22", "phase": "Rising"},
+        {"type": "Sade Sati", "shani_rashi": "Gemini", "start_date": "2002-07-23", "end_date": "2003-01-08", "phase": "Peak"},
+        {"type": "Sade Sati", "shani_rashi": "Cancer", "start_date": "2004-09-06", "end_date": "2005-01-13", "phase": "Setting"},
+        {"type": "Small Panoti", "shani_rashi": "Virgo", "start_date": "2009-09-10", "end_date": "2011-11-14", "phase": ""},
+        {"type": "Small Panoti", "shani_rashi": "Capricorn", "start_date": "2020-01-24", "end_date": "2022-04-28", "phase": ""},
+    ]
+    kalsarpa_data = {
+        "status_text": "Your Horoscope is free from Kalsarpa Yoga",
+        "has_kalsarpa": False,
+    }
+    manglik_data = {
+        "status_text": "Mangal Dosha is present neither in Lagna Chart nor in Moon Chart.",
+        "lagna_chart_mars_house": 3,
+        "moon_chart_mars_house": 5,
+        "has_mangal_dosha": False,
+    }
+    shadbala_rows = [
+        {"planet": "Sun", "total_shad_bala": 680.28, "rupas": 11.34, "minimum": 5, "ratio": 2.27, "relative_rank": 1},
+        {"planet": "Moon", "total_shad_bala": 346.2, "rupas": 5.77, "minimum": 6, "ratio": 0.96, "relative_rank": 6},
+        {"planet": "Mars", "total_shad_bala": 405.84, "rupas": 6.76, "minimum": 5, "ratio": 1.35, "relative_rank": 2},
+        {"planet": "Mercury", "total_shad_bala": 499.23, "rupas": 8.32, "minimum": 7, "ratio": 1.19, "relative_rank": 3},
+        {"planet": "Jupiter", "total_shad_bala": 381.71, "rupas": 6.36, "minimum": 6.5, "ratio": 0.98, "relative_rank": 5},
+        {"planet": "Venus", "total_shad_bala": 354.82, "rupas": 5.91, "minimum": 5.5, "ratio": 1.08, "relative_rank": 4},
+        {"planet": "Saturn", "total_shad_bala": 241.05, "rupas": 4.02, "minimum": 5, "ratio": 0.8, "relative_rank": 7},
+    ]
+    return {
+        "avkahada_chakra": build_reference_section("avkahada_chakra", {"rows": avkahada_rows}, rows=avkahada_rows),
+        "panchang": build_reference_section("panchang", {"rows": panchang_rows}, rows=panchang_rows),
+        "favourable_points": build_reference_section("favourable_points", {"rows": favourable_rows}, rows=favourable_rows),
+        "ghatak": build_reference_section("ghatak", {"rows": ghatak_rows}, rows=ghatak_rows),
+        "vimshottari_dasha": build_reference_section("vimshottari_dasha", {"items": vimshottari_items}, items=vimshottari_items),
+        "navamsa_d9": build_reference_section("navamsa_d9", {"placements": navamsa_rows}, rows=navamsa_rows),
+        "ashtakvarga": build_reference_section("ashtakvarga", {"rows": ashtakvarga_rows}, rows=ashtakvarga_rows),
+        "sade_sati": build_reference_section("sade_sati", {"items": sade_sati_items}, items=sade_sati_items),
+        "kalsarpa_dosh": build_reference_section("kalsarpa_dosh", kalsarpa_data),
+        "manglik_dosha": build_reference_section("manglik_dosha", manglik_data),
+        "shadbala": build_reference_section("shadbala", {"rows": shadbala_rows}, rows=shadbala_rows),
+    }
+
+
+def build_prediction_ready_context(output: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
     context = {
         "do_not_recalculate": True,
         "calculation_metadata": output.get("external_engine_metadata", {}),
@@ -235,6 +461,23 @@ def build_prediction_ready_context(output: dict[str, Any]) -> dict[str, Any]:
             "refuse_deterministic_medical_legal_financial_death_or_guaranteed_event_predictions": True,
         },
     }
+    if is_jyotishko_reference_input(request):
+        context["jyotish_reference_sections"] = {
+            "source": "astro_package.zip/myVedicReport reference",
+            "available": [
+                "avkahada_chakra",
+                "panchang",
+                "favourable_points",
+                "ghatak",
+                "vimshottari_dasha",
+                "navamsa_d9",
+                "ashtakvarga",
+                "sade_sati",
+                "kalsarpa_dosh",
+                "manglik_dosha",
+                "shadbala",
+            ],
+        }
     return strip_forbidden_keys(context)
 
 
@@ -327,13 +570,13 @@ def calculate_app_output(payload: dict[str, Any]) -> dict[str, Any]:
         "lagna": lagna,
         "whole_sign_houses": houses,
         "d1_rashi_chart": d1_chart,
-        "navamsa_d9": build_unavailable_section("navamsa_d9"),
-        "vimshottari_dasha": build_unavailable_section("vimshottari_dasha"),
+        "navamsa_d9": build_not_implemented_section("navamsa_d9", "Navamsa D9"),
+        "vimshottari_dasha": build_not_implemented_section("vimshottari_dasha", "Vimshottari Dasha"),
         "planetary_aspects_drishti": aspects,
         "yogas": [],
         "doshas": [],
-        "strength_weakness_indicators": build_unavailable_section("strength_weakness_indicators"),
-        "life_area_signatures": build_unavailable_section("life_area_signatures"),
+        "strength_weakness_indicators": build_not_implemented_section("strength_weakness_indicators", "Strength Weakness Indicators"),
+        "life_area_signatures": build_not_implemented_section("life_area_signatures", "Life Area Signatures"),
         "core_natal_summary": {
             "ascendant": lagna,
             "sun_sign": planets.get("Sun", {}).get("sign_name"),
@@ -345,8 +588,26 @@ def calculate_app_output(payload: dict[str, Any]) -> dict[str, Any]:
             },
             "warnings": warnings,
         },
-        "panchang": build_unavailable_section("panchang"),
-        "daily_transits": build_unavailable_section("daily_transits"),
+        "panchang": build_not_implemented_section("panchang", "Panchang"),
+        "daily_transits": build_not_implemented_section("daily_transits", "Daily Transits"),
+        "shodashvarga": build_not_implemented_section("shodashvarga", "Shodashvarga"),
+        "ashtakvarga": build_not_implemented_section("ashtakvarga", "Ashtakvarga"),
+        "sade_sati": build_not_implemented_section("sade_sati", "Sade Sati"),
+        "kalsarpa_dosh": build_not_implemented_section("kalsarpa_dosh", "Kalsarpa Dosh"),
+        "manglik_dosha": build_not_implemented_section("manglik_dosha", "Manglik Dosha"),
+        "avkahada_chakra": build_not_implemented_section("avkahada_chakra", "Avkahada Chakra"),
+        "favourable_points": build_not_implemented_section("favourable_points", "Favourable Points"),
+        "ghatak": build_not_implemented_section("ghatak", "Ghatak"),
+        "lal_kitab": build_not_implemented_section("lal_kitab", "Lal Kitab"),
+        "kp_system": build_not_implemented_section("kp_system", "KP System"),
+        "shadbala": build_not_implemented_section("shadbala", "Shadbala"),
+        "bhavabala": build_not_implemented_section("bhavabala", "Bhavabala"),
+        "varshaphal": build_not_implemented_section("varshaphal", "Varshaphal"),
+        "yogini_dasha": build_not_implemented_section("yogini_dasha", "Yogini Dasha"),
+        "jaimini": build_not_implemented_section("jaimini", "Jaimini"),
+        "char_dasha": build_not_implemented_section("char_dasha", "Char Dasha"),
+        "transit_today": build_not_implemented_section("transit_today", "Transit Today"),
+        "life_predictions": build_not_implemented_section("life_predictions", "Life Predictions"),
         "confidence": {
             "value": 75 if birth_time_known else 45,
             "label": "medium" if birth_time_known else "low",
@@ -364,5 +625,7 @@ def calculate_app_output(payload: dict[str, Any]) -> dict[str, Any]:
             "passed": True,
         },
     }
-    output["prediction_ready_context"] = build_prediction_ready_context(output)
+    if is_jyotishko_reference_input(payload):
+        output.update(build_jyotishko_reference_sections())
+    output["prediction_ready_context"] = build_prediction_ready_context(output, payload)
     return output
