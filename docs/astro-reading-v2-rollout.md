@@ -54,3 +54,11 @@ Voice input uses browser Web Speech Recognition when supported.
 Read aloud uses browser `speechSynthesis` when supported.
 No paid speech API or network call is used.
 The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
+
+## Phase 14
+
+Optional local AI provider interface is added for future experimentation.
+The disabled provider is the default and `ASTRO_LLM_PROVIDER=disabled`.
+An Ollama provider can be exercised locally with `ASTRO_LLM_PROVIDER=ollama`.
+Reading V2 is not wired to local AI by default.
+No paid AI or production LLM dependency is added.
