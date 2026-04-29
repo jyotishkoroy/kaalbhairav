@@ -1,4 +1,5 @@
 export * from "@/components/astro/AstroReadingV2Panel";
+export * from "@/components/astro/AstroV2ChatClient";
 export * from "@/components/astro/BirthProfileCard";
 export * from "@/components/astro/FollowUpChips";
 export * from "@/components/astro/MonthlyGuidanceCard";

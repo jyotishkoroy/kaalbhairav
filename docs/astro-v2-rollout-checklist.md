@@ -218,6 +218,16 @@ Before enabling production:
 - npm run lint passes
 - npm run build passes
 - preview deployment builds
+
+## Phase 17 — /astro/v2 real chat flow
+
+- Added AstroV2ChatClient.
+- /astro/v2 now has question input, optional manual birth details, submit, answer card, safe metadata card, follow-up chip integration, voice transcript integration, and read-aloud for latest answer.
+- The page calls existing /api/astro/v1/chat.
+- The page does not call Groq directly.
+- The page does not expose secrets.
+- Server still decides stable vs V2 using ASTRO_READING_V2_ENABLED.
+- No geocoding API or paid API was added.
 - Supabase auth works
 - Upstash rate limiting works
 - chart calculation works

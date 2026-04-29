@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { AstroReadingV2Panel } from "@/components/astro/AstroReadingV2Panel";
+import { AstroV2ChatClient } from "@/components/astro/AstroV2ChatClient";
+import { createClient } from "@/lib/supabase/server";
 import { isAstroReadingV2UiEnabled } from "@/lib/astro/reading/ui-feature-flags";
 
 export const metadata: Metadata = {
@@ -9,8 +10,27 @@ export const metadata: Metadata = {
     "A safe preview page for TarayAI Astro Reading V2 tools behind feature flags.",
 };
 
-export default function AstroV2Page() {
+export default async function AstroV2Page() {
   const uiEnabled = isAstroReadingV2UiEnabled();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let profileId: string | undefined;
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("birth_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    profileId = profile?.id;
+  }
 
   return (
     <main className="min-h-screen bg-black px-4 py-10 text-white">
@@ -56,11 +76,7 @@ export default function AstroV2Page() {
           ) : null}
         </section>
 
-        <AstroReadingV2Panel
-          memoryEnabled={false}
-          previousTopic="preview"
-          latestAnswer="This is a browser-only preview panel. It does not call the Reading V2 API by itself."
-        />
+        <AstroV2ChatClient profileId={profileId} />
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-lg font-medium">Safe rollout rules</h2>
