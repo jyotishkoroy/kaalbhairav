@@ -197,6 +197,9 @@ describe('local AI reading refiner', () => {
 
     expect(call?.system).toContain('Do not add new predictions')
     expect(call?.system).toContain('Do not add new remedies')
+    expect(call?.system).toContain(
+      'Do not replace a topic-specific answer with a generic disclaimer',
+    )
     expect(call?.system).toContain('medical')
     expect(call?.system).toContain('guaranteed')
   })

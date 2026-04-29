@@ -137,4 +137,19 @@ describe("/api/astro/v2/reading", () => {
       }),
     );
   });
+
+  it("passes remedy mode to router", async () => {
+    await POST(
+      createRequest({
+        question: "Give me a remedy on my bad sleep cycle.",
+        mode: "remedy_focused",
+      }),
+    );
+
+    expect(generateReadingV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "remedy_focused",
+      }),
+    );
+  });
 });

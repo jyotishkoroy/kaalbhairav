@@ -1,9 +1,12 @@
 import type { UserConcern } from '@/lib/astro/reading/reading-types'
-import { classifySafety } from '@/lib/astro/safety/safety-classifier'
+import {
+  classifySafety,
+  type SafetyClassification,
+  type SafetyRiskName,
+} from '@/lib/astro/safety/safety-classifier'
 import {
   buildSafeReplacementAnswer,
   buildSafetyPrefix,
-  shouldReplaceAnswer,
 } from '@/lib/astro/safety/safety-response'
 import {
   containsForbiddenClaim,
@@ -17,16 +20,55 @@ export type SafetyFilterResult = {
   forbiddenClaimsRemoved: boolean
 }
 
+function mergeClassifications(
+  primary: SafetyClassification,
+  secondary: SafetyClassification | undefined,
+): SafetyClassification {
+  if (!secondary) return primary
+
+  const risk = { ...primary.risk, ...secondary.risk }
+  const riskNames = Array.from(
+    new Set<SafetyRiskName>([
+      ...primary.riskNames,
+      ...secondary.riskNames,
+    ]),
+  )
+
+  return {
+    risk,
+    riskNames,
+    hasRisk: riskNames.length > 0,
+  }
+}
+
 export function applySafetyFilter(input: {
   question: string
   answer: string
   concern: UserConcern
 }): SafetyFilterResult {
-  const combined = `${input.question}\n${input.answer}`
-  const classification = classifySafety(combined)
+  const questionClassification = classifySafety(input.question)
+  const answerClassification =
+    input.concern.topic === 'death' ||
+    (input.concern.topic === 'health' && input.concern.questionType === 'yes_no')
+      ? classifySafety(input.answer)
+      : undefined
+  const classification = mergeClassifications(
+    questionClassification,
+    answerClassification,
+  )
   const forbiddenClaimsRemoved = containsForbiddenClaim(input.answer)
+  const replaceableRisks = new Set([
+    'selfHarm',
+    'medical',
+    'death',
+    'legal',
+    'pregnancy',
+  ])
+  const shouldReplace = classification.riskNames.some((riskName) =>
+    replaceableRisks.has(riskName),
+  )
 
-  if (shouldReplaceAnswer(classification)) {
+  if (shouldReplace) {
     const replacement = buildSafeReplacementAnswer({
       classification,
       concern: input.concern,

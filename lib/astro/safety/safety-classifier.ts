@@ -16,41 +16,158 @@ export type SafetyClassification = {
   hasRisk: boolean
 }
 
-const RISK_PATTERNS: Record<SafetyRiskName, RegExp[]> = {
-  selfHarm: [
-    /\b(suicide|kill myself|end my life|self harm|self-harm|harm myself)\b/i,
-  ],
-  medical: [
-    /\b(disease|cancer|illness|diagnose|diagnosis|doctor|medical|hospital|symptom|treatment|serious disease)\b/i,
-  ],
-  death: [
-    /\b(death|die|when will i die|lifespan|life span|death date|longevity)\b/i,
-  ],
-  legal: [
-    /\b(court|case|jail|prison|legal|lawsuit|police|arrest)\b/i,
-  ],
-  pregnancy: [
-    /\b(pregnant|pregnancy|conceive|miscarriage|fertility)\b/i,
-  ],
-  fearBased: [
-    /\b(cursed|curse|black magic|evil eye|doomed|never marry|ruined)\b/i,
-  ],
-  gemstone: [
-    /\b(blue sapphire|neelam|gemstone|stone|wear.*sapphire|wear.*gem)\b/i,
-  ],
+function normalizeText(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function hasWord(text: string, word: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(word)}\\b`, 'i').test(text)
+}
+
+function hasAnyWord(text: string, words: string[]): boolean {
+  return words.some((word) => hasWord(text, word))
+}
+
+function hasAnyPhrase(text: string, phrases: string[]): boolean {
+  return phrases.some((phrase) => text.includes(phrase.toLowerCase()))
+}
+
+function hasAnyMatch(
+  text: string,
+  words: string[],
+  phrases: string[] = [],
+): boolean {
+  return hasAnyWord(text, words) || hasAnyPhrase(text, phrases)
+}
+
+const RISK_PATTERNS: Record<
+  SafetyRiskName,
+  { words: string[]; phrases: string[] }
+> = {
+  selfHarm: {
+    words: ['suicide'],
+    phrases: ['kill myself', 'end my life', 'self harm', 'self-harm', 'harm myself'],
+  },
+  medical: {
+    words: [
+      'disease',
+      'cancer',
+      'illness',
+      'ill',
+      'diagnose',
+      'diagnosis',
+      'doctor',
+      'medical',
+      'hospital',
+      'symptom',
+      'symptoms',
+      'treatment',
+      'sick',
+      'sickness',
+      'medicine',
+      'medication',
+    ],
+    phrases: [
+      'serious disease',
+      'medical condition',
+      'health problem',
+      'mental health',
+      'do i have',
+      'am i sick',
+      'according to my chart do i have',
+    ],
+  },
+  death: {
+    words: ['death', 'die', 'lifespan', 'longevity'],
+    phrases: ['life span', 'when will i die', 'death date', 'how long will i live'],
+  },
+  legal: {
+    words: [
+      'court',
+      'lawsuit',
+      'lawyer',
+      'attorney',
+      'judge',
+      'bail',
+      'jail',
+      'prison',
+      'fir',
+      'contract',
+      'legal',
+      'police',
+    ],
+    phrases: [
+      'court case',
+      'legal case',
+      'police case',
+      'win my case',
+      'sign this contract',
+      'legal notice',
+      'property dispute',
+    ],
+  },
+  pregnancy: {
+    words: ['pregnant', 'pregnancy', 'conceive', 'miscarriage', 'fertility'],
+    phrases: [],
+  },
+  fearBased: {
+    words: ['curse', 'doomed', 'ruined'],
+    phrases: ['cursed', 'black magic', 'evil eye', 'never marry'],
+  },
+  gemstone: {
+    words: ['blue sapphire', 'neelam', 'gemstone', 'stone'],
+    phrases: ['wear sapphire', 'wear gem'],
+  },
 }
 
 export function detectSafetyRisk(message: string): SafetyRisk {
+  const text = normalizeText(message)
+
   return {
-    selfHarm: RISK_PATTERNS.selfHarm.some((pattern) => pattern.test(message)),
-    medical: RISK_PATTERNS.medical.some((pattern) => pattern.test(message)),
-    death: RISK_PATTERNS.death.some((pattern) => pattern.test(message)),
-    legal: RISK_PATTERNS.legal.some((pattern) => pattern.test(message)),
-    pregnancy: RISK_PATTERNS.pregnancy.some((pattern) => pattern.test(message)),
-    fearBased: RISK_PATTERNS.fearBased.some((pattern) =>
-      pattern.test(message),
+    selfHarm: hasAnyMatch(
+      text,
+      RISK_PATTERNS.selfHarm.words,
+      RISK_PATTERNS.selfHarm.phrases,
     ),
-    gemstone: RISK_PATTERNS.gemstone.some((pattern) => pattern.test(message)),
+    medical: hasAnyMatch(
+      text,
+      RISK_PATTERNS.medical.words,
+      RISK_PATTERNS.medical.phrases,
+    ),
+    death: hasAnyMatch(
+      text,
+      RISK_PATTERNS.death.words,
+      RISK_PATTERNS.death.phrases,
+    ),
+    legal: hasAnyMatch(
+      text,
+      RISK_PATTERNS.legal.words,
+      RISK_PATTERNS.legal.phrases,
+    ),
+    pregnancy: hasAnyMatch(
+      text,
+      RISK_PATTERNS.pregnancy.words,
+      RISK_PATTERNS.pregnancy.phrases,
+    ),
+    fearBased: hasAnyMatch(
+      text,
+      RISK_PATTERNS.fearBased.words,
+      RISK_PATTERNS.fearBased.phrases,
+    ),
+    gemstone: hasAnyMatch(
+      text,
+      RISK_PATTERNS.gemstone.words,
+      RISK_PATTERNS.gemstone.phrases,
+    ),
   }
 }
 
@@ -65,4 +182,8 @@ export function classifySafety(message: string): SafetyClassification {
     riskNames,
     hasRisk: riskNames.length > 0,
   }
+}
+
+export function classifySafetyRisk(message: string): SafetyClassification {
+  return classifySafety(message)
 }

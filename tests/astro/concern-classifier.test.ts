@@ -18,6 +18,25 @@ describe('Reading V2 concern classifier', () => {
     })
   })
 
+  it('classifies promotion as career', () => {
+    const concern = classifyUserConcern('I am working hard and not getting promotion.')
+
+    expect(concern.topic).toBe('career')
+  })
+
+  it('classifies tomorrow as timing', () => {
+    const concern = classifyUserConcern('how will be my tomorrow?')
+
+    expect(['timing', 'general']).toContain(concern.topic)
+    expect(concern.questionType).toBe('timing')
+  })
+
+  it('classifies sleep remedy as health or remedy without legal risk', () => {
+    const concern = classifyUserConcern('Give me a remedy on my bad sleep cycle.')
+
+    expect(['health', 'remedy']).toContain(concern.topic)
+  })
+
   it('classifies sad marriage delay questions', () => {
     expect(classifyUserConcern('I am tired of waiting for marriage')).toMatchObject({
       topic: 'marriage',

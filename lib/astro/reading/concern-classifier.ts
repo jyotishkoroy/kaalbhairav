@@ -77,11 +77,15 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
     'hospital',
     'pain',
     'symptom',
+    'symptoms',
     'pregnant',
     'pregnancy',
     'cancer',
     'depression',
     'anxiety',
+    'sleep',
+    'rest',
+    'routine',
   ],
   family: ['family', 'mother', 'father', 'parents', 'sibling', 'brother', 'sister', 'child', 'children', 'home', 'ghar'],
   education: ['education', 'study', 'studies', 'exam', 'college', 'school', 'degree', 'course', 'student', 'marks', 'result', 'admission'],
@@ -91,7 +95,7 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
   general: [],
 }
 
-const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'monthly', 'this month', 'next month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen']
+const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'monthly', 'this month', 'next month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen', 'tomorrow', 'today', 'next week']
 
 const YES_NO_WORDS = ['will i', 'will my', 'can i', 'can my', 'do i', 'does my', 'is there', 'am i']
 
@@ -121,7 +125,7 @@ const HIGH_RISK_PATTERNS: Array<[string, RegExp]> = [
   ['self_harm', /\b(suicide|kill myself|end my life|self harm|self-harm)\b/i],
   ['death_prediction', /\b(death date|when will i die|when i will die|will i die|lifespan|life span|longevity)\b/i],
   ['medical_diagnosis', /\b(cancer|serious disease|diagnose|pregnant|pregnancy|medical|hospital|doctor)\b/i],
-  ['legal_certainty', /\b(court|case|jail|prison|legal|lawsuit|police)\b/i],
+  ['legal_certainty', /\b(court|jail|prison|legal|lawsuit|police)\b/i],
   ['fear_based', /\b(cursed|black magic|evil eye|never marry|doomed)\b/i],
 ]
 
@@ -134,20 +138,36 @@ function normalizeMessage(message: string): string {
     .trim()
 }
 
-function includesAny(message: string, words: string[]): boolean {
-  return words.some((word) => message.includes(word))
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function hasWord(message: string, word: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(word)}\\b`, 'i').test(message)
+}
+
+function hasAnyWord(message: string, words: string[]): boolean {
+  return words.some((word) => hasWord(message, word))
+}
+
+function hasAnyPhrase(message: string, phrases: string[]): boolean {
+  return phrases.some((phrase) => message.includes(phrase.toLowerCase()))
+}
+
+function hasAny(message: string, words: string[], phrases: string[] = []): boolean {
+  return hasAnyWord(message, words) || hasAnyPhrase(message, phrases)
 }
 
 function countMatches(message: string, words: string[]): number {
   return words.reduce((count, word) => {
-    return message.includes(word) ? count + 1 : count
+    return hasWord(message, word) ? count + 1 : count
   }, 0)
 }
 
 export function detectTopic(message: string): ReadingTopic {
   const lower = normalizeMessage(message)
 
-  if (includesAny(lower, TOPIC_KEYWORDS.death)) return 'death'
+  if (hasAny(lower, TOPIC_KEYWORDS.death)) return 'death'
 
   const scores = Object.entries(TOPIC_KEYWORDS)
     .filter(([topic]) => topic !== 'general' && topic !== 'death')
@@ -164,17 +184,20 @@ export function detectTopic(message: string): ReadingTopic {
 
   if (!top) return 'general'
 
-  if (top.topic === 'relationship' && includesAny(lower, TOPIC_KEYWORDS.marriage) && !includesAny(lower, ['breakup', 'ex', 'move on', 'girlfriend', 'boyfriend'])) {
+  if (top.topic === 'relationship' && hasAny(lower, TOPIC_KEYWORDS.marriage) && !hasAny(lower, ['breakup', 'ex', 'move on', 'girlfriend', 'boyfriend'])) {
     return 'marriage'
   }
 
-  if (top.topic === 'relationship' && includesAny(lower, TOPIC_KEYWORDS.family)) {
+  if (top.topic === 'relationship' && hasAny(lower, TOPIC_KEYWORDS.family)) {
     return 'family'
   }
 
-  if (top.topic === 'remedy' && includesAny(lower, TOPIC_KEYWORDS.career) && !includesAny(lower, ['remedy', 'remedies', 'upay'])) {
+  if (top.topic === 'remedy' && hasAny(lower, TOPIC_KEYWORDS.career) && !hasAny(lower, ['remedy', 'remedies', 'upay'])) {
     return 'career'
   }
+
+  if (hasAny(lower, TOPIC_KEYWORDS.career)) return 'career'
+  if (hasAny(lower, ['tomorrow', 'today', 'next week', 'next month', 'next year', 'date'])) return 'general'
 
   return top.topic
 }
@@ -182,11 +205,11 @@ export function detectTopic(message: string): ReadingTopic {
 export function detectQuestionType(message: string): QuestionType {
   const lower = normalizeMessage(message)
 
-  if (includesAny(lower, REMEDY_WORDS)) return 'remedy'
-  if (includesAny(lower, DECISION_WORDS)) return 'decision'
-  if (includesAny(lower, TIMING_WORDS)) return 'timing'
-  if (includesAny(lower, EXPLANATION_WORDS)) return 'explanation'
-  if (includesAny(lower, YES_NO_WORDS)) return 'yes_no'
+  if (hasAny(lower, REMEDY_WORDS)) return 'remedy'
+  if (hasAny(lower, DECISION_WORDS)) return 'decision'
+  if (hasAny(lower, TIMING_WORDS)) return 'timing'
+  if (hasAny(lower, EXPLANATION_WORDS)) return 'explanation'
+  if (hasAny(lower, YES_NO_WORDS)) return 'yes_no'
 
   return 'general_prediction'
 }
@@ -194,36 +217,38 @@ export function detectQuestionType(message: string): QuestionType {
 export function detectEmotionalTone(message: string): EmotionalTone {
   const lower = normalizeMessage(message)
 
-  if (includesAny(lower, URGENT_WORDS)) return 'urgent'
-  if (includesAny(lower, SAD_WORDS)) return 'sad'
-  if (includesAny(lower, ANGRY_WORDS)) return 'angry'
-  if (includesAny(lower, CONFUSED_WORDS)) return 'confused'
-  if (includesAny(lower, ANXIOUS_WORDS)) return 'anxious'
-  if (includesAny(lower, HOPEFUL_WORDS)) return 'hopeful'
+  if (hasAny(lower, URGENT_WORDS)) return 'urgent'
+  if (hasAny(lower, SAD_WORDS)) return 'sad'
+  if (hasAny(lower, ANGRY_WORDS)) return 'angry'
+  if (hasAny(lower, CONFUSED_WORDS)) return 'confused'
+  if (hasAny(lower, ANXIOUS_WORDS)) return 'anxious'
+  if (hasAny(lower, HOPEFUL_WORDS)) return 'hopeful'
 
   return 'calm'
 }
 
 export function detectsTechnicalRequest(message: string): boolean {
-  return includesAny(normalizeMessage(message), TECHNICAL_ASTRO_WORDS)
+  return hasAny(normalizeMessage(message), TECHNICAL_ASTRO_WORDS)
 }
 
 export function detectsPracticalNeed(message: string): boolean {
   const lower = normalizeMessage(message)
 
-  return includesAny(lower, PRACTICAL_WORDS) || detectQuestionType(lower) === 'decision' || detectQuestionType(lower) === 'remedy'
+  return hasAny(lower, PRACTICAL_WORDS) || detectQuestionType(lower) === 'decision' || detectQuestionType(lower) === 'remedy'
 }
 
 export function detectsMonthlyGuidanceRequest(message: string): boolean {
   const lower = normalizeMessage(message)
 
   return (
-    lower.includes('this month') ||
-    lower.includes('monthly guidance') ||
-    lower.includes('month guidance') ||
-    lower.includes('guidance for this month') ||
-    lower.includes('what should i do this month') ||
-    lower.includes('how is this month')
+    hasAnyPhrase(lower, [
+      'this month',
+      'monthly guidance',
+      'month guidance',
+      'guidance for this month',
+      'what should i do this month',
+      'how is this month',
+    ])
   )
 }
 

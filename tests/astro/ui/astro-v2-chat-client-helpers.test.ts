@@ -56,6 +56,15 @@ describe("Astro V2 chat client helpers", () => {
     });
   });
 
+  it("preserves selected backend mode", () => {
+    expect(
+      buildAstroV2ChatRequest({
+        question: "Give me a remedy.",
+        mode: "remedy_focused",
+      }).mode,
+    ).toBe("remedy_focused");
+  });
+
   it("keeps only provided birth details and parses coordinates", () => {
     const request = buildAstroV2ChatRequest({
       question: "When will I get married?",
