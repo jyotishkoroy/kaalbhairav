@@ -16,6 +16,8 @@ describe("Astro integration readiness checks", () => {
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
     delete process.env.GROQ_API_KEY;
+    delete process.env.ASTRO_ENGINE_SERVICE_URL;
+    delete process.env.ASTRO_ENGINE_SERVICE_API_KEY;
     delete process.env.ASTRO_ENGINE_URL;
     delete process.env.ASTRO_PYTHON_ENGINE_URL;
     delete process.env.PYTHON_ENGINE_URL;
@@ -56,7 +58,8 @@ describe("Astro integration readiness checks", () => {
     process.env.UPSTASH_REDIS_REST_URL = "https://upstash.example";
     process.env.UPSTASH_REDIS_REST_TOKEN = "token";
     process.env.GROQ_API_KEY = "groq";
-    process.env.ASTRO_ENGINE_URL = "https://oracle-vm.example";
+    process.env.ASTRO_ENGINE_SERVICE_URL = "https://oracle-vm.example";
+    process.env.ASTRO_ENGINE_SERVICE_API_KEY = "engine-key";
     process.env.VERCEL_URL = "preview.vercel.app";
 
     const checks = getAstroIntegrationChecks();

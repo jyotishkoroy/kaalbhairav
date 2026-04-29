@@ -60,6 +60,7 @@ The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
 Optional local AI provider interface is added for future experimentation.
 The disabled provider is the default and `ASTRO_LLM_PROVIDER=disabled`.
 An Ollama provider can be exercised locally with `ASTRO_LLM_PROVIDER=ollama`.
+The only valid provider values are `disabled` and `ollama`; `enabled` is not supported and falls back to disabled.
 Reading V2 is not wired to local AI by default.
 No paid AI or production LLM dependency is added.
 
@@ -79,3 +80,9 @@ No paid AI or production LLM dependency is added.
 - Preview deployment uses `npx vercel`.
 - Production deployment is intentionally deferred.
 - Stable path remains default.
+
+## Latest production verification
+
+- `/astro/v2` route was added after the initial 404.
+- Production deployment should be rerun after env flag changes because `NEXT_PUBLIC_` flags are baked at build time.
+- `ASTRO_LLM_PROVIDER=enabled` is not a valid provider; use `disabled` or `ollama`.

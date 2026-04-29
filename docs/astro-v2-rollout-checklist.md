@@ -41,11 +41,21 @@ Required env:
 Used by chart calculation / astrology engine path.
 
 Common env names to verify:
+- ASTRO_ENGINE_SERVICE_URL
+- ASTRO_ENGINE_SERVICE_API_KEY
 - ASTRO_ENGINE_URL
 - ASTRO_PYTHON_ENGINE_URL
 - PYTHON_ENGINE_URL
 
 Use the env name that the current code actually reads.
+
+### Local LLM adapter
+
+Valid values for `ASTRO_LLM_PROVIDER`:
+- disabled
+- ollama
+
+Do not document or rely on `enabled` as a valid provider value. If the variable is set to `enabled`, the code treats it as disabled.
 
 ### Vercel
 

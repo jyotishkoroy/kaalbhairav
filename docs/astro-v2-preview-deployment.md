@@ -91,10 +91,12 @@ Required env:
 
 Verify:
 - chart calculation route still works
-- remote engine URL points to the correct Oracle VM endpoint
+- remote engine service URL points to the correct Oracle VM endpoint
 - existing stable calculation path is unchanged
 
 Check whichever env name the current code reads:
+- ASTRO_ENGINE_SERVICE_URL
+- ASTRO_ENGINE_SERVICE_API_KEY
 - ASTRO_ENGINE_URL
 - ASTRO_PYTHON_ENGINE_URL
 - PYTHON_ENGINE_URL
@@ -104,6 +106,14 @@ Check whichever env name the current code reads:
 Verify:
 - legacy fallback still works if used by the existing chat route
 - GROQ_API_KEY is configured only server-side
+
+### Local LLM adapter
+
+Valid values for `ASTRO_LLM_PROVIDER`:
+- disabled
+- ollama
+
+If `ASTRO_LLM_PROVIDER=enabled`, the code normalizes it to disabled. Do not use `enabled` as a documented or supported provider value.
 
 ### Vercel
 

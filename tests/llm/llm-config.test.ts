@@ -51,4 +51,15 @@ describe('LLM provider config', () => {
       enabled: false,
     })
   })
+
+  it('treats enabled as disabled because only disabled and ollama are supported', () => {
+    process.env.ASTRO_LLM_PROVIDER = 'enabled'
+
+    expect(getLLMProviderConfig()).toMatchObject({
+      provider: 'disabled',
+      enabled: false,
+    })
+    expect(isLocalLLMEnabled()).toBe(false)
+    expect(getLLMProvider().name).toBe('disabled')
+  })
 })

@@ -63,13 +63,21 @@ export function getAstroIntegrationChecks(): IntegrationCheck[] {
       id: "astro-engine-url",
       label: "Astro engine / Oracle VM URL",
       status:
+        hasEnv("ASTRO_ENGINE_SERVICE_URL") ||
         hasEnv("ASTRO_ENGINE_URL") ||
         hasEnv("ASTRO_PYTHON_ENGINE_URL") ||
         hasEnv("PYTHON_ENGINE_URL")
           ? "pass"
           : "warn",
       message:
-        "Remote Oracle VM / Python astrology engine URL should be configured if calculation route depends on remote engine.",
+        "Remote Oracle VM / Python engine URL should be configured if calculation route depends on remote engine. Supported names include ASTRO_ENGINE_SERVICE_URL, ASTRO_ENGINE_URL, ASTRO_PYTHON_ENGINE_URL, and PYTHON_ENGINE_URL.",
+    },
+    {
+      id: "astro-engine-service-api-key",
+      label: "Astro engine service API key",
+      status: optionalEnv("ASTRO_ENGINE_SERVICE_API_KEY") ? "pass" : "warn",
+      message:
+        "Remote astro engine service API key should be set when the remote engine service requires authentication.",
     },
     {
       id: "vercel-url",
