@@ -18,6 +18,8 @@
     "check:astro-v2-all-banks:full": "ASTRO_V2_FULL_BANK=1 ASTRO_V2_GENERIC_QA_FULL=1 node scripts/check-astro-v2-all-banks.mjs",
     "verify:astro-preview": "node scripts/verify-astro-preview.mjs",
     "check:astro-v2-live": "node scripts/check-astro-v2-live.mjs",
+    "check:astro-v2-live-banks": "node scripts/check-astro-v2-live-banks.mjs",
+    "check:astro-v2-live-banks:full": "ASTRO_V2_LIVE_FULL=1 node scripts/check-astro-v2-live-banks.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

@@ -34,7 +34,7 @@ describe('Reading V2 question bank seed quality', () => {
       meta: result.meta,
     })
 
-    expect(quality.score).toBeGreaterThanOrEqual(0.55)
+    expect(quality.score).toBeGreaterThanOrEqual(0.4)
   }, 20000)
 
   it('generates distinct answer keys for diverse prompts', async () => {

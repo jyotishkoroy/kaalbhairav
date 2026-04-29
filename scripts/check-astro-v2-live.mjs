@@ -1,4 +1,4 @@
-const BASE_URL = process.env.ASTRO_V2_LIVE_BASE_URL || "https://www.tarayai.com";
+const BASE_URL = process.env.ASTRO_V2_LIVE_BASE_URL || "https://tarayai.com";
 
 const cases = [
   {

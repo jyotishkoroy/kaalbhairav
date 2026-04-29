@@ -1,15 +1,14 @@
 import fs from 'node:fs'
-import { getGeneratedPaths } from './astro-question-bank-core.mjs'
+import { getGeneratedQuestionBankPaths, loadJsonlRecords } from './astro-v2-bank-check-core.mjs'
 
-const { jsonlPath, summaryPath } = getGeneratedPaths()
+const { jsonlPath, summaryPath, reportPath } = getGeneratedQuestionBankPaths()
 
 if (!fs.existsSync(jsonlPath) || !fs.existsSync(summaryPath)) {
   throw new Error('Generated bank missing. Run npm run generate:astro-v2-question-bank first.')
 }
 
 const limit = process.env.ASTRO_V2_FULL_BANK === '1' ? 52000 : Number(process.env.ASTRO_V2_BANK_LIMIT ?? 1000)
-const lines = fs.readFileSync(jsonlPath, 'utf8').trim().split('\n').slice(0, limit)
-const records = lines.map((line) => JSON.parse(line))
+const records = loadJsonlRecords(jsonlPath).slice(0, limit)
 const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'))
 
 const issues = []
@@ -34,10 +33,9 @@ const report = {
   },
 }
 
-fs.writeFileSync('generated/astro-v2-question-bank/check-report.json', JSON.stringify(report, null, 2))
+fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
 console.log(JSON.stringify(report, null, 2))
 
 if (issues.length > 0) {
   process.exitCode = 1
 }
-
