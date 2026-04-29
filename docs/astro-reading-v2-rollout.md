@@ -46,3 +46,11 @@ UI components were added behind `NEXT_PUBLIC_ASTRO_READING_V2_UI_ENABLED`.
 The new UI layer includes `ReadingModeSelector`, `FollowUpChips`, `ReadingMemoryCard`, and optional safe cards.
 This UI flag does not enable the server-side V2 runtime.
 The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
+
+## Phase 13
+
+Browser voice helpers are added behind `NEXT_PUBLIC_ASTRO_VOICE_ENABLED`.
+Voice input uses browser Web Speech Recognition when supported.
+Read aloud uses browser `speechSynthesis` when supported.
+No paid speech API or network call is used.
+The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.

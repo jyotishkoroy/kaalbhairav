@@ -2,6 +2,8 @@ export * from "@/components/astro/AstroReadingV2Panel";
 export * from "@/components/astro/BirthProfileCard";
 export * from "@/components/astro/FollowUpChips";
 export * from "@/components/astro/MonthlyGuidanceCard";
+export * from "@/components/astro/ReadAloudButton";
 export * from "@/components/astro/ReadingMemoryCard";
 export * from "@/components/astro/ReadingModeSelector";
 export * from "@/components/astro/RemedyCard";
+export * from "@/components/astro/VoiceInputButton";

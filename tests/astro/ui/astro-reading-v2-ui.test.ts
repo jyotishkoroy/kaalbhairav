@@ -1,7 +1,10 @@
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { readingModeOptions } from "@/components/astro/ReadingModeSelector";
 import { defaultFollowUpChips } from "@/components/astro/FollowUpChips";
-import { isAstroReadingV2UiEnabled } from "@/lib/astro/reading/ui-feature-flags";
+import {
+  isAstroReadingV2UiEnabled,
+  isAstroVoiceUiEnabled,
+} from "@/lib/astro/reading/ui-feature-flags";
 
 const ORIGINAL_ENV = process.env;
 
@@ -24,6 +27,18 @@ describe("Astro Reading V2 UI exports", () => {
     process.env.NEXT_PUBLIC_ASTRO_READING_V2_UI_ENABLED = "true";
 
     expect(isAstroReadingV2UiEnabled()).toBe(true);
+  });
+
+  it("keeps browser voice UI disabled by default", () => {
+    delete process.env.NEXT_PUBLIC_ASTRO_VOICE_ENABLED;
+
+    expect(isAstroVoiceUiEnabled()).toBe(false);
+  });
+
+  it("can enable browser voice UI with client flag", () => {
+    process.env.NEXT_PUBLIC_ASTRO_VOICE_ENABLED = "true";
+
+    expect(isAstroVoiceUiEnabled()).toBe(true);
   });
 
   it("exports reading mode options", () => {
