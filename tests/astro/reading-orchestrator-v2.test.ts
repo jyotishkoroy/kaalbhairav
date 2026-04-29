@@ -286,4 +286,59 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.remediesLayer).toBe('disabled')
     expect(result.meta?.remedyEvidenceIncluded).toBe(false)
   })
+
+  it('includes monthly guidance for explicit monthly requests even when ASTRO_MONTHLY_ENABLED is false', async () => {
+    process.env.ASTRO_MONTHLY_ENABLED = 'false'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'What is my guidance for this month?',
+        dasha: {
+          mahadasha: 'Saturn',
+        },
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(result.meta?.monthlyLayer).toBe('disabled')
+    expect(result.meta?.monthlyGuidanceIncluded).toBe(true)
+    expect(answer).toContain('Monthly guidance')
+    expect(answer).toContain('Career focus:')
+  })
+
+  it('can include monthly guidance proactively when ASTRO_MONTHLY_ENABLED is true', async () => {
+    process.env.ASTRO_MONTHLY_ENABLED = 'true'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'When will I get a job?',
+        dasha: {
+          mahadasha: 'Saturn',
+        },
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(result.meta?.monthlyLayer).toBe('enabled_phase_11')
+    expect(result.meta?.monthlyGuidanceIncluded).toBe(true)
+    expect(answer).toContain('Monthly guidance')
+  })
+
+  it('does not include proactive monthly guidance when ASTRO_MONTHLY_ENABLED is false for normal questions', async () => {
+    process.env.ASTRO_MONTHLY_ENABLED = 'false'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'When will I get a job?',
+        dasha: {
+          mahadasha: 'Saturn',
+        },
+      }),
+    )
+
+    expect(result.meta?.monthlyLayer).toBe('disabled')
+    expect(result.meta?.monthlyGuidanceIncluded).toBe(false)
+  })
 })

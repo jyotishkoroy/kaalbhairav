@@ -91,7 +91,7 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
   general: [],
 }
 
-const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen']
+const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'monthly', 'this month', 'next month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen']
 
 const YES_NO_WORDS = ['will i', 'will my', 'can i', 'can my', 'do i', 'does my', 'is there', 'am i']
 
@@ -212,6 +212,19 @@ export function detectsPracticalNeed(message: string): boolean {
   const lower = normalizeMessage(message)
 
   return includesAny(lower, PRACTICAL_WORDS) || detectQuestionType(lower) === 'decision' || detectQuestionType(lower) === 'remedy'
+}
+
+export function detectsMonthlyGuidanceRequest(message: string): boolean {
+  const lower = normalizeMessage(message)
+
+  return (
+    lower.includes('this month') ||
+    lower.includes('monthly guidance') ||
+    lower.includes('month guidance') ||
+    lower.includes('guidance for this month') ||
+    lower.includes('what should i do this month') ||
+    lower.includes('how is this month')
+  )
 }
 
 export function detectHighRiskFlags(message: string): string[] {

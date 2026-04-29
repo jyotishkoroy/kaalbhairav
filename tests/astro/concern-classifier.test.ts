@@ -5,6 +5,7 @@ import {
   detectHighRiskFlags,
   detectQuestionType,
   detectTopic,
+  detectsMonthlyGuidanceRequest,
   detectsPracticalNeed,
   detectsTechnicalRequest,
 } from '@/lib/astro/reading/concern-classifier'
@@ -136,5 +137,11 @@ describe('Reading V2 concern classifier', () => {
     expect(detectsTechnicalRequest('Show my dasha and transit')).toBe(true)
     expect(detectsPracticalNeed('Tell me about career')).toBe(false)
     expect(detectsTechnicalRequest('Tell me about career')).toBe(false)
+  })
+
+  it('detects monthly guidance requests', () => {
+    expect(detectsMonthlyGuidanceRequest('What is my guidance for this month?')).toBe(true)
+    expect(detectsMonthlyGuidanceRequest('How is this month for career?')).toBe(true)
+    expect(detectsMonthlyGuidanceRequest('When will I get a job?')).toBe(false)
   })
 })

@@ -1,5 +1,6 @@
 import { getAstroFeatureFlags } from '@/lib/astro/config/feature-flags'
 import { buildAstroEvidence } from '@/lib/astro/interpretation'
+import { generateMonthlyGuidance, renderMonthlyGuidance } from '@/lib/astro/monthly'
 import { interpretRemedies } from '@/lib/astro/interpretation/remedies'
 import {
   buildMemorySummary,
@@ -8,7 +9,10 @@ import {
   saveAstrologyReadingMemory,
   summarizeReadingForMemory,
 } from '@/lib/astro/memory'
-import { classifyUserConcern } from '@/lib/astro/reading/concern-classifier'
+import {
+  classifyUserConcern,
+  detectsMonthlyGuidanceRequest,
+} from '@/lib/astro/reading/concern-classifier'
 import { generateHumanReadingResult } from '@/lib/astro/reading/human-generator'
 import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
 import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
@@ -205,6 +209,7 @@ export async function generateReadingV2(
     const flags = getAstroFeatureFlags()
     const memoryEnabled = flags.memoryEnabled
     const remediesEnabled = flags.remediesEnabled
+    const monthlyEnabled = flags.monthlyEnabled
     const userId =
       typeof input.userId === 'string' && input.userId.trim()
         ? input.userId.trim()
@@ -249,6 +254,8 @@ export async function generateReadingV2(
       enabled: memoryEnabled,
       userId,
     })
+    const monthlyRequested = detectsMonthlyGuidanceRequest(v2Input.question)
+    const shouldIncludeMonthlyGuidance = monthlyEnabled || monthlyRequested
     const result = generateHumanReadingResult({
       concern,
       evidence,
@@ -257,9 +264,28 @@ export async function generateReadingV2(
       language,
       memorySummary,
     })
+    let monthlyGuidanceText = ''
+    let monthlyGuidanceIncluded = false
+
+    if (shouldIncludeMonthlyGuidance) {
+      const monthlyGuidance = generateMonthlyGuidance({
+        topic: concern.topic,
+        chart,
+        dasha,
+        transits,
+        question: v2Input.question,
+      })
+
+      monthlyGuidanceText = renderMonthlyGuidance(monthlyGuidance)
+      monthlyGuidanceIncluded = true
+    }
+
+    const combinedAnswer = [result.answer, monthlyGuidanceText]
+      .filter(Boolean)
+      .join('\n\n')
     const safety = applySafetyFilter({
       question: v2Input.question,
-      answer: result.answer,
+      answer: combinedAnswer,
       concern,
     })
     await saveOptionalMemory({
@@ -291,6 +317,8 @@ export async function generateReadingV2(
         memorySummaryUsed: Boolean(memorySummary),
         remediesLayer: remediesEnabled ? 'enabled_phase_9' : 'disabled',
         remedyEvidenceIncluded,
+        monthlyLayer: monthlyEnabled ? 'enabled_phase_11' : 'disabled',
+        monthlyGuidanceIncluded,
       },
     }
   } catch (error) {
