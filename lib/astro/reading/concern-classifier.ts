@@ -106,7 +106,39 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
   general: [],
 }
 
-const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'monthly', 'this month', 'next month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen', 'tomorrow', 'today', 'next week', 'kobe', 'কবে']
+const TIMING_WORDS = [
+  'when',
+  'kab',
+  'date',
+  'month',
+  'monthly',
+  'this month',
+  'next month',
+  'year',
+  'time',
+  'period',
+  'phase',
+  'how long',
+  'by when',
+  'will it happen',
+  'tomorrow',
+  'today',
+  'next week',
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+  'kobe',
+  'কবে',
+]
 
 const YES_NO_WORDS = ['will i', 'will my', 'can i', 'can my', 'do i', 'does my', 'is there', 'am i']
 
