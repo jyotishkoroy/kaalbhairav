@@ -204,6 +204,94 @@ def build_unavailable_section(name: str) -> dict[str, Any]:
     }
 
 
+def is_record(value: Any) -> bool:
+    return isinstance(value, dict) and len(value) > 0
+
+
+def pick_first_record(*values: Any) -> dict[str, Any] | None:
+    for value in values:
+        if is_record(value):
+            return value
+    return None
+
+
+def get_record_field(source: Any, key: str) -> dict[str, Any] | None:
+    if not is_record(source):
+        return None
+    value = source.get(key)
+    return value if is_record(value) else None
+
+
+def get_string_field(source: Any, keys: list[str]) -> str | None:
+    if not is_record(source):
+        return None
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return str(value)
+    return None
+
+
+def build_panchang_section(payload: dict[str, Any], chart: dict[str, Any], output: dict[str, Any]) -> dict[str, Any]:
+    payload_record = payload if is_record(payload) else {}
+    chart_record = chart if is_record(chart) else {}
+    output_record = output if is_record(output) else {}
+    raw_record = pick_first_record(
+        get_record_field(payload_record, "raw"),
+        get_record_field(payload_record, "astronomical_data"),
+        get_record_field(payload_record, "astro"),
+    )
+
+    astronomical_record = pick_first_record(
+        get_record_field(chart_record, "astronomical"),
+        get_record_field(chart_record, "astronomical_data"),
+        get_record_field(raw_record, "astronomical"),
+        get_record_field(raw_record, "astronomical_data"),
+        get_record_field(output_record, "astronomical"),
+        get_record_field(output_record, "astronomical_data"),
+    )
+    expanded_sections_record = pick_first_record(
+        get_record_field(chart_record, "expanded_sections"),
+        get_record_field(raw_record, "expanded_sections"),
+        get_record_field(astronomical_record, "expanded_sections"),
+        get_record_field(output_record, "expanded_sections"),
+    )
+    panchang_source = pick_first_record(
+        get_record_field(chart_record, "panchang"),
+        get_record_field(raw_record, "panchang"),
+        get_record_field(output_record, "panchang"),
+        get_record_field(astronomical_record, "panchang"),
+        get_record_field(expanded_sections_record, "panchang"),
+        get_record_field(chart_record, "panchang_data"),
+        get_record_field(raw_record, "panchang_data"),
+        get_record_field(output_record, "panchang_data"),
+    )
+    if not panchang_source:
+        return build_unavailable_section("panchang")
+
+    rows = [
+        {"label": "Vara", "value": get_string_field(panchang_source, ["vara", "weekday", "day", "day_name"])},
+        {"label": "Tithi", "value": get_string_field(panchang_source, ["tithi", "tithi_name", "tithiName"])},
+        {"label": "Nakshatra", "value": get_string_field(panchang_source, ["nakshatra", "nakshatra_name", "nakshatraName"])},
+        {"label": "Yoga", "value": get_string_field(panchang_source, ["yoga", "yoga_name", "yogaName"])},
+        {"label": "Karana", "value": get_string_field(panchang_source, ["karana", "karana_name", "karanaName"])},
+        {"label": "Paksha", "value": get_string_field(panchang_source, ["paksha", "lunar_phase"])},
+    ]
+    rows = [row for row in rows if isinstance(row["value"], str) and row["value"].strip()]
+    if not rows:
+        return build_unavailable_section("panchang")
+    return {
+        "status": "available",
+        "source": panchang_source.get("source", "python_astro_calculation_engine"),
+        "data": panchang_source,
+        "rows": rows,
+        "items": [],
+        "warnings": [],
+    }
+
+
 def build_available_section(
     name: str,
     data: Any,
@@ -220,31 +308,6 @@ def build_available_section(
         "rows": safe_rows,
         "items": safe_items,
         "warnings": [],
-    }
-
-
-def build_reference_section(
-    name: str,
-    data: Any,
-    rows: list[dict[str, Any]] | None = None,
-    items: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    safe_rows = rows or []
-    safe_items = items or []
-    return {
-        "status": "available",
-        "source": "reference_report_seed",
-        "data": data,
-        "rows": safe_rows,
-        "items": safe_items,
-        "warnings": [
-            {
-                "warning_code": f"{name.upper()}_SEEDED_FROM_REFERENCE_REPORT",
-                "severity": "low",
-                "affected_calculations": [name],
-                "explanation": f"{name} values are seeded from the bundled reference report for this reference fixture path.",
-            }
-        ],
     }
 
 
@@ -412,7 +475,7 @@ def calculate_app_output(payload: dict[str, Any]) -> dict[str, Any]:
             },
             "warnings": warnings,
         },
-        "panchang": build_not_implemented_section("panchang", "Panchang"),
+        "panchang": build_unavailable_section("panchang"),
         "daily_transits": build_not_implemented_section("daily_transits", "Daily Transits"),
         "shodashvarga": build_not_implemented_section("shodashvarga", "Shodashvarga"),
         "ashtakvarga": build_not_implemented_section("ashtakvarga", "Ashtakvarga"),
@@ -449,5 +512,6 @@ def calculate_app_output(payload: dict[str, Any]) -> dict[str, Any]:
             "passed": True,
         },
     }
+    output["panchang"] = build_panchang_section(payload, chart, output)
     output["prediction_ready_context"] = build_prediction_ready_context(output, payload)
     return output

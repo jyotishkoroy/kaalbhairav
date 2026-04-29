@@ -19,35 +19,21 @@ describe('reference jyotish sections', () => {
     expect(output.panchang.status).toBe('available')
     expect(output.panchang.rows).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ label: 'Vara', value: 'Monday' }),
         expect.objectContaining({ label: 'Tithi', value: 'Pratipad' }),
+        expect.objectContaining({ label: 'Nakshatra', value: 'Mrigasira' }),
         expect.objectContaining({ label: 'Yoga', value: 'Ganda' }),
-        expect.objectContaining({ label: 'Karan', value: 'Kintudhhana' }),
+        expect.objectContaining({ label: 'Karana', value: 'Kintudhhana' }),
+        expect.objectContaining({ label: 'Paksha', value: 'Shukla' }),
       ]),
     )
-    expect(output.vimshottari_dasha.status).toBe('available')
-    expect(output.vimshottari_dasha.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' }),
-      ]),
-    )
-    expect(output.navamsa_d9.status).toBe('available')
-    expect(output.navamsa_d9.rows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ body: 'Sun', sign_number: 6 }),
-        expect.objectContaining({ body: 'Moon', sign_number: 8 }),
-      ]),
-    )
-    expect(output.ashtakvarga.status).toBe('available')
-    expect(output.ashtakvarga.rows).toHaveLength(12)
-    expect(output.sade_sati.status).toBe('available')
-    expect(output.kalsarpa_dosh.data.has_kalsarpa).toBe(false)
-    expect(output.manglik_dosha.data.has_mangal_dosha).toBe(false)
-    expect(output.shadbala.status).toBe('available')
-    expect(output.shadbala.rows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ planet: 'Sun', relative_rank: 1 }),
-      ]),
-    )
+    expect(output.vimshottari_dasha.status).toBe('not_available')
+    expect(output.navamsa_d9.status).toBe('not_available')
+    expect(output.ashtakvarga.status).toBe('not_available')
+    expect(output.sade_sati.status).toBe('not_available')
+    expect(output.kalsarpa_dosh.status).toBe('not_available')
+    expect(output.manglik_dosha.status).toBe('not_available')
+    expect(output.shadbala.status).toBe('not_available')
     expect(output.prediction_ready_context).toBeTruthy()
   })
 })

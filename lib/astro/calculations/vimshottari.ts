@@ -35,8 +35,6 @@ function addDays(iso: string, days: number): string {
   return new Date(new Date(iso).getTime() + days * 86400000).toISOString()
 }
 
-function nowISO(): string { return new Date().toISOString() }
-
 function findCurrent<T extends { start_utc: string; end_utc: string }>(periods: T[]): T | null {
   const now = Date.now()
   return periods.find(p => new Date(p.start_utc).getTime() <= now && now < new Date(p.end_utc).getTime()) ?? null

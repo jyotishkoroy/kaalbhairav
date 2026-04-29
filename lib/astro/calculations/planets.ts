@@ -1,6 +1,6 @@
 import { calcPlanet, SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, SE_MEAN_NODE, SE_TRUE_NODE } from '../engine/swiss.ts'
 import { normalize360 } from './math.ts'
-import { calculateSign, type SignPlacement } from './sign.ts'
+import { calculateSign } from './sign.ts'
 import { calculateNakshatra, type NakshatraPlacement } from './nakshatra.ts'
 import { nearSignBoundary, nearNakshatraBoundary, nearPadaBoundary } from './boundary.ts'
 

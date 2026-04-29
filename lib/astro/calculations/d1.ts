@@ -1,4 +1,3 @@
-import { RASHI_MAP } from './constants.ts'
 import type { PlanetPosition } from './planets.ts'
 import type { LagnaResult } from './lagna.ts'
 import type { WholeSignHouse } from './houses.ts'
@@ -27,8 +26,6 @@ export function calculateD1Chart(
   houses: WholeSignHouse[],
 ): D1Chart {
   const lagnaSignIdx = lagna?.sign_index ?? null
-  const houseReliability = lagna?.reliability ?? 'not_available'
-
   const planet_to_sign: Record<string, SignPlacement> = {}
   const planet_to_house: Record<string, number | null> = {}
   const occupying_planets_by_house: Record<number, string[]> = {}

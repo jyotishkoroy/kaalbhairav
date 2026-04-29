@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
             } catch {}
           }
         }
-      } catch (err) {
+      } catch {
         send('error', { message: 'The Guru paused. Please try again.' })
         controller.close()
         return

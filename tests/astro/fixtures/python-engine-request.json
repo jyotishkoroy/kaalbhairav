@@ -40,5 +40,17 @@
     "profile_id": "profile-test",
     "current_utc": "2026-04-28T00:00:00.000Z",
     "production": false
+  },
+  "raw": {
+    "panchang": {
+      "vara": "Monday",
+      "weekday": "Monday",
+      "tithi": "Pratipad",
+      "nakshatra": "Mrigasira",
+      "yoga": "Ganda",
+      "karana": "Kintudhhana",
+      "paksha": "Shukla",
+      "lunar_month": "Not provided"
+    }
   }
 }

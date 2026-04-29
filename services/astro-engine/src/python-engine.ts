@@ -23,7 +23,6 @@ const pythonOutputSchema = masterAstroOutputSchema.and(z.object({
 
 const DEFAULT_TIMEOUT_MS = 15_000
 const MAX_STDOUT_BYTES = 2_000_000
-const MAX_STDERR_BYTES = 16_384
 
 export class PythonAstroEngineError extends Error {
   readonly code: string
@@ -93,9 +92,7 @@ export async function calculateWithPythonEngine(
   return await new Promise<MasterAstroCalculationOutput>((resolve, reject) => {
     let settled = false
     let stdout = ''
-    let stderr = ''
     let stdoutBytes = 0
-    let stderrBytes = 0
     let killedByTimeout = false
     let killedByStdoutLimit = false
 
@@ -136,13 +133,6 @@ export async function calculateWithPythonEngine(
         return
       }
       stdout += chunk.toString('utf8')
-    })
-
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderrBytes += chunk.length
-      if (stderrBytes <= MAX_STDERR_BYTES) {
-        stderr += chunk.toString('utf8')
-      }
     })
 
     child.on('error', () => {

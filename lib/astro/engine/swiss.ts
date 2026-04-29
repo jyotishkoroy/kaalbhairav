@@ -186,12 +186,7 @@ export function initSwissEphemeris(): SwissEphStatus {
 
   try {
     _sweph = require('sweph') as SwephInstance
-    try {
-      const pkg = require('sweph/package.json') as { version?: string }
-      swePackageVersion = `sweph@${pkg.version ?? 'unknown'}`
-    } catch {
-      swePackageVersion = 'sweph@2.10.3-5'
-    }
+    swePackageVersion = 'sweph'
     sweCVersion = _sweph.version()
 
     _sweph.set_ephe_path(ephePath)
