@@ -139,6 +139,108 @@ function normalizeAvailableSection(value: unknown) {
   }
 }
 
+function normalizeDisplaySection(value: unknown) {
+  if (!value || typeof value !== 'object') return null
+
+  const section = value as {
+    status?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    data?: unknown
+    warnings?: unknown[]
+    current_mahadasha?: unknown
+    current_antardasha?: unknown
+    current_pratyantardasha?: unknown
+    transits?: unknown[]
+    transit_planets?: unknown[]
+    signatures?: unknown[]
+    aspects?: unknown[]
+    placements?: unknown[]
+  }
+
+  return {
+    status: typeof section.status === 'string' ? section.status : undefined,
+    rows: Array.isArray(section.rows) ? section.rows : [],
+    items: Array.isArray(section.items) ? section.items : [],
+    data: section.data ?? null,
+    current_mahadasha: section.current_mahadasha ?? null,
+    current_antardasha: section.current_antardasha ?? null,
+    current_pratyantardasha: section.current_pratyantardasha ?? null,
+    transits: Array.isArray(section.transits) ? section.transits : [],
+    transit_planets: Array.isArray(section.transit_planets) ? section.transit_planets : [],
+    signatures: Array.isArray(section.signatures) ? section.signatures : [],
+    aspects: Array.isArray(section.aspects) ? section.aspects : [],
+    placements: Array.isArray(section.placements) ? section.placements : [],
+  }
+}
+
+function statusRank(status: string | undefined): number {
+  if (status === 'real' || status === 'available') return 3
+  if (status === 'partial') return 2
+  if (status === 'not_available' || status === 'stub' || status === 'error' || status === 'failed') return 1
+  return 0
+}
+
+function displaySectionHasData(section: ReturnType<typeof normalizeDisplaySection>): boolean {
+  if (!section) return false
+  if (section.rows.length > 0) return true
+  if (section.items.length > 0) return true
+  if (section.transits.length > 0) return true
+  if (section.transit_planets.length > 0) return true
+  if (section.signatures.length > 0) return true
+  if (section.aspects.length > 0) return true
+  if (section.placements.length > 0) return true
+  if (section.current_mahadasha || section.current_antardasha || section.current_pratyantardasha) return true
+
+  if (section.data && typeof section.data === 'object') {
+    const data = section.data as {
+      rows?: unknown
+      items?: unknown
+      placements?: unknown
+      mahadasha_sequence?: unknown
+      current_dasha?: unknown
+      signatures?: unknown
+      aspects?: unknown
+      transits?: unknown
+      transit_planets?: unknown
+    }
+    if (Array.isArray(data.rows) && data.rows.length > 0) return true
+    if (Array.isArray(data.items) && data.items.length > 0) return true
+    if (Array.isArray(data.placements) && data.placements.length > 0) return true
+    if (Array.isArray(data.mahadasha_sequence) && data.mahadasha_sequence.length > 0) return true
+    if (Array.isArray(data.signatures) && data.signatures.length > 0) return true
+    if (Array.isArray(data.aspects) && data.aspects.length > 0) return true
+    if (Array.isArray(data.transits) && data.transits.length > 0) return true
+    if (Array.isArray(data.transit_planets) && data.transit_planets.length > 0) return true
+    if (data.current_dasha && typeof data.current_dasha === 'object') return true
+  }
+
+  return false
+}
+
+function preferDisplaySection(candidate: unknown, fallback: unknown): unknown {
+  const normalizedCandidate = normalizeDisplaySection(candidate)
+  const normalizedFallback = normalizeDisplaySection(fallback)
+
+  if (!normalizedCandidate) return fallback ?? candidate
+  if (!normalizedFallback) return candidate
+
+  const candidateHasData = displaySectionHasData(normalizedCandidate)
+  const fallbackHasData = displaySectionHasData(normalizedFallback)
+
+  if (candidateHasData && !fallbackHasData) return candidate
+  if (fallbackHasData && !candidateHasData) return fallback
+
+  const candidateRank = statusRank(normalizedCandidate.status)
+  const fallbackRank = statusRank(normalizedFallback.status)
+
+  if (candidateRank !== fallbackRank) {
+    return candidateRank > fallbackRank ? candidate : fallback
+  }
+
+  return candidateHasData ? candidate : (fallback ?? candidate)
+}
+
 function availableSectionHasDisplayData(section: ReturnType<typeof normalizeAvailableSection>): boolean {
   if (!section) return false
   if (section.rows.length > 0) return true
@@ -776,14 +878,14 @@ export function buildProfileExpandedSectionsFromStoredChartJson(chartJson: Recor
 
   return {
     ...storedExpanded,
-    daily_transits: storedExpanded.daily_transits ?? rebuilt.daily_transits,
-    panchang: preferAvailableSection(rebuilt.panchang, storedExpanded.panchang) as AstroExpandedSections['panchang'],
-    current_timing: rebuilt.current_timing ?? storedExpanded.current_timing,
-    vimshottari_dasha: preferAvailableSection(rebuilt.vimshottari_dasha, storedExpanded.vimshottari_dasha) as AstroExpandedSections['vimshottari_dasha'],
-    navamsa_d9: preferAvailableSection(rebuilt.navamsa_d9, storedExpanded.navamsa_d9) as AstroExpandedSections['navamsa_d9'],
-    planetary_aspects: storedExpanded.planetary_aspects ?? rebuilt.planetary_aspects,
-    basic_aspects: storedExpanded.basic_aspects ?? rebuilt.basic_aspects,
-    life_area_signatures: storedExpanded.life_area_signatures ?? rebuilt.life_area_signatures,
+    daily_transits: preferDisplaySection(rebuilt.daily_transits, storedExpanded.daily_transits) as AstroExpandedSections['daily_transits'],
+    panchang: preferDisplaySection(rebuilt.panchang, storedExpanded.panchang) as AstroExpandedSections['panchang'],
+    current_timing: preferDisplaySection(rebuilt.current_timing, storedExpanded.current_timing) as AstroExpandedSections['current_timing'],
+    vimshottari_dasha: preferDisplaySection(rebuilt.vimshottari_dasha, storedExpanded.vimshottari_dasha) as AstroExpandedSections['vimshottari_dasha'],
+    navamsa_d9: preferDisplaySection(rebuilt.navamsa_d9, storedExpanded.navamsa_d9) as AstroExpandedSections['navamsa_d9'],
+    planetary_aspects: preferDisplaySection(rebuilt.planetary_aspects, storedExpanded.planetary_aspects) as AstroExpandedSections['planetary_aspects'],
+    basic_aspects: preferDisplaySection(rebuilt.basic_aspects, storedExpanded.basic_aspects) as AstroExpandedSections['basic_aspects'],
+    life_area_signatures: preferDisplaySection(rebuilt.life_area_signatures, storedExpanded.life_area_signatures) as AstroExpandedSections['life_area_signatures'],
     ashtakvarga: preferAvailableSection(rebuilt.ashtakvarga, storedExpanded.ashtakvarga) as AstroExpandedSections['ashtakvarga'],
     sade_sati: preferAvailableSection(rebuilt.sade_sati, storedExpanded.sade_sati) as AstroExpandedSections['sade_sati'],
     kalsarpa_dosh: preferAvailableSection(rebuilt.kalsarpa_dosh, storedExpanded.kalsarpa_dosh) as AstroExpandedSections['kalsarpa_dosh'],

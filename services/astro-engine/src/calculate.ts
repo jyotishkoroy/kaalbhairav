@@ -27,6 +27,27 @@ function safeShadowLog(details: Record<string, unknown>) {
   console.info('astro_python_shadow', details)
 }
 
+function mergePythonBaseWithTsDerivedSections(
+  pythonOutput: MasterAstroCalculationOutput,
+  tsOutput: MasterAstroCalculationOutput,
+): MasterAstroCalculationOutput {
+  return {
+    ...pythonOutput,
+    panchang: tsOutput.panchang,
+    daily_transits: tsOutput.daily_transits,
+    navamsa_d9: tsOutput.navamsa_d9,
+    vimshottari_dasha: tsOutput.vimshottari_dasha,
+    yogas: tsOutput.yogas,
+    doshas: tsOutput.doshas,
+    strength_weakness_indicators: tsOutput.strength_weakness_indicators,
+    life_area_signatures: tsOutput.life_area_signatures,
+    prediction_ready_context: tsOutput.prediction_ready_context,
+    core_natal_summary: tsOutput.core_natal_summary,
+    confidence: tsOutput.confidence,
+    warnings: tsOutput.warnings,
+  }
+}
+
 export async function calculateAstroEngine(
   args: CalculateArgs,
 ): Promise<MasterAstroCalculationOutput> {
@@ -59,7 +80,12 @@ export async function calculateAstroEngine(
   }
 
   try {
-    return await calculateWithPythonEngine(args)
+    const pythonOutput = await calculateWithPythonEngine(args)
+    const tsOutput = await calculateMasterAstroOutput(args)
+    if (tsOutput.calculation_status === 'rejected') {
+      return pythonOutput
+    }
+    return mergePythonBaseWithTsDerivedSections(pythonOutput, tsOutput)
   } catch (error) {
     console.warn('astro_python_engine_fallback', {
       code: summarizePythonError(error),

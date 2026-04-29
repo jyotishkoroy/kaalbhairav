@@ -288,12 +288,31 @@ describe('profile chart json adapter', () => {
   it('repairs stale stored expanded sections from available astronomical data', () => {
     const expanded = buildProfileExpandedSectionsFromStoredChartJson({
       expanded_sections: {
+        daily_transits: {
+          status: 'partial',
+          rows: [],
+          warnings: ['stale storage'],
+        },
         panchang: {
           status: 'partial',
           rows: [],
           warnings: ['stale storage'],
         },
+        current_timing: {
+          status: 'not_available',
+          warnings: ['stale storage'],
+        },
         navamsa_d9: {
+          status: 'partial',
+          rows: [],
+          warnings: ['stale storage'],
+        },
+        planetary_aspects: {
+          status: 'partial',
+          rows: [],
+          warnings: ['stale storage'],
+        },
+        life_area_signatures: {
           status: 'partial',
           rows: [],
           warnings: ['stale storage'],
@@ -357,10 +376,13 @@ describe('profile chart json adapter', () => {
       }),
     })
 
+    expect(expanded?.daily_transits?.status).toBe('real')
+    expect(rowsOf(expanded?.daily_transits)[0]?.summary).toBe('Sun in Aries, House 1')
     expect(expanded?.panchang?.status).toBe('available')
     expect(rowsOf(expanded?.panchang).map((row) => `${row.label}: ${row.value}`)).toEqual(
       expect.arrayContaining(['Tithi: Pratipad', 'Yoga: Ganda', 'Karan: Kintudhhana']),
     )
+    expect(expanded?.current_timing?.status).toBe('real')
     expect(expanded?.navamsa_d9?.status).toBe('available')
     expect(rowsOf(expanded?.navamsa_d9)).toEqual(
       expect.arrayContaining([
@@ -368,6 +390,10 @@ describe('profile chart json adapter', () => {
         expect.objectContaining({ body: 'Moon', sign_number: 8 }),
       ]),
     )
+    expect(expanded?.planetary_aspects?.status).toBe('real')
+    expect(rowsOf(expanded?.planetary_aspects)[0]?.summary).toBe('Sun → Moon: graha drishti 7th')
+    expect(expanded?.life_area_signatures?.status).toBe('real')
+    expect(rowsOf(expanded?.life_area_signatures)[0]?.summary).toBe('self: H1 Aries, lord Mars in H1')
     expect(expanded?.current_timing?.current_mahadasha?.lord).toBe('Jupiter')
     expect(expanded?.vimshottari_dasha?.status).toBe('available')
   })
