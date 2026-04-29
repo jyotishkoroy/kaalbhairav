@@ -58,6 +58,22 @@ function stringifyMetaValue(value: unknown): string {
   return String(value);
 }
 
+function getPayloadError(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const error = record.error;
+  const message = record.message;
+
+  return typeof error === "string"
+    ? error
+    : typeof message === "string"
+      ? message
+      : undefined;
+}
+
 type AstroV2ChatClientProps = {
   profileId?: string;
 };
@@ -156,13 +172,13 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
     setError(undefined);
 
     try {
-      const response = await fetch("/api/astro/v1/chat", {
+      const response = await fetch("/api/astro/v2/reading", {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          profile_id: profileId,
+          userId: profileId,
           ...buildAstroV2ChatRequest({
             question,
             mode,
@@ -174,9 +190,11 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
       const payload = await readAstroV2Response(response);
 
       if (!response.ok) {
+        const payloadError = getPayloadError(payload);
         const parsedError = extractAstroV2ChatResponse(payload);
         throw new Error(
-          parsedError.answer ||
+          payloadError ||
+            parsedError.answer ||
             (payload && typeof payload === "string"
               ? payload.slice(0, 240)
               : await readErrorMessage(response)),
@@ -192,7 +210,8 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
       }
 
       if (!parsed.answer) {
-        throw new Error("The server returned an empty answer.");
+        const payloadError = getPayloadError(payload);
+        throw new Error(payloadError || "The server returned an empty answer.");
       }
 
       setAnswer(parsed.answer);
@@ -213,9 +232,8 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
       <div>
         <h2 className="text-xl font-medium">Ask Reading V2</h2>
         <p className="mt-2 text-sm leading-6 text-white/65">
-          Ask a question. The server decides whether to use Reading V2 based on
-          ASTRO_READING_V2_ENABLED. This page does not expose secrets or call
-          Groq directly from the browser.
+          This page calls the dedicated Reading V2 server route. The browser
+          never calls Groq directly and never receives server secrets.
         </p>
         {!profileId ? (
           <p className="mt-2 text-sm leading-6 text-amber-100/80">

@@ -39,6 +39,23 @@ describe("Astro V2 chat client helpers", () => {
     });
   });
 
+  it("builds request body for dedicated v2 JSON route", () => {
+    const request = buildAstroV2ChatRequest({
+      question: "Give me a remedy on my bad sleep cycle.",
+      mode: "remedy_focused",
+    });
+
+    expect(request).toMatchObject({
+      question: "Give me a remedy on my bad sleep cycle.",
+      message: "Give me a remedy on my bad sleep cycle.",
+      mode: "remedy_focused",
+      metadata: {
+        source: "astro-v2-page",
+        requestedMode: "remedy_focused",
+      },
+    });
+  });
+
   it("keeps only provided birth details and parses coordinates", () => {
     const request = buildAstroV2ChatRequest({
       question: "When will I get married?",

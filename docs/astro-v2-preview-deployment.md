@@ -195,3 +195,14 @@ Only do this after explicit production rollout approval.
 - done events complete the response.
 - JSON fallback remains supported.
 - No API response shape was changed.
+
+### Phase 17 direct reading route fix
+
+- /astro/v2 no longer calls /api/astro/v1/chat for direct readings.
+- /api/astro/v1/chat is conversational and may return clarifying_question SSE events.
+- /astro/v2 now calls /api/astro/v2/reading.
+- /api/astro/v2/reading returns JSON with answer and meta.
+- This prevents unrelated generic clarifying questions from appearing as every answer.
+- Existing /api/astro/v1/chat remains unchanged.
+- Groq refinement remains server-side only.
+- Safety and metadata still flow through Reading V2.
