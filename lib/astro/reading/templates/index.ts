@@ -1,0 +1,5 @@
+export * from '@/lib/astro/reading/templates/emotional-openings'
+export * from '@/lib/astro/reading/templates/topic-openings'
+export * from '@/lib/astro/reading/templates/synthesis'
+export * from '@/lib/astro/reading/templates/guidance'
+export * from '@/lib/astro/reading/templates/closings'

@@ -1,0 +1,178 @@
+import { describe, expect, it } from 'vitest'
+import type { AstroEvidence } from '@/lib/astro/interpretation/evidence'
+import { buildAstroEvidence } from '@/lib/astro/interpretation'
+import { classifyUserConcern } from '@/lib/astro/reading/concern-classifier'
+import {
+  generateHumanReading,
+  generateHumanReadingResult,
+} from '@/lib/astro/reading/human-generator'
+import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
+import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
+import {
+  containsAiStylePhrase,
+  lintHumanStyle,
+} from '@/lib/astro/reading/style-linter'
+
+function makeEvidence(): AstroEvidence[] {
+  return [
+    {
+      id: 'career-saturn-mahadasha',
+      topic: 'career',
+      factor: 'Saturn Mahadasha',
+      humanMeaning:
+        'Career growth may feel slower, but this phase supports long-term stability through discipline.',
+      likelyExperience:
+        'The person may feel under-recognized or delayed despite consistent effort.',
+      guidance:
+        'Focus on skill-building, process, discipline, and stable choices rather than sudden jumps.',
+      caution: 'Avoid changing direction only because of frustration or comparison.',
+      timingHint:
+        'Improvement is more likely through gradual consolidation than one sudden breakthrough.',
+      confidence: 'medium',
+      visibleToUser: true,
+    },
+  ]
+}
+
+describe('Human reading generator', () => {
+  it('generates a readable human-style answer from evidence', () => {
+    const concern = classifyUserConcern(
+      'I am working hard but not getting promotion. When will things improve?',
+    )
+
+    const answer = generateHumanReading({
+      concern,
+      evidence: makeEvidence(),
+      question:
+        'I am working hard but not getting promotion. When will things improve?',
+    })
+
+    expect(answer.length).toBeGreaterThan(300)
+    expect(answer).toContain('I')
+    expect(answer).toContain('Saturn Mahadasha')
+    expect(answer).toContain('My practical guidance')
+    expect(answer).not.toContain('as an AI')
+    expect(answer).not.toContain('Based on the data provided')
+    expect(containsAiStylePhrase(answer)).toBe(false)
+  })
+
+  it('creates a typed Reading V2 result', () => {
+    const concern = classifyUserConcern('When will I get a job?')
+    const result = generateHumanReadingResult({
+      concern,
+      evidence: makeEvidence(),
+      question: 'When will I get a job?',
+    })
+
+    expect(result.answer).toBeTruthy()
+    expect(result.meta.version).toBe('v2')
+    expect(result.meta.topic).toBe('career')
+    expect(result.meta.evidenceCount).toBe(1)
+  })
+
+  it('handles empty evidence without crashing', () => {
+    const concern = classifyUserConcern('What is going on in my life?')
+    const answer = generateHumanReading({
+      concern,
+      evidence: [],
+      question: 'What is going on in my life?',
+    })
+
+    expect(answer.length).toBeGreaterThan(80)
+    expect(answer).not.toContain('as an AI')
+  })
+
+  it('includes memory summary when provided', () => {
+    const concern = classifyUserConcern('When will I get a job?')
+    const answer = generateHumanReading({
+      concern,
+      evidence: makeEvidence(),
+      question: 'When will I get a job?',
+      memorySummary:
+        'Last time, the user asked about career delay and was advised to focus on steady preparation.',
+    })
+
+    expect(answer).toContain('From the earlier context')
+    expect(answer).toContain('career delay')
+  })
+
+  it('lints common AI-style phrases', () => {
+    const text =
+      'Based on the data provided, here are the key insights. In conclusion, as an AI, it is important to note this.'
+    const linted = lintHumanStyle(text)
+
+    expect(linted).not.toContain('Based on the data provided')
+    expect(linted).not.toContain('as an AI')
+    expect(linted).toContain('What I am seeing here')
+    expect(linted).toContain('So my honest reading is')
+  })
+
+  it('detects preferred language', () => {
+    expect(detectPreferredLanguage('kab shaadi hogi')).toBe('hinglish')
+    expect(detectPreferredLanguage('मेरी शादी कब होगी')).toBe('hindi')
+    expect(detectPreferredLanguage('আমার কাজ কবে ভালো হবে')).toBe('bengali')
+    expect(detectPreferredLanguage('When will my career improve?')).toBe('english')
+  })
+
+  it('selects reading modes from concern shape', () => {
+    expect(selectReadingMode(classifyUserConcern('What remedy should I do?'))).toBe(
+      'remedy_focused',
+    )
+    expect(selectReadingMode(classifyUserConcern('When will I get a job?'))).toBe(
+      'timing_prediction',
+    )
+    expect(
+      selectReadingMode(classifyUserConcern('Should I change my job now?')),
+    ).toBe('practical_guidance')
+    expect(
+      selectReadingMode(
+        classifyUserConcern('Explain my Saturn Mahadasha and Moon nakshatra.'),
+      ),
+    ).toBe('deep_astrology')
+  })
+
+  it('can generate from the real evidence engine output', () => {
+    const concern = classifyUserConcern('When will I get a job?')
+    const evidence = buildAstroEvidence({
+      concern,
+      chart: {
+        lagna: 'Leo',
+        moonSign: 'Gemini',
+      },
+      dasha: {
+        mahadasha: 'Saturn',
+        antardasha: 'Mercury',
+      },
+    })
+
+    const answer = generateHumanReading({
+      concern,
+      evidence,
+      question: 'When will I get a job?',
+    })
+
+    expect(evidence.length).toBeGreaterThan(0)
+    expect(answer.length).toBeGreaterThan(250)
+    expect(answer).toContain('Saturn')
+  })
+
+  it('does not expose hidden evidence marked invisible', () => {
+    const concern = classifyUserConcern('When will I get a job?')
+    const evidence: AstroEvidence[] = [
+      {
+        ...makeEvidence()[0],
+        factor: 'Hidden internal factor',
+        visibleToUser: false,
+      },
+    ]
+
+    const answer = generateHumanReading({
+      concern,
+      evidence,
+      question: 'When will I get a job?',
+    })
+
+    expect(answer).not.toContain('Hidden internal factor')
+    expect(answer.length).toBeGreaterThan(80)
+  })
+})
