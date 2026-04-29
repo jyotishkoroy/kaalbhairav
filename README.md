@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# tarayai
 
-## Getting Started
+tarayai is a proprietary astrology companion project created and maintained by Jyotishko Roy.
 
-First, run the development server:
+Website: https://tarayai.com  
+Contact: jyotishko.roy@tarayai.com
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Ownership
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copyright (c) 2026 Jyotishko Roy. All rights reserved.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This project, including its source code, documentation, prompts, workflows, database schemas, benchmark structures, UI designs, scripts, tests, and project architecture, is proprietary to Jyotishko Roy / tarayai.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+No permission is granted to copy, modify, distribute, sublicense, host, sell, commercially use, train models on, scrape, or create derivative works from this repository or any part of it without prior written permission from Jyotishko Roy.
 
-## Learn More
+Commercial use, resale, white-label deployment, SaaS hosting, sublicensing, or derivative commercial products require a separate paid commercial license from Jyotishko Roy.
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project is proprietary and all rights are reserved.
 
-## Deploy on Vercel
+No copying, redistribution, commercial use, model training, scraping, hosted reuse, or derivative use is permitted without prior written permission from Jyotishko Roy.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+For commercial licensing, partnership, or permission requests, contact:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+jyotishko.roy@tarayai.com
+
+Project/domain:
+
+https://tarayai.com
