@@ -1,131 +1,26 @@
 # Astro Reading V2 Rollout
 
-## Principle
+## Relevance Fix
 
-Do not touch the stable path first.
-The existing astrology reading flow remains the default. Reading V2 is routed only when `ASTRO_READING_V2_ENABLED=true`.
+Reading V2 now uses stricter topic classification and topic-aware evidence generation so unrelated prompts do not collapse into the same generic output.
 
-## Stable path
+## Key Rules
 
-User -> existing conversation/orchestrator -> existing answer
+- Monthly guidance is a feature-available flag, not an always-append block.
+- Remedies are a feature-available flag, not an always-append block.
+- Memory is topic-aware and session-scoped.
+- The Groq refiner only polishes relevant answers and falls back if it broadens the topic.
 
-## V2 path
+## Coverage
 
-User -> Reading Orchestrator V2 -> evidence -> memory -> human generator -> safety -> answer
+- Career and work
+- Timing and date questions
+- Remedy prompts
+- Relationship and marriage
+- Money and finance
+- Education
+- Health, death, and legal safety
 
-## Flags
+## Live Check
 
-```env
-ASTRO_READING_V2_ENABLED=false
-ASTRO_MEMORY_ENABLED=false
-ASTRO_REMEDIES_ENABLED=false
-ASTRO_MONTHLY_ENABLED=false
-ASTRO_VOICE_ENABLED=false
-```
-
-## Rollout rule
-
-Enable one flag at a time:
-
-1. Enable locally.
-2. Run tests.
-3. Test manually.
-4. Enable in preview.
-5. Test again.
-6. Only then enable in production.
-
-## Current phase
-
-Phase 8 adds the deterministic safety layer to Reading V2. Safety runs on every normal V2 response and handles medical, death/lifespan, legal, pregnancy, self-harm, fear-based, and gemstone risks.
-
-The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
-
-## Phase 12
-
-UI components were added behind `NEXT_PUBLIC_ASTRO_READING_V2_UI_ENABLED`.
-The new UI layer includes `ReadingModeSelector`, `FollowUpChips`, `ReadingMemoryCard`, and optional safe cards.
-This UI flag does not enable the server-side V2 runtime.
-The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
-
-## Phase 13
-
-Browser voice helpers are added behind `NEXT_PUBLIC_ASTRO_VOICE_ENABLED`.
-Voice input uses browser Web Speech Recognition when supported.
-Read aloud uses browser `speechSynthesis` when supported.
-No paid speech API or network call is used.
-The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
-
-## Phase 14
-
-Optional local AI provider interface is added for future experimentation.
-The disabled provider is the default and `ASTRO_LLM_PROVIDER=disabled`.
-An Ollama provider can be exercised locally with `ASTRO_LLM_PROVIDER=ollama`.
-The only valid provider values are `disabled` and `ollama`; `enabled` is not supported and falls back to disabled.
-Reading V2 is not wired to local AI by default.
-No paid AI or production LLM dependency is added.
-
-## Phase 15
-
-- Added rollout flag readiness checks.
-- Added integration readiness checks for Supabase, Upstash, legacy AI connector, Oracle VM/Python engine, and Vercel.
-- Added stable path guard tests.
-- Added manual rollout checklist.
-- All experimental flags remain disabled by default.
-
-## Phase 16 — Preview deployment verification
-
-- Added preview verification utility.
-- Added `npm run verify:astro-preview`.
-- Added preview deployment checklist.
-- Preview deployment uses `npx vercel`.
-- Production deployment is intentionally deferred.
-- Stable path remains default.
-
-## Latest production verification
-
-- `/astro/v2` route was added after the initial 404.
-- Production deployment should be rerun after env flag changes because `NEXT_PUBLIC_` flags are baked at build time.
-- `ASTRO_LLM_PROVIDER=enabled` is not a valid provider; use `disabled` or `ollama`.
-
-## Phase 18 — Optional Groq provider and safe LLM refinement
-
-- Adds `ASTRO_LLM_PROVIDER=groq`.
-- Adds `ASTRO_LLM_REFINER_ENABLED`.
-- Valid providers are `disabled`, `ollama`, and `groq`.
-- `enabled` is invalid and safely normalizes to disabled.
-- Groq only refines the already-safe deterministic Reading V2 answer.
-- Safety runs before and after Groq refinement.
-- If Groq fails, the deterministic safe answer is returned.
-- `GROQ_API_KEY` must stay in Vercel/project secrets only.
-- Groq API keys can expire; rotate them before expiry.
-
-## Phase 17 — /astro/v2 real chat flow
-
-- Added AstroV2ChatClient.
-- /astro/v2 now has question input, optional manual birth details, submit, answer card, safe metadata card, follow-up chip integration, voice transcript integration, and read-aloud for latest answer.
-- The page calls existing /api/astro/v1/chat.
-- The page does not call Groq directly.
-- The page does not expose secrets.
-- Server still decides stable vs V2 using ASTRO_READING_V2_ENABLED.
-- No geocoding API or paid API was added.
-
-### Phase 17 SSE fix
-
-- /astro/v2 now handles the existing /api/astro/v1/chat Server-Sent Events response.
-- clarifying_question events render as assistant output instead of empty-answer errors.
-- streamed token/content/delta/message events are collected into an answer.
-- meta events populate safe metadata.
-- done events complete the response.
-- JSON fallback remains supported.
-- No API response shape was changed.
-
-### Phase 17 direct reading route fix
-
-- /astro/v2 no longer calls /api/astro/v1/chat for direct readings.
-- /api/astro/v1/chat is conversational and may return clarifying_question SSE events.
-- /astro/v2 now calls /api/astro/v2/reading.
-- /api/astro/v2/reading returns JSON with answer and meta.
-- This prevents unrelated generic clarifying questions from appearing as every answer.
-- Existing /api/astro/v1/chat remains unchanged.
-- Groq refinement remains server-side only.
-- Safety and metadata still flow through Reading V2.
+- `npm run check:astro-v2-live`

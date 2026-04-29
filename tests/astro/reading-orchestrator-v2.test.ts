@@ -209,7 +209,7 @@ describe('Reading Orchestrator V2', () => {
     const second = await generateReadingV2(
       makeInput({
         userId,
-        question: 'Should I change my job now?',
+        question: 'When will I get a job?',
       }),
     )
 
@@ -231,7 +231,7 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.memorySummaryUsed).toBe(false)
   })
 
-  it('includes remedy evidence for explicit remedy requests even when ASTRO_REMEDIES_ENABLED is false', async () => {
+  it('does not include remedy evidence when ASTRO_REMEDIES_ENABLED is false and the question is not explicit remedy intent', async () => {
     process.env.ASTRO_REMEDIES_ENABLED = 'false'
 
     const result = await generateReadingV2(
@@ -246,13 +246,13 @@ describe('Reading Orchestrator V2', () => {
     const answer = String(result.answer ?? '').toLowerCase()
 
     expect(result.meta?.remediesLayer).toBe('disabled')
-    expect(result.meta?.remedyEvidenceIncluded).toBe(true)
-    expect(answer).toContain('routine')
+    expect(result.meta?.remedyEvidenceIncluded).toBe(false)
+    expect(answer).not.toContain('routine')
     expect(answer).not.toContain('wear blue sapphire immediately')
     expect(answer).not.toContain('guaranteed result')
   })
 
-  it('can include remedy evidence proactively when ASTRO_REMEDIES_ENABLED is true', async () => {
+  it('does not include remedy evidence proactively for normal questions when ASTRO_REMEDIES_ENABLED is true', async () => {
     process.env.ASTRO_REMEDIES_ENABLED = 'true'
 
     const result = await generateReadingV2(
@@ -267,8 +267,8 @@ describe('Reading Orchestrator V2', () => {
     const answer = String(result.answer ?? '').toLowerCase()
 
     expect(result.meta?.remediesLayer).toBe('enabled_phase_9')
-    expect(result.meta?.remedyEvidenceIncluded).toBe(true)
-    expect(answer).toContain('routine')
+    expect(result.meta?.remedyEvidenceIncluded).toBe(false)
+    expect(answer).not.toContain('routine')
   })
 
   it('does not include proactive remedy evidence when ASTRO_REMEDIES_ENABLED is false for normal questions', async () => {
@@ -287,7 +287,7 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.remedyEvidenceIncluded).toBe(false)
   })
 
-  it('includes monthly guidance for explicit monthly requests even when ASTRO_MONTHLY_ENABLED is false', async () => {
+  it('does not include monthly guidance when ASTRO_MONTHLY_ENABLED is false', async () => {
     process.env.ASTRO_MONTHLY_ENABLED = 'false'
 
     const result = await generateReadingV2(
@@ -302,12 +302,11 @@ describe('Reading Orchestrator V2', () => {
     const answer = String(result.answer ?? '')
 
     expect(result.meta?.monthlyLayer).toBe('disabled')
-    expect(result.meta?.monthlyGuidanceIncluded).toBe(true)
-    expect(answer).toContain('Monthly guidance')
-    expect(answer).toContain('Career focus:')
+    expect(result.meta?.monthlyGuidanceIncluded).toBe(false)
+    expect(answer).not.toContain('Monthly guidance')
   })
 
-  it('can include monthly guidance proactively when ASTRO_MONTHLY_ENABLED is true', async () => {
+  it('does not include monthly guidance proactively for normal questions when ASTRO_MONTHLY_ENABLED is true', async () => {
     process.env.ASTRO_MONTHLY_ENABLED = 'true'
 
     const result = await generateReadingV2(
@@ -322,8 +321,8 @@ describe('Reading Orchestrator V2', () => {
     const answer = String(result.answer ?? '')
 
     expect(result.meta?.monthlyLayer).toBe('enabled_phase_11')
-    expect(result.meta?.monthlyGuidanceIncluded).toBe(true)
-    expect(answer).toContain('Monthly guidance')
+    expect(result.meta?.monthlyGuidanceIncluded).toBe(false)
+    expect(answer).not.toContain('Monthly guidance')
   })
 
   it('does not include proactive monthly guidance when ASTRO_MONTHLY_ENABLED is false for normal questions', async () => {

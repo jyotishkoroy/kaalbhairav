@@ -43,6 +43,7 @@ describe("Astro V2 chat client helpers", () => {
     const request = buildAstroV2ChatRequest({
       question: "Give me a remedy on my bad sleep cycle.",
       mode: "remedy_focused",
+      sessionId: "astro-v2-session-test",
     });
 
     expect(request).toMatchObject({
@@ -52,6 +53,7 @@ describe("Astro V2 chat client helpers", () => {
       metadata: {
         source: "astro-v2-page",
         requestedMode: "remedy_focused",
+        sessionId: "astro-v2-session-test",
       },
     });
   });

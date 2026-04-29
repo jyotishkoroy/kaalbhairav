@@ -23,7 +23,13 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
     'change job',
     'naukri',
     'kaam',
+    'naukri',
+    'job',
+    'kazi',
     'profession',
+    'काम',
+    'नौकरी',
+    'কাজ',
   ],
   marriage: [
     'marriage',
@@ -66,6 +72,8 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
     'cash',
     'paisa',
     'earning',
+    'धन',
+    'টাকা',
   ],
   health: [
     'health',
@@ -86,16 +94,19 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
     'sleep',
     'rest',
     'routine',
+    'health',
+    'नींद',
+    'स्वास्थ्य',
   ],
   family: ['family', 'mother', 'father', 'parents', 'sibling', 'brother', 'sister', 'child', 'children', 'home', 'ghar'],
   education: ['education', 'study', 'studies', 'exam', 'college', 'school', 'degree', 'course', 'student', 'marks', 'result', 'admission'],
   spirituality: ['spiritual', 'spirituality', 'god', 'mantra', 'puja', 'pooja', 'meditation', 'karma', 'dharma', 'sadhana', 'moksha'],
-  remedy: ['remedy', 'remedies', 'upay', 'solution', 'mantra', 'gemstone', 'stone', 'puja', 'pooja', 'donation', 'fast', 'vrat', 'what should i do'],
-  death: ['death', 'die', 'lifespan', 'life span', 'when will i die', 'will i die', 'death date', 'longevity'],
+  remedy: ['remedy', 'remedies', 'upay', 'solution', 'mantra', 'gemstone', 'stone', 'puja', 'pooja', 'donation', 'fast', 'vrat', 'what should i do', 'उपाय', 'प्रार्थना'],
+  death: ['death', 'die', 'lifespan', 'life span', 'when will i die', 'will i die', 'death date', 'longevity', 'मृत्यु', 'মৃত্যু', 'मौत'],
   general: [],
 }
 
-const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'monthly', 'this month', 'next month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen', 'tomorrow', 'today', 'next week']
+const TIMING_WORDS = ['when', 'kab', 'date', 'month', 'monthly', 'this month', 'next month', 'year', 'time', 'period', 'phase', 'how long', 'by when', 'will it happen', 'tomorrow', 'today', 'next week', 'kobe', 'কবে']
 
 const YES_NO_WORDS = ['will i', 'will my', 'can i', 'can my', 'do i', 'does my', 'is there', 'am i']
 
@@ -103,7 +114,7 @@ const DECISION_WORDS = ['should i', 'continue', 'move on', 'leave', 'change', 's
 
 const EXPLANATION_WORDS = ['why', 'reason', 'explain', 'understand', 'meaning', 'what is happening']
 
-const REMEDY_WORDS = ['remedy', 'remedies', 'upay', 'solution', 'mantra', 'puja', 'pooja', 'gemstone', 'stone', 'donation', 'fast', 'vrat', 'what should i do']
+const REMEDY_WORDS = ['remedy', 'remedies', 'upay', 'solution', 'mantra', 'puja', 'pooja', 'gemstone', 'stone', 'donation', 'fast', 'vrat']
 
 const SAD_WORDS = ['tired', 'hopeless', 'sad', 'crying', 'lonely', 'alone', 'exhausted', 'waiting', 'broken', 'hurt']
 
@@ -168,6 +179,19 @@ export function detectTopic(message: string): ReadingTopic {
   const lower = normalizeMessage(message)
 
   if (hasAny(lower, TOPIC_KEYWORDS.death)) return 'death'
+  if (hasAny(lower, TOPIC_KEYWORDS.health) && hasAny(lower, ['doctor', 'disease', 'illness', 'sleep', 'rest', 'routine', 'anxiety', 'stress', 'symptom', 'symptoms'])) {
+    return 'health'
+  }
+  if (hasAny(lower, TOPIC_KEYWORDS.marriage)) return 'marriage'
+  if (hasAny(lower, TOPIC_KEYWORDS.career)) return 'career'
+  if (hasAny(lower, TOPIC_KEYWORDS.money)) return 'money'
+  if (hasAny(lower, TOPIC_KEYWORDS.education)) return 'education'
+  if (hasAny(lower, TOPIC_KEYWORDS.family)) return 'family'
+  if (hasAny(lower, TOPIC_KEYWORDS.relationship)) return 'relationship'
+  if (hasAny(lower, TOPIC_KEYWORDS.spirituality)) return 'spirituality'
+  if (hasAny(lower, TOPIC_KEYWORDS.remedy)) {
+    return hasAny(lower, TOPIC_KEYWORDS.career) ? 'career' : 'remedy'
+  }
 
   const scores = Object.entries(TOPIC_KEYWORDS)
     .filter(([topic]) => topic !== 'general' && topic !== 'death')
@@ -196,7 +220,6 @@ export function detectTopic(message: string): ReadingTopic {
     return 'career'
   }
 
-  if (hasAny(lower, TOPIC_KEYWORDS.career)) return 'career'
   if (hasAny(lower, ['tomorrow', 'today', 'next week', 'next month', 'next year', 'date'])) return 'general'
 
   return top.topic
@@ -248,6 +271,15 @@ export function detectsMonthlyGuidanceRequest(message: string): boolean {
       'guidance for this month',
       'what should i do this month',
       'how is this month',
+      'for april',
+      'for may',
+      'for june',
+      'for july',
+      'for august',
+      'for september',
+      'for october',
+      'for november',
+      'for december',
     ])
   )
 }

@@ -24,7 +24,7 @@ import type {
   AstrologyReadingResult,
   GenerateStableReading,
 } from './reading-router-types'
-import type { ReadingV2Input } from './reading-types'
+import type { ReadingMode, ReadingV2Input } from './reading-types'
 
 function getQuestion(input: AstrologyReadingInput): string {
   if (typeof input.question === 'string' && input.question.trim()) {
@@ -123,14 +123,19 @@ async function callStableFallback(
 async function getOptionalMemorySummary(input: {
   enabled: boolean
   userId?: string
-}): Promise<string | undefined> {
+}): Promise<{ summary: string | undefined; topic?: ClassifiedConcern['topic'] } | undefined> {
   if (!input.enabled || !input.userId) return undefined
 
   try {
     const memory = await getAstrologyMemory(input.userId)
-    return buildMemorySummary(memory)
+    return {
+      summary: buildMemorySummary(memory),
+      topic: memory?.previousReadings.at(-1)?.topic,
+    }
   } catch {
-    return undefined
+    return {
+      summary: undefined,
+    }
   }
 }
 
@@ -169,6 +174,48 @@ function toReadingV2Input(input: AstrologyReadingInput): ReadingV2Input {
     context: input.context,
     metadata: input.metadata,
   }
+}
+
+function hasExplicitRemedyIntent(question: string, mode: ReadingMode): boolean {
+  const text = question.toLowerCase()
+  return (
+    mode === 'remedy_focused' ||
+    /\b(remedy|remedies|upay|mantra|puja|gemstone|ratna)\b/i.test(text) ||
+    text.includes('उपाय') ||
+    text.includes('प्रार्थना')
+  )
+}
+
+function hasExplicitMonthlyIntent(question: string, mode: ReadingMode): boolean {
+  const text = question.toLowerCase()
+  const exactDatePattern =
+    /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b/i
+  const monthTerms = [
+    'this month',
+    'monthly',
+    'month ahead',
+    'april',
+    'may',
+    'june',
+    'july',
+    'august',
+    'september',
+    'october',
+    'november',
+    'december',
+    'january',
+    'february',
+    'march',
+  ]
+
+  return (
+    !exactDatePattern.test(text) &&
+    (detectsMonthlyGuidanceRequest(text) ||
+      monthTerms.some((term) => text.includes(term)) ||
+      (mode === 'timing_prediction' &&
+        /\b20\d{2}\b/.test(text) &&
+        monthTerms.some((term) => text.includes(term))))
+  )
 }
 
 /**
@@ -219,8 +266,11 @@ export async function generateReadingV2(
     const chart = getChartSource(input)
     const dasha = getDashaSource(input)
     const transits = getTransitSource(input)
+    const mode = selectReadingMode(concern)
     const shouldAddRemedyEvidence =
-      remediesEnabled || concern.questionType === 'remedy' || concern.topic === 'remedy'
+      remediesEnabled &&
+      hasExplicitRemedyIntent(v2Input.question, mode) &&
+      (concern.topic === 'remedy' || concern.questionType === 'remedy')
     let evidence = buildAstroEvidence({
       concern,
       chart,
@@ -248,16 +298,25 @@ export async function generateReadingV2(
         ...evidence,
         ...remedyEvidence.filter((item) => !existingIds.has(item.id)),
       ]
+    } else {
+      evidence = evidence.filter((item) => item.topic !== 'remedy')
     }
     const remedyEvidenceIncluded = evidence.some((item) => item.topic === 'remedy')
-    const mode = selectReadingMode(concern)
     const language = detectPreferredLanguage(v2Input.question)
-    const memorySummary = await getOptionalMemorySummary({
-      enabled: memoryEnabled,
-      userId,
-    })
-    const monthlyRequested = detectsMonthlyGuidanceRequest(v2Input.question)
-    const shouldIncludeMonthlyGuidance = monthlyEnabled || monthlyRequested
+    const memoryContext: {
+      summary?: string
+      topic?: ClassifiedConcern['topic']
+    } =
+      (await getOptionalMemorySummary({
+        enabled: memoryEnabled,
+        userId,
+      })) ?? {}
+    const memorySummary =
+      typeof memoryContext.summary === 'string' ? memoryContext.summary : undefined
+    const shouldIncludeMemory =
+      Boolean(memorySummary) && memoryContext.topic === concern.topic
+    const shouldIncludeMonthlyGuidance =
+      monthlyEnabled && hasExplicitMonthlyIntent(v2Input.question, mode)
     const llmConfig = getLLMProviderConfig()
     const llmRefinerConfig = getLLMRefinerConfig()
     const result = generateHumanReadingResult({
@@ -266,7 +325,7 @@ export async function generateReadingV2(
       question: v2Input.question,
       mode,
       language,
-      memorySummary,
+      memorySummary: shouldIncludeMemory ? memorySummary : undefined,
     })
     let monthlyGuidanceText = ''
     let monthlyGuidanceIncluded = false
@@ -303,6 +362,9 @@ export async function generateReadingV2(
         answer: firstSafety.answer,
         maxTokens: llmRefinerConfig.maxTokens,
         temperature: llmRefinerConfig.temperature,
+        originalAnswer: result.answer,
+        topic: concern.topic,
+        mode,
       })
 
       llmRefinerUsed = refined.usedLLM
@@ -348,7 +410,7 @@ export async function generateReadingV2(
           firstSafety.forbiddenClaimsRemoved ||
           finalSafety.forbiddenClaimsRemoved,
         memoryLayer: memoryEnabled ? 'enabled_phase_7' : 'disabled',
-        memorySummaryUsed: Boolean(memorySummary),
+        memorySummaryUsed: Boolean(shouldIncludeMemory),
         remediesLayer: remediesEnabled ? 'enabled_phase_9' : 'disabled',
         remedyEvidenceIncluded,
         monthlyLayer: monthlyEnabled ? 'enabled_phase_11' : 'disabled',

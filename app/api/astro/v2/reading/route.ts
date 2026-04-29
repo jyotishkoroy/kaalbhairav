@@ -12,6 +12,7 @@ type AstroV2ReadingRequestBody = {
   birthDetails?: unknown;
   metadata?: unknown;
   userId?: unknown;
+  sessionId?: unknown;
   chart?: unknown;
   context?: unknown;
   dasha?: unknown;
@@ -113,10 +114,11 @@ export async function POST(request: Request) {
   const birthDetails = parseBirthDetails(body.birthDetails);
   const metadata = parseMetadata(body.metadata);
   const userId = readString(body.userId);
+  const sessionId = readString(body.sessionId) ?? readString(metadata?.sessionId)
 
   try {
     const result = await generateReadingV2({
-      userId: userId ?? "astro-v2-page",
+      userId: userId ?? sessionId ?? "astro-v2-page-anonymous",
       question,
       mode: readMode(body.mode),
       birthDetails: birthDetails as
@@ -136,6 +138,7 @@ export async function POST(request: Request) {
       metadata: {
         source: "astro-v2-page",
         directV2Route: true,
+        sessionId,
         ...metadata,
       },
     });

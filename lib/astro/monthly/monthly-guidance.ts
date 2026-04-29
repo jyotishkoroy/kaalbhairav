@@ -110,6 +110,6 @@ export function renderMonthlyGuidance(guidance: MonthlyGuidance): string {
     `Relationship focus: ${guidance.relationshipFocus}`,
     `Avoid: ${guidance.avoid.join(" ")}`,
     `Do more of: ${guidance.doMoreOf.join(" ")}`,
-    `Simple remedy: ${guidance.remedy}`,
+    `Practical note: ${guidance.remedy}`,
   ].join("\n\n");
 }

@@ -152,4 +152,27 @@ describe("/api/astro/v2/reading", () => {
       }),
     );
   });
+
+  it("uses sessionId metadata as the anonymous user id when userId is missing", async () => {
+    await POST(
+      createRequest({
+        question: "how will be my tomorrow?",
+        mode: "timing_prediction",
+        metadata: {
+          sessionId: "astro-v2-session-123",
+        },
+      }),
+    );
+
+    expect(generateReadingV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "astro-v2-session-123",
+        metadata: expect.objectContaining({
+          sessionId: "astro-v2-session-123",
+          source: "astro-v2-page",
+          directV2Route: true,
+        }),
+      }),
+    );
+  });
 });

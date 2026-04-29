@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "verify:astro-preview": "node scripts/verify-astro-preview.mjs",
+    "check:astro-v2-live": "node scripts/check-astro-v2-live.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

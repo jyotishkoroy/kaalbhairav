@@ -92,7 +92,7 @@ describe("Monthly guidance engine", () => {
     expect(rendered).toContain("Relationship focus:");
     expect(rendered).toContain("Avoid:");
     expect(rendered).toContain("Do more of:");
-    expect(rendered).toContain("Simple remedy:");
+    expect(rendered).toContain("Practical note:");
   });
 
   it("exposes all monthly themes", () => {

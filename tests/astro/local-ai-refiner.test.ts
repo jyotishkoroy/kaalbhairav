@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   refineReadingWithLocalAI,
   refineReadingWithSafeLLM,
+  shouldAcceptRefinedAnswer,
 } from '@/lib/astro/reading/local-ai-refiner'
 import { disabledLLMProvider } from '@/lib/llm'
 import type { LLMProvider } from '@/lib/llm/provider'
@@ -202,5 +203,56 @@ describe('local AI reading refiner', () => {
     )
     expect(call?.system).toContain('medical')
     expect(call?.system).toContain('guaranteed')
+  })
+
+  it('rejects monthly guidance added to a non-monthly answer', () => {
+    expect(
+      shouldAcceptRefinedAnswer({
+        originalAnswer: 'The answer is about career stability.',
+        refinedAnswer: 'Monthly guidance for April 2026: stay steady.',
+        question: 'When will I get a job?',
+      }),
+    ).toBe(false)
+  })
+
+  it('rejects multi-topic dump added by the refiner', () => {
+    expect(
+      shouldAcceptRefinedAnswer({
+        originalAnswer: 'The answer is about timing and effort.',
+        refinedAnswer:
+          'Career and relationship both matter here, so stay calm and balanced.',
+        question: 'How will tomorrow be?',
+      }),
+    ).toBe(false)
+  })
+
+  it('rejects remedy text added when the question was not about remedies', () => {
+    expect(
+      shouldAcceptRefinedAnswer({
+        originalAnswer: 'The answer is about timing only.',
+        refinedAnswer: 'A simple remedy can help here.',
+        question: 'How will tomorrow be?',
+      }),
+    ).toBe(false)
+  })
+
+  it('accepts a refined answer that preserves career topic', () => {
+    expect(
+      shouldAcceptRefinedAnswer({
+        originalAnswer: 'Career effort is the focus.',
+        refinedAnswer: 'Career effort is the focus, and progress should stay practical.',
+        question: 'I am working hard and not getting promotion.',
+      }),
+    ).toBe(true)
+  })
+
+  it('accepts a refined answer that preserves a specific timing date', () => {
+    expect(
+      shouldAcceptRefinedAnswer({
+        originalAnswer: 'The answer mentions 8th November 2026 and timing.',
+        refinedAnswer: 'The answer mentions 8th November 2026 and timing clearly.',
+        question: 'how will be my 8th November 2026?',
+      }),
+    ).toBe(true)
   })
 })

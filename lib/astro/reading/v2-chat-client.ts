@@ -13,6 +13,7 @@ export type AstroV2ChatRequestInput = {
   question: string;
   mode: ReadingMode;
   birthDetails?: Partial<AstroV2BirthDetailsForm>;
+  sessionId?: string;
 };
 
 export type AstroV2ChatDisplayResponse = {
@@ -122,6 +123,7 @@ export function buildAstroV2ChatRequest(
     metadata: {
       source: "astro-v2-page",
       requestedMode: input.mode,
+      sessionId: input.sessionId,
     },
   };
 }

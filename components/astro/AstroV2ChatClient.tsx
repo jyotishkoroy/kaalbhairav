@@ -88,6 +88,14 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
   const [meta, setMeta] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId] = useState(() => {
+    if (typeof window === "undefined") return "astro-v2-page-server";
+    const existing = window.localStorage.getItem("astro-v2-session-id");
+    if (existing) return existing;
+    const next = `astro-v2-${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+    window.localStorage.setItem("astro-v2-session-id", next);
+    return next;
+  });
 
   const safeMeta = useMemo(() => pickSafeMeta(meta), [meta]);
   const canSubmit = shouldSubmitAstroV2Question(question) && !isLoading && Boolean(profileId);
@@ -183,6 +191,7 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
             question,
             mode,
             birthDetails,
+            sessionId,
           }),
         }),
       });

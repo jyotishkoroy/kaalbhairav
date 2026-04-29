@@ -20,6 +20,9 @@ export type SafeLLMRefineInput = {
   model?: string
   maxTokens?: number
   temperature?: number
+  originalAnswer?: string
+  topic?: string
+  mode?: string
 }
 
 export type SafeLLMRefineResult = {
@@ -40,6 +43,11 @@ function buildSystemPrompt(): string {
     'Do not replace a topic-specific answer with a generic disclaimer.',
     "Keep the user's topic: career, timing, remedy, relationship, money, or health exactly as provided.",
     'If the original answer contains safe practical steps, keep them.',
+    'Do not add monthly guidance unless it already exists in the original answer.',
+    'Do not add remedies unless they already exist in the original answer or the question explicitly asks for remedies.',
+    'Do not turn a specific timing answer into a generic monthly report.',
+    'Do not add separate career and relationship sections unless they were already present.',
+    'Keep any specific date phrase unchanged.',
     'Do not add medical, legal, pregnancy, death, lifespan, gemstone, curse, miracle, or guaranteed claims.',
     'Do not remove safety boundaries or disclaimers.',
     'Do not mention AI.',
@@ -55,6 +63,73 @@ function buildUserPrompt(input: SafeLLMRefineInput): string {
     'Rewrite the answer to sound more natural, caring, and human.',
     'Preserve all safety boundaries and do not add any new factual claims.',
   ].join('\n\n')
+}
+
+function containsTopicText(text: string, question: string): boolean {
+  const lowerText = text.toLowerCase()
+  const lowerQuestion = question.toLowerCase()
+  const terms = [
+    'career',
+    'job',
+    'work',
+    'promotion',
+    'timing',
+    'tomorrow',
+    'today',
+    'month',
+    'date',
+    'relationship',
+    'marriage',
+    'money',
+    'health',
+    'sleep',
+    'remedy',
+    'upay',
+    'mantra',
+  ]
+
+  return terms.some((term) => lowerText.includes(term) || lowerQuestion.includes(term))
+}
+
+export function shouldAcceptRefinedAnswer(input: {
+  originalAnswer: string
+  refinedAnswer: string
+  question: string
+}): boolean {
+  const original = input.originalAnswer.toLowerCase()
+  const refined = input.refinedAnswer.toLowerCase()
+  const question = input.question.toLowerCase()
+
+  if (!refined.trim()) return false
+
+  const originalHasMonthly = /monthly guidance|this month|month ahead/i.test(original)
+  const refinedAddsMonthly =
+    /monthly guidance|this month|month ahead/i.test(refined) && !originalHasMonthly
+  if (refinedAddsMonthly) return false
+
+  const originalHasRemedy = /remedy|upay|mantra|practice/i.test(original)
+  const refinedAddsRemedy =
+    /remedy|upay|mantra/i.test(refined) &&
+    !originalHasRemedy &&
+    !/remedy|upay|mantra/i.test(question)
+  if (refinedAddsRemedy) return false
+
+  const refinedAddsMultiTopicDump =
+    refined.includes('career') &&
+    refined.includes('relationship') &&
+    !original.includes('career') &&
+    !original.includes('relationship')
+
+  if (refinedAddsMultiTopicDump) return false
+
+  if (
+    containsTopicText(original, question) &&
+    !containsTopicText(refined, question)
+  ) {
+    return false
+  }
+
+  return true
 }
 
 export async function refineReadingWithSafeLLM(
@@ -73,6 +148,24 @@ export async function refineReadingWithSafeLLM(
     const text = result.text.trim()
 
     if (!text) {
+      return {
+        answer: input.answer,
+        usedLLM: false,
+        provider: result.provider,
+        model: result.model,
+        fallback: true,
+      }
+    }
+
+    const originalAnswer = input.originalAnswer ?? input.answer
+
+    if (
+      !shouldAcceptRefinedAnswer({
+        originalAnswer,
+        refinedAnswer: text,
+        question: input.question,
+      })
+    ) {
       return {
         answer: input.answer,
         usedLLM: false,
