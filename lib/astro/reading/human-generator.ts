@@ -5,6 +5,7 @@ import type {
   ReadingV2Result,
   UserConcern,
 } from '@/lib/astro/reading/reading-types'
+import { applyLanguageTone } from '@/lib/astro/reading/language-transformer'
 import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
 import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
 import { lintHumanStyle } from '@/lib/astro/reading/style-linter'
@@ -73,7 +74,10 @@ export function generateHumanReading(input: HumanReadingInput): string {
     .filter(Boolean)
     .join('\n\n')
 
-  return lintHumanStyle(raw)
+  return applyLanguageTone({
+    text: lintHumanStyle(raw),
+    language: input.language ?? detectPreferredLanguage(input.question ?? ''),
+  })
 }
 
 export function generateHumanReadingResult(

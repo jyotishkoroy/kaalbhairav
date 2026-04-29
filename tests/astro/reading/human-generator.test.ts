@@ -114,6 +114,42 @@ describe('Human reading generator', () => {
     expect(detectPreferredLanguage('When will my career improve?')).toBe('english')
   })
 
+  it('generates Hinglish-flavored support for Hinglish questions', () => {
+    const concern = classifyUserConcern('meri naukri kab lagegi')
+    const answer = generateHumanReading({
+      concern,
+      evidence: makeEvidence(),
+      question: 'meri naukri kab lagegi',
+    })
+
+    expect(answer).toContain('Yeh')
+    expect(answer.length).toBeGreaterThan(250)
+  })
+
+  it('generates Hindi support line for Hindi script questions', () => {
+    const concern = classifyUserConcern('मेरी नौकरी कब लगेगी')
+    const answer = generateHumanReading({
+      concern,
+      evidence: makeEvidence(),
+      question: 'मेरी नौकरी कब लगेगी',
+    })
+
+    expect(/[अ-ह]/.test(answer)).toBe(true)
+    expect(answer.length).toBeGreaterThan(250)
+  })
+
+  it('generates Bengali support line for Bengali script questions', () => {
+    const concern = classifyUserConcern('আমার কাজ কবে ভালো হবে')
+    const answer = generateHumanReading({
+      concern,
+      evidence: makeEvidence(),
+      question: 'আমার কাজ কবে ভালো হবে',
+    })
+
+    expect(/[অ-হ]/.test(answer)).toBe(true)
+    expect(answer.length).toBeGreaterThan(250)
+  })
+
   it('selects reading modes from concern shape', () => {
     expect(selectReadingMode(classifyUserConcern('What remedy should I do?'))).toBe(
       'remedy_focused',

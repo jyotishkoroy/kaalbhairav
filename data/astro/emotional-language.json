@@ -1,0 +1,42 @@
+{
+  "english": {
+    "softeners": [
+      "I would read this carefully.",
+      "This needs a calm reading.",
+      "This does not need a fear-based answer."
+    ],
+    "delayNotDenial": "This looks more like delay and maturity than denial.",
+    "practicalReminder": "The useful step is to stay steady and make the next choice from clarity, not pressure.",
+    "remedyBoundary": "Keep remedies simple, safe, and within your means."
+  },
+  "hinglish": {
+    "softeners": [
+      "Isko main calmly read karunga, fear-based way mein nahi.",
+      "Yeh question important hai, isliye answer bhi grounded hona chahiye.",
+      "Is phase ko panic se nahi, clarity se dekhna zaroori hai."
+    ],
+    "delayNotDenial": "Yeh phase delay dikha raha hai, denial nahi.",
+    "practicalReminder": "Abhi useful step yeh hai ki decision pressure se nahi, clarity se lo.",
+    "remedyBoundary": "Remedies simple, safe aur apni capacity ke andar rakhna better hai."
+  },
+  "hindi": {
+    "softeners": [
+      "इसको शांत मन से पढ़ना ज़रूरी है।",
+      "यह डर पर आधारित उत्तर नहीं होना चाहिए।",
+      "इस प्रश्न में भावनात्मक दबाव दिखता है, इसलिए उत्तर संतुलित होना चाहिए।"
+    ],
+    "delayNotDenial": "यह स्थिति अस्वीकार नहीं, बल्कि देरी और परिपक्वता दिखाती है।",
+    "practicalReminder": "अभी उपयोगी कदम यह है कि निर्णय दबाव से नहीं, स्पष्टता से लें।",
+    "remedyBoundary": "उपाय सरल, सुरक्षित और अपनी क्षमता के अंदर रखें।"
+  },
+  "bengali": {
+    "softeners": [
+      "এটা শান্তভাবে পড়া দরকার, ভয়ের জায়গা থেকে নয়।",
+      "এই প্রশ্নে আবেগের চাপ আছে, তাই উত্তরটা ভারসাম্যপূর্ণ হওয়া দরকার।",
+      "এখানে তাড়াহুড়ো নয়, পরিষ্কার বোঝাপড়া বেশি জরুরি।"
+    ],
+    "delayNotDenial": "এটা অস্বীকার নয়, বরং দেরি এবং পরিপক্বতার ইঙ্গিত দেয়।",
+    "practicalReminder": "এখন দরকার চাপ থেকে নয়, পরিষ্কার বোঝাপড়া থেকে সিদ্ধান্ত নেওয়া।",
+    "remedyBoundary": "প্রতিকার সহজ, নিরাপদ এবং নিজের সামর্থ্যের মধ্যে রাখা ভালো।"
+  }
+}

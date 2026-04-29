@@ -54,6 +54,39 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.usedFallback).toBe(false)
   })
 
+  it('sets Hinglish language metadata for Hinglish questions', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'meri naukri kab lagegi',
+      }),
+    )
+
+    expect(result.meta?.language).toBe('hinglish')
+    expect(String(result.answer ?? '')).toContain('Yeh')
+  })
+
+  it('sets Hindi language metadata for Hindi script questions', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'मेरी नौकरी कब लगेगी',
+      }),
+    )
+
+    expect(result.meta?.language).toBe('hindi')
+    expect(String(result.answer ?? '').length).toBeGreaterThan(50)
+  })
+
+  it('sets Bengali language metadata for Bengali script questions', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'আমার কাজ কবে ভালো হবে',
+      }),
+    )
+
+    expect(result.meta?.language).toBe('bengali')
+    expect(String(result.answer ?? '').length).toBeGreaterThan(50)
+  })
+
   it('uses message when question is missing', async () => {
     const result = await generateReadingV2(
       makeInput({
