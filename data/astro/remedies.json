@@ -1,0 +1,95 @@
+{
+  "Saturn": [
+    {
+      "planet": "Saturn",
+      "type": "discipline",
+      "instruction": "Keep one fixed routine for 40 days, especially around waking time, work discipline, and unfinished responsibilities.",
+      "safetyNote": "This is a safe discipline-based remedy and does not replace practical effort."
+    },
+    {
+      "planet": "Saturn",
+      "type": "service",
+      "instruction": "On Saturdays, help an elderly person, worker, or someone in need without expecting recognition.",
+      "safetyNote": "Keep the remedy simple and within your means."
+    },
+    {
+      "planet": "Saturn",
+      "type": "reflection",
+      "instruction": "Avoid harsh speech, delayed commitments, and unfinished responsibilities for 40 days.",
+      "safetyNote": "Saturn remedies should build responsibility, not fear."
+    }
+  ],
+  "Jupiter": [
+    {
+      "planet": "Jupiter",
+      "type": "charity",
+      "instruction": "Offer help, teaching, or useful guidance to someone who genuinely needs it.",
+      "safetyNote": "Do this without financial strain or expectation."
+    },
+    {
+      "planet": "Jupiter",
+      "type": "reflection",
+      "instruction": "Study one meaningful spiritual or ethical text for a few minutes daily.",
+      "safetyNote": "Use this as grounding, not as a replacement for action."
+    }
+  ],
+  "Venus": [
+    {
+      "planet": "Venus",
+      "type": "routine",
+      "instruction": "Keep your living space clean and peaceful, and practice respectful communication in relationships.",
+      "safetyNote": "Venus remedies should improve harmony, not create dependency."
+    },
+    {
+      "planet": "Venus",
+      "type": "charity",
+      "instruction": "Offer simple help related to food, clothing, or comfort to someone in need.",
+      "safetyNote": "Keep it affordable and sincere."
+    }
+  ],
+  "Mercury": [
+    {
+      "planet": "Mercury",
+      "type": "routine",
+      "instruction": "Write down your decisions, tasks, and pending communication every morning for 21 days.",
+      "safetyNote": "Mercury remedies should reduce confusion and improve clarity."
+    },
+    {
+      "planet": "Mercury",
+      "type": "reflection",
+      "instruction": "Avoid gossip, careless promises, and scattered multitasking.",
+      "safetyNote": "This is a behavioral remedy, not a guaranteed prediction tool."
+    }
+  ],
+  "Moon": [
+    {
+      "planet": "Moon",
+      "type": "routine",
+      "instruction": "Keep a stable sleep schedule and reduce emotional overthinking before bedtime.",
+      "safetyNote": "If emotional distress is severe, seek human support or qualified help."
+    },
+    {
+      "planet": "Moon",
+      "type": "reflection",
+      "instruction": "Journal your emotions for 10 minutes daily without judging them.",
+      "safetyNote": "This supports emotional clarity; it is not medical treatment."
+    }
+  ],
+  "General": [
+    {
+      "type": "routine",
+      "instruction": "Choose one small daily practice and keep it consistent for 21 to 40 days.",
+      "safetyNote": "Consistency matters more than intensity."
+    },
+    {
+      "type": "service",
+      "instruction": "Do one useful act of service quietly, without needing recognition.",
+      "safetyNote": "Safe remedies should reduce fear and increase steadiness."
+    },
+    {
+      "type": "reflection",
+      "instruction": "Before reacting, pause and ask whether the decision is coming from fear or clarity.",
+      "safetyNote": "This remedy supports better choices, not guaranteed outcomes."
+    }
+  ]
+}

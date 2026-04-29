@@ -1,75 +1,128 @@
-import type { AstroEvidence } from "@/lib/astro/interpretation/evidence";
+import remediesData from '@/data/astro/remedies.json'
+import type { AstroEvidence } from '@/lib/astro/interpretation/evidence'
 import {
+  getAntardasha,
   getMahadasha,
   matchesAny,
   type AstroInterpretationContext,
-} from "@/lib/astro/interpretation/context";
+} from '@/lib/astro/interpretation/context'
 
 export type Remedy = {
-  planet?: string;
-  type: "discipline" | "charity" | "mantra" | "reflection" | "service" | "routine";
-  instruction: string;
-  safetyNote?: string;
-};
+  planet?: string
+  type: 'discipline' | 'charity' | 'mantra' | 'reflection' | 'service' | 'routine'
+  instruction: string
+  safetyNote?: string
+}
 
-export const saturnSafeRemedies: Remedy[] = [
-  {
-    planet: "Saturn",
-    type: "discipline",
-    instruction:
-      "Keep one fixed routine for 40 days, especially around waking time, work discipline, and unfinished responsibilities.",
-  },
-  {
-    planet: "Saturn",
-    type: "service",
-    instruction:
-      "On Saturdays, help an elderly person, worker, or someone in need without expecting recognition.",
-  },
-];
+type RemediesByPlanet = Record<string, Remedy[]>
+
+const REMEDIES_BY_PLANET = remediesData as RemediesByPlanet
+
+const UNSAFE_REMEDY_PATTERNS = [
+  /guarantee/i,
+  /miracle/i,
+  /cure/i,
+  /wear .* immediately/i,
+  /blue sapphire immediately/i,
+  /pay .* puja/i,
+  /expensive/i,
+  /do not see a doctor/i,
+  /stop medical/i,
+]
+
+export const saturnSafeRemedies: Remedy[] = REMEDIES_BY_PLANET.Saturn ?? []
+
+export function isSafeRemedy(remedy: Remedy): boolean {
+  const combined = `${remedy.instruction} ${remedy.safetyNote ?? ''}`
+
+  return !UNSAFE_REMEDY_PATTERNS.some((pattern) => pattern.test(combined))
+}
+
+export function getSafeRemediesForPlanet(
+  planet: string | undefined,
+  limit = 2,
+): Remedy[] {
+  const key = normalizePlanetKey(planet)
+  const remedies = REMEDIES_BY_PLANET[key] ?? REMEDIES_BY_PLANET.General ?? []
+
+  return remedies.filter(isSafeRemedy).slice(0, limit)
+}
+
+export function getGeneralSafeRemedies(limit = 2): Remedy[] {
+  return (REMEDIES_BY_PLANET.General ?? []).filter(isSafeRemedy).slice(0, limit)
+}
+
+export function formatRemedy(remedy: Remedy): string {
+  return remedy.safetyNote
+    ? `${remedy.instruction} Safety note: ${remedy.safetyNote}`
+    : remedy.instruction
+}
+
+function normalizePlanetKey(planet: string | undefined): string {
+  if (!planet) return 'General'
+
+  const lower = planet.toLowerCase()
+
+  if (matchesAny(lower, ['saturn', 'shani'])) return 'Saturn'
+  if (matchesAny(lower, ['jupiter', 'guru'])) return 'Jupiter'
+  if (matchesAny(lower, ['venus', 'shukra'])) return 'Venus'
+  if (matchesAny(lower, ['mercury', 'budh'])) return 'Mercury'
+  if (matchesAny(lower, ['moon', 'chandra'])) return 'Moon'
+
+  return 'General'
+}
+
+function pickRemedyPlanet(ctx: AstroInterpretationContext): string | undefined {
+  const mahadasha = getMahadasha(ctx)
+  const antardasha = getAntardasha(ctx)
+
+  if (matchesAny(mahadasha, ['saturn', 'shani'])) return 'Saturn'
+  if (matchesAny(antardasha, ['saturn', 'shani'])) return 'Saturn'
+  if (matchesAny(mahadasha, ['jupiter', 'guru'])) return 'Jupiter'
+  if (matchesAny(antardasha, ['jupiter', 'guru'])) return 'Jupiter'
+  if (matchesAny(mahadasha, ['venus', 'shukra'])) return 'Venus'
+  if (matchesAny(antardasha, ['venus', 'shukra'])) return 'Venus'
+  if (matchesAny(mahadasha, ['mercury', 'budh'])) return 'Mercury'
+  if (matchesAny(antardasha, ['mercury', 'budh'])) return 'Mercury'
+  if (matchesAny(mahadasha, ['moon', 'chandra'])) return 'Moon'
+  if (matchesAny(antardasha, ['moon', 'chandra'])) return 'Moon'
+
+  return undefined
+}
+
+function remediesToGuidance(remedies: Remedy[]): string {
+  if (remedies.length === 0) {
+    return 'Use simple, non-harmful practices like routine, reflection, service, and calm decision-making.'
+  }
+
+  return remedies.map(formatRemedy).join(' ')
+}
 
 export function interpretRemedies(ctx: AstroInterpretationContext): AstroEvidence[] {
-  if (ctx.concern.topic !== "remedy" && ctx.concern.questionType !== "remedy") {
-    return [];
+  if (ctx.concern.topic !== 'remedy' && ctx.concern.questionType !== 'remedy') {
+    return []
   }
 
-  const evidence: AstroEvidence[] = [];
-  const mahadasha = getMahadasha(ctx);
+  const planet = pickRemedyPlanet(ctx)
+  const remedies = planet ? getSafeRemediesForPlanet(planet, 2) : getGeneralSafeRemedies(2)
+  const guidance = remediesToGuidance(remedies)
+  const factor = planet ? `${planet}-safe remedy` : 'Safe general remedy'
+  const id = planet ? `remedy-${planet.toLowerCase()}-safe` : 'remedy-general-safe'
 
-  if (matchesAny(mahadasha, ["saturn", "shani"])) {
-    evidence.push({
-      id: "remedy-saturn-safe-discipline",
-      topic: "remedy",
-      factor: "Saturn-safe remedy",
+  return [
+    {
+      id,
+      topic: 'remedy',
+      factor,
       humanMeaning:
-        "The safest Saturn remedy is discipline, service, patience, and consistency rather than fear-based spending.",
+        'A safe remedy should reduce fear, increase steadiness, and support better choices.',
       likelyExperience:
-        "The person may want a direct remedy because the phase feels slow or heavy.",
-      guidance:
-        "Use routine, service, and responsibility-based remedies before considering strong gemstones or costly rituals.",
+        'The person may want something practical to do because the phase feels slow, heavy, or uncertain.',
+      guidance,
       caution:
-        "Do not wear strong gemstones or pay for fear-based rituals without careful chart review by a trusted expert.",
-      confidence: "high",
+        'Avoid remedies that promise certainty, create fear, require unaffordable spending, or replace medical/legal/professional help.',
+      confidence: 'high',
       visibleToUser: true,
-    });
-  }
-
-  if (evidence.length === 0) {
-    evidence.push({
-      id: "remedy-general-safe",
-      topic: "remedy",
-      factor: "Safe remedy boundary",
-      humanMeaning:
-        "A safe remedy should support calmness, discipline, service, and better choices.",
-      likelyExperience:
-        "The person may be seeking relief and wants something practical to do.",
-      guidance:
-        "Prefer simple, non-harmful practices like prayer, charity, journaling, routine, and respectful service.",
-      caution:
-        "Avoid any remedy that promises guaranteed results, creates fear, or requires unaffordable spending.",
-      confidence: "high",
-      visibleToUser: true,
-    });
-  }
-
-  return evidence;
+    },
+  ]
 }

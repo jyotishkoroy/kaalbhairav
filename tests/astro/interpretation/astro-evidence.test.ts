@@ -170,7 +170,7 @@ describe("AstroEvidence engine", () => {
     );
 
     expect(
-      evidence.some((item) => item.id === "remedy-saturn-safe-discipline"),
+      evidence.some((item) => item.id === "remedy-saturn-safe"),
     ).toBe(true);
   });
 

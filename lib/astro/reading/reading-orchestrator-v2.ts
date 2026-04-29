@@ -1,5 +1,6 @@
 import { getAstroFeatureFlags } from '@/lib/astro/config/feature-flags'
 import { buildAstroEvidence } from '@/lib/astro/interpretation'
+import { interpretRemedies } from '@/lib/astro/interpretation/remedies'
 import {
   buildMemorySummary,
   extractGuidanceForMemory,
@@ -203,6 +204,7 @@ export async function generateReadingV2(
     const concern = classifyUserConcern(v2Input.question)
     const flags = getAstroFeatureFlags()
     const memoryEnabled = flags.memoryEnabled
+    const remediesEnabled = flags.remediesEnabled
     const userId =
       typeof input.userId === 'string' && input.userId.trim()
         ? input.userId.trim()
@@ -210,7 +212,9 @@ export async function generateReadingV2(
     const chart = getChartSource(input)
     const dasha = getDashaSource(input)
     const transits = getTransitSource(input)
-    const evidence = buildAstroEvidence({
+    const shouldAddRemedyEvidence =
+      remediesEnabled || concern.questionType === 'remedy' || concern.topic === 'remedy'
+    let evidence = buildAstroEvidence({
       concern,
       chart,
       dasha,
@@ -218,6 +222,27 @@ export async function generateReadingV2(
       profile: input.birthDetails,
       metadata: input.metadata,
     })
+    if (shouldAddRemedyEvidence) {
+      const remedyEvidence = interpretRemedies({
+        concern: {
+          ...concern,
+          topic: 'remedy',
+          questionType: 'remedy',
+        },
+        chart,
+        dasha,
+        transits,
+        profile: input.birthDetails,
+        metadata: input.metadata,
+      })
+
+      const existingIds = new Set(evidence.map((item) => item.id))
+      evidence = [
+        ...evidence,
+        ...remedyEvidence.filter((item) => !existingIds.has(item.id)),
+      ]
+    }
+    const remedyEvidenceIncluded = evidence.some((item) => item.topic === 'remedy')
     const mode = selectReadingMode(concern)
     const language = detectPreferredLanguage(v2Input.question)
     const memorySummary = await getOptionalMemorySummary({
@@ -264,6 +289,8 @@ export async function generateReadingV2(
         forbiddenClaimsRemoved: safety.forbiddenClaimsRemoved,
         memoryLayer: memoryEnabled ? 'enabled_phase_7' : 'disabled',
         memorySummaryUsed: Boolean(memorySummary),
+        remediesLayer: remediesEnabled ? 'enabled_phase_9' : 'disabled',
+        remedyEvidenceIncluded,
       },
     }
   } catch (error) {

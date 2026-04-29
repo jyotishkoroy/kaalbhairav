@@ -37,6 +37,7 @@ describe('Reading Orchestrator V2', () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV }
     delete process.env.ASTRO_MEMORY_ENABLED
+    delete process.env.ASTRO_REMEDIES_ENABLED
   })
 
   afterEach(() => {
@@ -195,5 +196,61 @@ describe('Reading Orchestrator V2', () => {
 
     expect(result.meta?.memoryLayer).toBe('enabled_phase_7')
     expect(result.meta?.memorySummaryUsed).toBe(false)
+  })
+
+  it('includes remedy evidence for explicit remedy requests even when ASTRO_REMEDIES_ENABLED is false', async () => {
+    process.env.ASTRO_REMEDIES_ENABLED = 'false'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'What remedy should I do for career delay?',
+        dasha: {
+          mahadasha: 'Saturn',
+        },
+      }),
+    )
+
+    const answer = String(result.answer ?? '').toLowerCase()
+
+    expect(result.meta?.remediesLayer).toBe('disabled')
+    expect(result.meta?.remedyEvidenceIncluded).toBe(true)
+    expect(answer).toContain('routine')
+    expect(answer).not.toContain('wear blue sapphire immediately')
+    expect(answer).not.toContain('guaranteed result')
+  })
+
+  it('can include remedy evidence proactively when ASTRO_REMEDIES_ENABLED is true', async () => {
+    process.env.ASTRO_REMEDIES_ENABLED = 'true'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'When will I get a job?',
+        dasha: {
+          mahadasha: 'Saturn',
+        },
+      }),
+    )
+
+    const answer = String(result.answer ?? '').toLowerCase()
+
+    expect(result.meta?.remediesLayer).toBe('enabled_phase_9')
+    expect(result.meta?.remedyEvidenceIncluded).toBe(true)
+    expect(answer).toContain('routine')
+  })
+
+  it('does not include proactive remedy evidence when ASTRO_REMEDIES_ENABLED is false for normal questions', async () => {
+    process.env.ASTRO_REMEDIES_ENABLED = 'false'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'When will I get a job?',
+        dasha: {
+          mahadasha: 'Saturn',
+        },
+      }),
+    )
+
+    expect(result.meta?.remediesLayer).toBe('disabled')
+    expect(result.meta?.remedyEvidenceIncluded).toBe(false)
   })
 })

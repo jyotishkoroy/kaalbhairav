@@ -14,6 +14,25 @@ describe('astro feature flags', () => {
 
     expect(isAstroReadingV2Enabled()).toBe(false)
     expect(getAstroFeatureFlags().readingV2Enabled).toBe(false)
+    expect(getAstroFeatureFlags().remediesEnabled).toBe(false)
+  })
+
+  it('defaults remedies to false', () => {
+    delete process.env.ASTRO_REMEDIES_ENABLED
+
+    expect(getAstroFeatureFlags().remediesEnabled).toBe(false)
+  })
+
+  it.each([
+    ['true', true],
+    ['1', true],
+    ['false', false],
+    ['0', false],
+    ['maybe', false],
+  ])('parses remedies value %s as %s', (value, expected) => {
+    process.env.ASTRO_REMEDIES_ENABLED = value
+
+    expect(getAstroFeatureFlags().remediesEnabled).toBe(expected)
   })
 
   it.each([

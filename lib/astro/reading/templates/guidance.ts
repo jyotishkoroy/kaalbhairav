@@ -1,8 +1,18 @@
 import type { AstroEvidence } from '@/lib/astro/interpretation/evidence'
 
+function prioritizeRemedyEvidence(evidence: AstroEvidence[]): AstroEvidence[] {
+  const remedy = evidence.filter(
+    (item) => item.visibleToUser && item.topic === 'remedy',
+  )
+  const nonRemedy = evidence.filter(
+    (item) => item.visibleToUser && item.topic !== 'remedy',
+  )
+
+  return [...remedy, ...nonRemedy]
+}
+
 export function renderGuidance(evidence: AstroEvidence[]): string {
-  const guidance = evidence
-    .filter((item) => item.visibleToUser)
+  const guidance = prioritizeRemedyEvidence(evidence)
     .map((item) => item.guidance)
     .filter(Boolean)
 
@@ -16,8 +26,8 @@ export function renderGuidance(evidence: AstroEvidence[]): string {
 }
 
 export function renderCaution(evidence: AstroEvidence[]): string {
-  const cautions = evidence
-    .filter((item) => item.visibleToUser && item.caution)
+  const cautions = prioritizeRemedyEvidence(evidence)
+    .filter((item) => item.caution)
     .map((item) => item.caution)
     .filter((caution): caution is string => Boolean(caution))
 
