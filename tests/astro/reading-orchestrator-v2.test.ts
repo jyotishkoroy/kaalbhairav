@@ -1,6 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearAstrologyMemory } from '@/lib/astro/memory/memory-store'
 import { generateReadingV2 } from '@/lib/astro/reading/reading-orchestrator-v2'
 import type { AstrologyReadingInput } from '@/lib/astro/reading/reading-router-types'
+
+const ORIGINAL_ENV = { ...process.env }
 
 function makeInput(
   overrides: Partial<AstrologyReadingInput> = {},
@@ -31,6 +34,15 @@ function makeInput(
 }
 
 describe('Reading Orchestrator V2', () => {
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+    delete process.env.ASTRO_MEMORY_ENABLED
+  })
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV
+  })
+
   it('returns a V2 answer with metadata', async () => {
     const result = await generateReadingV2(makeInput())
 
@@ -101,7 +113,57 @@ describe('Reading Orchestrator V2', () => {
   it('marks memory and safety layers as not enabled in phase 6', async () => {
     const result = await generateReadingV2(makeInput())
 
-    expect(result.meta?.memoryLayer).toBe('not_enabled_phase_6')
-    expect(result.meta?.safetyLayer).toBe('not_enabled_phase_6')
+    expect(result.meta?.memoryLayer).toBe('disabled')
+    expect(result.meta?.safetyLayer).toBe('not_enabled_phase_7')
+  })
+
+  it('does not use memory when ASTRO_MEMORY_ENABLED is false', async () => {
+    process.env.ASTRO_MEMORY_ENABLED = 'false'
+
+    const result = await generateReadingV2(makeInput())
+
+    expect(result.meta?.memoryLayer).toBe('disabled')
+    expect(result.meta?.memorySummaryUsed).toBe(false)
+  })
+
+  it('saves and uses memory when ASTRO_MEMORY_ENABLED is true', async () => {
+    process.env.ASTRO_MEMORY_ENABLED = 'true'
+    const userId = 'memory-orchestrator-user'
+
+    await clearAstrologyMemory(userId)
+
+    const first = await generateReadingV2(
+      makeInput({
+        userId,
+        question: 'When will I get a job?',
+      }),
+    )
+
+    expect(first.meta?.memoryLayer).toBe('enabled_phase_7')
+    expect(first.meta?.memorySummaryUsed).toBe(false)
+
+    const second = await generateReadingV2(
+      makeInput({
+        userId,
+        question: 'Should I change my job now?',
+      }),
+    )
+
+    expect(second.meta?.memoryLayer).toBe('enabled_phase_7')
+    expect(second.meta?.memorySummaryUsed).toBe(true)
+    expect(String(second.answer ?? '')).toContain('From the earlier context')
+  })
+
+  it('skips memory gracefully when userId is missing', async () => {
+    process.env.ASTRO_MEMORY_ENABLED = 'true'
+
+    const result = await generateReadingV2(
+      makeInput({
+        userId: undefined,
+      }),
+    )
+
+    expect(result.meta?.memoryLayer).toBe('enabled_phase_7')
+    expect(result.meta?.memorySummaryUsed).toBe(false)
   })
 })

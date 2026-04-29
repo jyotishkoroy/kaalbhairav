@@ -1,4 +1,12 @@
+import { getAstroFeatureFlags } from '@/lib/astro/config/feature-flags'
 import { buildAstroEvidence } from '@/lib/astro/interpretation'
+import {
+  buildMemorySummary,
+  extractGuidanceForMemory,
+  getAstrologyMemory,
+  saveAstrologyReadingMemory,
+  summarizeReadingForMemory,
+} from '@/lib/astro/memory'
 import { classifyUserConcern } from '@/lib/astro/reading/concern-classifier'
 import { generateHumanReadingResult } from '@/lib/astro/reading/human-generator'
 import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
@@ -27,6 +35,8 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     ? (value as Record<string, unknown>)
     : undefined
 }
+
+type ClassifiedConcern = ReturnType<typeof classifyUserConcern>
 
 function getNestedRecord(
   source: unknown,
@@ -102,6 +112,46 @@ async function callStableFallback(
   }
 }
 
+async function getOptionalMemorySummary(input: {
+  enabled: boolean
+  userId?: string
+}): Promise<string | undefined> {
+  if (!input.enabled || !input.userId) return undefined
+
+  try {
+    const memory = await getAstrologyMemory(input.userId)
+    return buildMemorySummary(memory)
+  } catch {
+    return undefined
+  }
+}
+
+async function saveOptionalMemory(input: {
+  enabled: boolean
+  userId?: string
+  topic: ClassifiedConcern['topic']
+  question: string
+  answer: string
+  emotionalTone: string
+  birthDetails?: unknown
+}): Promise<void> {
+  if (!input.enabled || !input.userId) return
+
+  try {
+    await saveAstrologyReadingMemory({
+      userId: input.userId,
+      topic: input.topic,
+      question: input.question,
+      summary: summarizeReadingForMemory(input.answer),
+      guidanceGiven: extractGuidanceForMemory(input.answer),
+      emotionalTone: input.emotionalTone,
+      birthProfile: asRecord(input.birthDetails),
+    })
+  } catch {
+    // Memory must never break a reading.
+  }
+}
+
 function toReadingV2Input(input: AstrologyReadingInput): ReadingV2Input {
   return {
     userId: typeof input.userId === 'string' ? input.userId : undefined,
@@ -153,6 +203,12 @@ export async function generateReadingV2(
   try {
     const v2Input = toReadingV2Input(input)
     const concern = classifyUserConcern(v2Input.question)
+    const flags = getAstroFeatureFlags()
+    const memoryEnabled = flags.memoryEnabled
+    const userId =
+      typeof input.userId === 'string' && input.userId.trim()
+        ? input.userId.trim()
+        : undefined
     const chart = getChartSource(input)
     const dasha = getDashaSource(input)
     const transits = getTransitSource(input)
@@ -166,12 +222,26 @@ export async function generateReadingV2(
     })
     const mode = selectReadingMode(concern)
     const language = detectPreferredLanguage(v2Input.question)
+    const memorySummary = await getOptionalMemorySummary({
+      enabled: memoryEnabled,
+      userId,
+    })
     const result = generateHumanReadingResult({
       concern,
       evidence,
       question: v2Input.question,
       mode,
       language,
+      memorySummary,
+    })
+    await saveOptionalMemory({
+      enabled: memoryEnabled,
+      userId,
+      topic: concern.topic,
+      question: v2Input.question,
+      answer: result.answer,
+      emotionalTone: concern.emotionalTone,
+      birthDetails: input.birthDetails,
     })
 
     return {
@@ -185,8 +255,9 @@ export async function generateReadingV2(
         evidenceCount: evidence.length,
         routedBy: 'astro-reading-router',
         usedFallback: false,
-        safetyLayer: 'not_enabled_phase_6',
-        memoryLayer: 'not_enabled_phase_6',
+        safetyLayer: 'not_enabled_phase_7',
+        memoryLayer: memoryEnabled ? 'enabled_phase_7' : 'disabled',
+        memorySummaryUsed: Boolean(memorySummary),
       },
     }
   } catch (error) {
