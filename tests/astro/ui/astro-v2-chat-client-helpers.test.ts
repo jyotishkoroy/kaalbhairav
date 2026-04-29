@@ -3,7 +3,10 @@ import {
   buildAstroV2ChatRequest,
   emptyBirthDetails,
   extractAstroV2ChatResponse,
+  getTextFromAstroV2StreamEvent,
   normalizeAstroV2Question,
+  parseAstroV2SseEventLine,
+  parseAstroV2SseText,
   shouldSubmitAstroV2Question,
 } from "@/lib/astro/reading/v2-chat-client";
 
@@ -91,5 +94,65 @@ describe("Astro V2 chat client helpers", () => {
 
     expect(parsed.answer).toBe("");
     expect(parsed.meta).toEqual({});
+  });
+
+  it("parses clarifying question SSE as answer text", () => {
+    const text = [
+      'data: {"type":"meta","remaining":7,"session_id":"session-1"}',
+      'data: {"type":"clarifying_question","question":"Could you tell me more — is this about a meeting, a job search, a promotion, or something else at work?"}',
+      'data: {"type":"done","session_id":"session-1"}',
+      "",
+    ].join("\n");
+
+    const parsed = parseAstroV2SseText(text);
+
+    expect(parsed.answer).toBe(
+      "Could you tell me more — is this about a meeting, a job search, a promotion, or something else at work?",
+    );
+    expect(parsed.meta.remaining).toBe(7);
+    expect(parsed.meta.session_id).toBe("session-1");
+    expect(parsed.done).toBe(true);
+  });
+
+  it("extracts SSE response through display parser", () => {
+    const parsed = extractAstroV2ChatResponse(
+      'data: {"type":"clarifying_question","question":"Please clarify."}\n' +
+        'data: {"type":"done"}\n',
+    );
+
+    expect(parsed.answer).toBe("Please clarify.");
+    expect(parsed.meta).toEqual({});
+  });
+
+  it("parses streamed token events into answer", () => {
+    const text = [
+      'data: {"type":"token","token":"Hello"}',
+      'data: {"type":"token","token":" world"}',
+      'data: {"type":"done"}',
+      "",
+    ].join("\n");
+
+    expect(parseAstroV2SseText(text).answer).toBe("Hello world");
+  });
+
+  it("captures SSE error events", () => {
+    const parsed = parseAstroV2SseText(
+      'data: {"type":"error","message":"Rate limit reached"}\n',
+    );
+
+    expect(parsed.error).toBe("Rate limit reached");
+  });
+
+  it("ignores non-data SSE lines", () => {
+    expect(parseAstroV2SseEventLine("event: message")).toBeNull();
+  });
+
+  it("gets text from known stream event fields", () => {
+    expect(
+      getTextFromAstroV2StreamEvent({
+        type: "content",
+        content: "Readable content",
+      }),
+    ).toBe("Readable content");
   });
 });

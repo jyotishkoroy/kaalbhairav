@@ -9,6 +9,7 @@ import {
   buildAstroV2ChatRequest,
   emptyBirthDetails,
   extractAstroV2ChatResponse,
+  parseAstroV2SseText,
   shouldSubmitAstroV2Question,
   type AstroV2BirthDetailsForm,
 } from "@/lib/astro/reading/v2-chat-client";
@@ -47,7 +48,13 @@ function pickSafeMeta(meta: Record<string, unknown>): Partial<Record<SafeMetaKey
 
 function stringifyMetaValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  if (typeof value === "object" && value !== null) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "[unserializable object]";
+    }
+  }
   return String(value);
 }
 
@@ -112,6 +119,28 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
     }
   }
 
+  async function readAstroV2Response(response: Response): Promise<unknown> {
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (contentType.includes("text/event-stream")) {
+      return response.text();
+    }
+
+    if (contentType.includes("application/json")) {
+      return response.json().catch(() => null);
+    }
+
+    const text = await response.text();
+
+    if (text.trim().startsWith("data:")) return text;
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+
   async function handleSubmit() {
     if (!profileId) {
       setError("No active profile is available for chat yet.");
@@ -142,77 +171,25 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
         }),
       });
 
+      const payload = await readAstroV2Response(response);
+
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response));
+        const parsedError = extractAstroV2ChatResponse(payload);
+        throw new Error(
+          parsedError.answer ||
+            (payload && typeof payload === "string"
+              ? payload.slice(0, 240)
+              : await readErrorMessage(response)),
+        );
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("The server returned no response stream.");
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let latestAnswer = "";
-      let latestMeta: Record<string, unknown> = {};
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-
-          const payload = line.slice(6).trim();
-          if (!payload || payload === "[DONE]") continue;
-
-          try {
-            const json = JSON.parse(payload) as Record<string, unknown>;
-
-            if (json.type === "meta" && typeof json.session_id === "string") {
-              latestMeta = {
-                ...latestMeta,
-                sessionId: json.session_id,
-                remaining:
-                  typeof json.remaining === "number" ? json.remaining : latestMeta.remaining,
-              };
-            }
-
-            if (json.type === "final_answer") {
-              if (typeof json.rendered === "string") {
-                latestAnswer = json.rendered;
-              } else if (typeof json.answer === "string") {
-                latestAnswer = json.answer;
-              }
-
-              if (json.answer && typeof json.answer === "object") {
-                const answerRecord = json.answer as Record<string, unknown>;
-                if (answerRecord.final_answer && typeof answerRecord.final_answer === "object") {
-                  latestMeta = {
-                    ...latestMeta,
-                    ...(answerRecord.final_answer as Record<string, unknown>),
-                  };
-                }
-              }
-            }
-
-            if (json.type === "token" && typeof json.t === "string") {
-              latestAnswer += json.t;
-            }
-          } catch {
-            // Ignore malformed stream events and continue reading.
-          }
+      const parsed = extractAstroV2ChatResponse(payload);
+      if (!parsed.answer && typeof payload === "string" && payload.includes("data:")) {
+        const stream = parseAstroV2SseText(payload);
+        if (stream.error) {
+          throw new Error(stream.error);
         }
       }
-
-      const parsed = extractAstroV2ChatResponse({
-        answer: latestAnswer,
-        meta: latestMeta,
-      });
 
       if (!parsed.answer) {
         throw new Error("The server returned an empty answer.");

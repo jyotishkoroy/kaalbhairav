@@ -237,6 +237,16 @@ Before enabling production:
 - no raw report files are committed
 - no secrets are logged
 
+### Phase 17 SSE fix
+
+- /astro/v2 now handles the existing /api/astro/v1/chat Server-Sent Events response.
+- clarifying_question events render as assistant output instead of empty-answer errors.
+- streamed token/content/delta/message events are collected into an answer.
+- meta events populate safe metadata.
+- done events complete the response.
+- JSON fallback remains supported.
+- No API response shape was changed.
+
 ## Phase 16 — Preview deployment verification
 
 Before enabling production:

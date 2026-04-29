@@ -108,3 +108,13 @@ No paid AI or production LLM dependency is added.
 - The page does not expose secrets.
 - Server still decides stable vs V2 using ASTRO_READING_V2_ENABLED.
 - No geocoding API or paid API was added.
+
+### Phase 17 SSE fix
+
+- /astro/v2 now handles the existing /api/astro/v1/chat Server-Sent Events response.
+- clarifying_question events render as assistant output instead of empty-answer errors.
+- streamed token/content/delta/message events are collected into an answer.
+- meta events populate safe metadata.
+- done events complete the response.
+- JSON fallback remains supported.
+- No API response shape was changed.

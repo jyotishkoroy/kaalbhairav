@@ -21,6 +21,52 @@ export type AstroV2ChatDisplayResponse = {
   raw: unknown;
 };
 
+export type AstroV2StreamEvent =
+  | {
+      type: "meta";
+      remaining?: number;
+      session_id?: string;
+      [key: string]: unknown;
+    }
+  | {
+      type: "clarifying_question";
+      question: string;
+      [key: string]: unknown;
+    }
+  | {
+      type: "answer" | "message" | "content" | "delta" | "token";
+      answer?: string;
+      message?: string;
+      content?: string;
+      delta?: string;
+      token?: string;
+      text?: string;
+      [key: string]: unknown;
+    }
+  | {
+      type: "error";
+      error?: string;
+      message?: string;
+      [key: string]: unknown;
+    }
+  | {
+      type: "done";
+      session_id?: string;
+      [key: string]: unknown;
+    }
+  | {
+      type: string;
+      [key: string]: unknown;
+    };
+
+export type AstroV2StreamParseResult = {
+  answer: string;
+  meta: Record<string, unknown>;
+  events: AstroV2StreamEvent[];
+  error?: string;
+  done: boolean;
+};
+
 export type AstroV2ChatRequestBody = Record<string, unknown>;
 
 export const emptyBirthDetails: AstroV2BirthDetailsForm = {
@@ -84,9 +130,117 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+export function parseAstroV2SseEventLine(line: string): AstroV2StreamEvent | null {
+  const trimmed = line.trim();
+
+  if (!trimmed.startsWith("data:")) return null;
+
+  const data = trimmed.slice("data:".length).trim();
+
+  if (!data || data === "[DONE]") {
+    return {
+      type: "done",
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(data) as unknown;
+
+    if (isRecord(parsed) && typeof parsed.type === "string") {
+      return parsed as AstroV2StreamEvent;
+    }
+
+    return {
+      type: "message",
+      content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
+    };
+  } catch {
+    return {
+      type: "message",
+      content: data,
+    };
+  }
+}
+
+export function getTextFromAstroV2StreamEvent(
+  event: AstroV2StreamEvent,
+): string {
+  if (event.type === "clarifying_question") {
+    return typeof event.question === "string" ? event.question : "";
+  }
+
+  for (const key of ["answer", "message", "content", "delta", "token", "text"]) {
+    const value = event[key];
+
+    if (typeof value === "string") return value;
+  }
+
+  return "";
+}
+
+export function parseAstroV2SseText(text: string): AstroV2StreamParseResult {
+  const result: AstroV2StreamParseResult = {
+    answer: "",
+    meta: {},
+    events: [],
+    done: false,
+  };
+
+  const events = text
+    .split(/\r?\n/)
+    .map(parseAstroV2SseEventLine)
+    .filter((event): event is AstroV2StreamEvent => event !== null);
+
+  for (const event of events) {
+    result.events.push(event);
+
+    if (event.type === "meta") {
+      result.meta = {
+        ...result.meta,
+        ...event,
+      };
+      delete result.meta.type;
+      continue;
+    }
+
+    if (event.type === "done") {
+      result.done = true;
+      continue;
+    }
+
+    if (event.type === "error") {
+      result.error =
+        typeof event.error === "string"
+          ? event.error
+          : typeof event.message === "string"
+            ? event.message
+            : "The server returned an error.";
+      continue;
+    }
+
+    const textPart = getTextFromAstroV2StreamEvent(event);
+
+    if (textPart) {
+      result.answer = result.answer ? `${result.answer}${textPart}` : textPart;
+    }
+  }
+
+  return result;
+}
+
 export function extractAstroV2ChatResponse(
   payload: unknown,
 ): AstroV2ChatDisplayResponse {
+  if (typeof payload === "string" && payload.includes("data:")) {
+    const parsed = parseAstroV2SseText(payload);
+
+    return {
+      answer: parsed.answer,
+      meta: parsed.meta,
+      raw: parsed,
+    };
+  }
+
   if (!isRecord(payload)) {
     return {
       answer: "",
