@@ -4,6 +4,8 @@ export type AstrologyReadingInput = {
   message?: string
   birthDetails?: unknown
   chart?: unknown
+  dasha?: unknown
+  transits?: unknown
   context?: unknown
   metadata?: Record<string, unknown>
   [key: string]: unknown

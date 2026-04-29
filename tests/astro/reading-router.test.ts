@@ -60,21 +60,34 @@ describe('astro reading router', () => {
     expect(result.meta?.version).toBe('v2')
   })
 
-  it('falls back to stable generator when V2 flag is true but no custom V2 generator is provided', async () => {
+  it('uses the default real V2 orchestrator when V2 flag is true but no custom V2 generator is provided', async () => {
     process.env.ASTRO_READING_V2_ENABLED = 'true'
     const stableGenerator = vi.fn(async () => ({
       answer: 'stable fallback answer',
     }))
     const result = await generateAstrologyReadingWithRouter(
-      { question: 'Will my career improve?' },
+      {
+        userId: 'test-user',
+        question: 'When will I get a job?',
+        chart: {
+          lagna: 'Leo',
+          moonSign: 'Gemini',
+        },
+        dasha: {
+          mahadasha: 'Saturn',
+          antardasha: 'Mercury',
+        },
+      },
       {
         stableGenerator,
       },
     )
-    expect(stableGenerator).toHaveBeenCalledTimes(1)
-    expect(result.answer).toBe('stable fallback answer')
+
+    expect(stableGenerator).not.toHaveBeenCalled()
+    expect(result.answer ?? result.text ?? result.message).toBeTruthy()
     expect(result.meta?.version).toBe('v2')
-    expect(result.meta?.usedFallback).toBe(true)
+    expect(result.meta?.usedFallback).toBe(false)
+    expect(result.meta?.topic).toBe('career')
   })
 
   it('treats invalid flag values as false', async () => {
