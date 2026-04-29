@@ -3,7 +3,7 @@
 /**
  * Copyright (c) 2026 Jyotishko Roy.
  * Proprietary and confidential. All rights reserved.
- * Project: TarayAI - https://tarayai.com
+ * Project: tarayai — https://tarayai.com
  */
 
 import { useState } from 'react'

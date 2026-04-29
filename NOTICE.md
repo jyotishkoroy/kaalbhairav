@@ -1,6 +1,6 @@
 NOTICE
 
-TarayAI, tarayai.com, the TarayAI astrology companion system, Reading V2
+tarayai, tarayai.com, the tarayai astrology companion system, Reading V2
 architecture, hybrid deterministic/RAG/LLM reading flow, benchmark-driven answer
 contracts, chart-fact retrieval flow, validation system, and related
 documentation are authored and maintained by Jyotishko Roy.

@@ -1,6 +1,6 @@
 -- Copyright (c) 2026 Jyotishko Roy.
 -- Proprietary and confidential. All rights reserved.
--- Project: TarayAI - https://tarayai.com
+-- Project: tarayai — https://tarayai.com
 
 create table if not exists public.still_prompts (
   id int generated always as identity primary key,
