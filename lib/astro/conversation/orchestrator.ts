@@ -5,6 +5,8 @@ import { evaluateFollowUp } from './follow-up-policy.ts'
 import { buildSystemPrompt, buildUserPrompt, buildSafeContext, renderFinalAnswer } from './human-tone.ts'
 import { computeConfidence } from './confidence-scoring.ts'
 import { parseAndValidate, SAFE_FALLBACK_ANSWER, SAFE_FALLBACK_RENDERED } from './answer-contract.ts'
+import { generateAstrologyReadingWithRouter } from '../reading/reading-router.ts'
+import type { AstrologyReadingInput } from '../reading/reading-router-types.ts'
 
 const ORCHESTRATOR_VERSION = '1.0.0'
 const FORBIDDEN_KEYS = ['birth_date', 'birth_time', 'encrypted_birth_data', 'latitude', 'longitude']
@@ -175,90 +177,133 @@ export async function runOrchestrator(
     `\n\nConfidence guidance: set astrology_data_confidence to ${scores.astrology_data_confidence}, situation_confidence to ${scores.situation_confidence}, overall_confidence_score to ${scores.overall_confidence_score}, confidence_label to "${scores.confidence_label}".`
 
   const userPrompt = buildUserPrompt(state, predictionContext)
+  const stableInput: AstrologyReadingInput = {
+    userId: input.user_id,
+    question: input.question,
+    message: input.question,
+    context: {
+      predictionContext,
+      state,
+      safeContext,
+      systemPrompt,
+      userPrompt,
+      groqKey,
+      topic: state.topic,
+    },
+  }
+  let validatedAnswer: typeof SAFE_FALLBACK_ANSWER | null = null
 
-  let validatedAnswer = null
+  const result = await generateAstrologyReadingWithRouter(stableInput, {
+    stableGenerator: async (routerInput) => {
+      const routerContext = (routerInput.context ?? {}) as Record<string, unknown>
+      const routerPredictionContext = routerContext.predictionContext as PredictionContext
+      const routerState = routerContext.state as ConversationState
+      const routerSafeContext = routerContext.safeContext as ReturnType<typeof buildSafeContext>
+      const routerSystemPrompt = routerContext.systemPrompt as string
+      const routerUserPrompt = routerContext.userPrompt as string
+      const routerGroqKey = routerContext.groqKey as string | undefined
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let rawAnswer: string | null = null
-    const repairHint =
-      attempt === 1
-        ? '\n\nIMPORTANT: Your previous response failed JSON validation. Return ONLY valid JSON matching the schema exactly. No extra text.'
-        : ''
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let rawAnswer: string | null = null
+        const repairHint =
+          attempt === 1
+            ? '\n\nIMPORTANT: Your previous response failed JSON validation. Return ONLY valid JSON matching the schema exactly. No extra text.'
+            : ''
 
-    try {
-      const llmPayload = {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt + repairHint },
-          { role: 'system', content: `prediction_context (do not recalculate):\n${JSON.stringify(safeContext)}` },
-          { role: 'user', content: userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        stream: false,
-        temperature: 0.4,
-        max_tokens: 900,
+        try {
+          const llmPayload = {
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: routerSystemPrompt + repairHint },
+              { role: 'system', content: `prediction_context (do not recalculate):\n${JSON.stringify(routerSafeContext)}` },
+              { role: 'user', content: routerUserPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            stream: false,
+            temperature: 0.4,
+            max_tokens: 900,
+          }
+
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${routerGroqKey}`,
+            },
+            body: JSON.stringify(llmPayload),
+          })
+
+          if (!res.ok) throw new Error(`Groq ${res.status}`)
+          const json = await res.json()
+          rawAnswer = json.choices?.[0]?.message?.content ?? null
+        } catch {
+          console.error('orchestrator_groq_error', { attempt, topic: routerState.topic })
+        }
+
+        if (rawAnswer) {
+          validatedAnswer = parseAndValidate(rawAnswer)
+          if (validatedAnswer) break
+        }
       }
 
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${groqKey}`,
+      const metadata: Record<string, unknown> = {
+        orchestrator_version: ORCHESTRATOR_VERSION,
+        mode: 'final_answer',
+        topic: routerState.topic,
+        subtopic: routerState.subtopic,
+        specificity: routerState.specificity,
+        sub_questions_asked: routerState.sub_questions_asked,
+        known_context: routerState.known_context,
+        high_risk_flags: routerState.high_risk_flags ?? [],
+        context_status: {
+          selected_topic_context: routerState.topic,
+          daily_transits: routerPredictionContext.expanded_context?.daily_transits_summary ? 'real' : 'not_available',
+          panchang: routerPredictionContext.expanded_context?.panchang_summary ? 'real' : 'not_available',
+          current_timing: routerPredictionContext.expanded_context?.current_timing_summary ? 'real' : 'not_available',
         },
-        body: JSON.stringify(llmPayload),
-      })
+        validation_status: validatedAnswer ? 'passed' : 'failed',
+      }
 
-      if (!res.ok) throw new Error(`Groq ${res.status}`)
-      const json = await res.json()
-      rawAnswer = json.choices?.[0]?.message?.content ?? null
-    } catch {
-      console.error('orchestrator_groq_error', { attempt, topic: state.topic })
-    }
+      if (!validatedAnswer) {
+        return {
+          answer: SAFE_FALLBACK_RENDERED,
+          text: SAFE_FALLBACK_RENDERED,
+          message: SAFE_FALLBACK_RENDERED,
+          meta: {
+            version: 'stable',
+            routedBy: 'astro-reading-router',
+            ...metadata,
+          },
+        }
+      }
 
-    if (rawAnswer) {
-      validatedAnswer = parseAndValidate(rawAnswer)
-      if (validatedAnswer) break
-    }
-  }
+      const rendered =
+        validatedAnswer.mode === 'final_answer' && validatedAnswer.final_answer
+          ? renderFinalAnswer(validatedAnswer.final_answer)
+          : SAFE_FALLBACK_RENDERED
 
-  const finalMetadata: Record<string, unknown> = {
-    orchestrator_version: ORCHESTRATOR_VERSION,
-    mode: 'final_answer',
-    topic: state.topic,
-    subtopic: state.subtopic,
-    specificity: state.specificity,
-    sub_questions_asked: state.sub_questions_asked,
-    known_context: state.known_context,
-    high_risk_flags: state.high_risk_flags ?? [],
-    context_status: {
-      selected_topic_context: state.topic,
-      daily_transits: predictionContext.expanded_context?.daily_transits_summary ? 'real' : 'not_available',
-      panchang: predictionContext.expanded_context?.panchang_summary ? 'real' : 'not_available',
-      current_timing: predictionContext.expanded_context?.current_timing_summary ? 'real' : 'not_available',
+      return {
+        answer: rendered,
+        text: rendered,
+        message: rendered,
+        meta: {
+          version: 'stable',
+          routedBy: 'astro-reading-router',
+          ...metadata,
+        },
+      }
     },
-    validation_status: validatedAnswer ? 'passed' : 'failed',
-  }
+  })
 
-  if (!validatedAnswer) {
-    return {
-      mode: 'final_answer',
-      state,
-      answer: SAFE_FALLBACK_ANSWER,
-      rendered: SAFE_FALLBACK_RENDERED,
-      metadata: finalMetadata,
-    }
-  }
-
-  const rendered =
-    validatedAnswer.mode === 'final_answer' && validatedAnswer.final_answer
-      ? renderFinalAnswer(validatedAnswer.final_answer)
-      : SAFE_FALLBACK_RENDERED
+  const finalAnswer = validatedAnswer ?? SAFE_FALLBACK_ANSWER
+  const rendered = typeof result.text === 'string' ? result.text : SAFE_FALLBACK_RENDERED
+  const metadata = (result.meta ?? {}) as Record<string, unknown>
 
   return {
     mode: 'final_answer',
     state,
-    answer: validatedAnswer,
+    answer: finalAnswer as typeof SAFE_FALLBACK_ANSWER,
     rendered,
-    metadata: finalMetadata,
+    metadata,
   }
 }

@@ -1,0 +1,917 @@
+{
+  "communities": {
+    "0": [
+      "aspects_calculategrahadrishti",
+      "ayanamsa_calculateayanamsa",
+      "boundary_nearnakshatraboundary",
+      "boundary_nearnavamsaboundary",
+      "boundary_nearpadaboundary",
+      "boundary_nearsignboundary",
+      "boundary_neartithiboundary",
+      "boundary_nearyogaboundary",
+      "confidence_calculateconfidence",
+      "constants_aspectoffsets",
+      "constants_karananamebyhalftithiindex",
+      "d1_calculated1chart",
+      "diagnostics_assertephemerisrange",
+      "doshas_calculatedoshas",
+      "doshas_unavailabledosha",
+      "houses_calculatewholesignhouses",
+      "julian_day_calculatejulianday",
+      "julian_day_juliandayformula",
+      "lagna_calculatelagna",
+      "lib_astro_calculations_aspects_ts",
+      "lib_astro_calculations_ayanamsa_ts",
+      "lib_astro_calculations_boundary_ts",
+      "lib_astro_calculations_confidence_ts",
+      "lib_astro_calculations_constants_ts",
+      "lib_astro_calculations_d1_ts",
+      "lib_astro_calculations_doshas_ts",
+      "lib_astro_calculations_houses_ts",
+      "lib_astro_calculations_julian_day_ts",
+      "lib_astro_calculations_lagna_ts",
+      "lib_astro_calculations_life_areas_ts",
+      "lib_astro_calculations_master_ts",
+      "lib_astro_calculations_math_ts",
+      "lib_astro_calculations_nakshatra_ts",
+      "lib_astro_calculations_navamsa_ts",
+      "lib_astro_calculations_panchang_ts",
+      "lib_astro_calculations_planets_ts",
+      "lib_astro_calculations_sign_ts",
+      "lib_astro_calculations_strength_ts",
+      "lib_astro_calculations_time_ts",
+      "lib_astro_calculations_timing_ts",
+      "lib_astro_calculations_tithi_ts",
+      "lib_astro_calculations_transits_ts",
+      "lib_astro_calculations_vimshottari_ts",
+      "lib_astro_calculations_yogas_ts",
+      "lib_astro_engine_real_ts",
+      "lib_astro_engine_types_ts",
+      "life_areas_calculatelifeareas",
+      "master_buildrejectedoutput",
+      "master_calculatemasterastrooutput",
+      "master_stripforbiddenkeys",
+      "math_angulardifference",
+      "math_nearlinearboundary",
+      "math_nearmoduloboundary",
+      "math_normalize360",
+      "nakshatra_calculatenakshatra",
+      "navamsa_calcnavamsasignindex",
+      "navamsa_calculatenavamsa",
+      "navamsa_calculatenavamsachart",
+      "panchang_calculatepanchang",
+      "panchang_calculatepanchangresult",
+      "panchang_jdtoiso",
+      "planets_buildboundarywarnings",
+      "planets_calculateallplanets",
+      "planets_calculateplanetposition",
+      "planets_extractnakfields",
+      "real_failedresult",
+      "real_runenginereal",
+      "sign_calculatesign",
+      "strength_calculatestrength",
+      "strength_unsupportedindicator",
+      "time_convertbirthtimetoutc",
+      "timing_calculatecurrenttiming",
+      "tithi_calculatetithi",
+      "transits_calculatedailytransits",
+      "transits_calculatetransits",
+      "vimshottari_adddays",
+      "vimshottari_calculatevimshottari",
+      "vimshottari_findcurrent",
+      "vimshottari_nowiso",
+      "yogas_calculateyogas",
+      "yogas_unavailableyoga"
+    ],
+    "1": [
+      "app_api_astro_v1_calculate_route_ts",
+      "app_api_astro_v1_chat_route_ts",
+      "app_api_astro_v1_profile_route_ts",
+      "app_api_llm_stream_route_ts",
+      "backend_getastroenginebackend",
+      "backend_getastroengineserviceapikey",
+      "backend_getastroengineserviceurl",
+      "backend_isremoteastroengineconfigured",
+      "calculate_calculateastroengine",
+      "calculate_getastroengineimpl",
+      "calculate_mergepythonbasewithtsderivedsections",
+      "calculate_safeshadowlog",
+      "chart_json_buildchartjson",
+      "chart_json_persistence_isavailabledisplaysection",
+      "chart_json_persistence_mergeavailablejyotishsectionsintochartjson",
+      "encryption_decryptjson",
+      "encryption_encryptjson",
+      "encryption_getkey",
+      "feature_flags_astroconversationorchestratorenabled",
+      "feature_flags_astrov1apienabled",
+      "feature_flags_astrov1chatenabled",
+      "hashing_canonicalize",
+      "hashing_sha256canonical",
+      "index_runengine",
+      "lib_astro_chart_json_persistence_ts",
+      "lib_astro_chart_json_ts",
+      "lib_astro_encryption_ts",
+      "lib_astro_engine_backend_ts",
+      "lib_astro_engine_index_ts",
+      "lib_astro_engine_remote_ts",
+      "lib_astro_engine_version_ts",
+      "lib_astro_feature_flags_ts",
+      "lib_astro_hashing_ts",
+      "lib_astro_normalize_ts",
+      "lib_astro_prediction_context_ts",
+      "lib_astro_schemas_calculate_ts",
+      "lib_astro_schemas_engine_request_ts",
+      "lib_astro_schemas_master_ts",
+      "lib_astro_settings_ts",
+      "lib_astro_types_ts",
+      "normalize_normalizebirthinput",
+      "prediction_context_buildexpandedcontext",
+      "prediction_context_buildpredictioncontext",
+      "prediction_context_isunavailable",
+      "python_engine_appendfallbackwarning",
+      "python_engine_calculatewithpythonengine",
+      "python_engine_getpythonentrypoint",
+      "python_engine_gettimeoutms",
+      "python_engine_pythonastroengineerror",
+      "python_engine_pythonastroengineerror_constructor",
+      "python_engine_summarizepythonerror",
+      "python_engine_withpythonfallbackwarning",
+      "remote_buildrejectedoutput",
+      "remote_calculatemasterastrooutputremote",
+      "remote_sanitizevalidationissues",
+      "route_createratelimiter",
+      "route_getnextchartversion",
+      "route_persistcalculatedoutput",
+      "route_post",
+      "security_test_buildstubpredictioncontext",
+      "security_test_findforbiddenkeypath",
+      "security_test_usetestkey",
+      "server_handleastroenginerequest",
+      "server_hasownfield",
+      "server_logrequest",
+      "services_astro_engine_src_calculate_ts",
+      "services_astro_engine_src_python_engine_ts",
+      "services_astro_engine_src_server_ts",
+      "settings_hashsettings",
+      "tests_astro_astro_engine_calculate_test_ts",
+      "tests_astro_python_engine_test_ts",
+      "tests_astro_security_test_ts",
+      "version_getruntimeengineversion",
+      "version_getruntimeephemerisversion"
+    ],
+    "2": [
+      "actions_approvedraft",
+      "actions_approvepost",
+      "actions_cleanslug",
+      "actions_createpost",
+      "actions_deletepost",
+      "actions_publishpost",
+      "actions_rejectdraft",
+      "actions_rejectpost",
+      "actions_sourcename",
+      "actions_unpublishpost",
+      "actions_updatepost",
+      "admin_requireadmin",
+      "app_adapter_adapt_planet",
+      "app_adapter_build_aspects",
+      "app_adapter_build_available_section",
+      "app_adapter_build_birth_details",
+      "app_adapter_build_d1_chart",
+      "app_adapter_build_houses",
+      "app_adapter_build_lagna",
+      "app_adapter_build_not_implemented_section",
+      "app_adapter_build_prediction_ready_context",
+      "app_adapter_build_reference_section",
+      "app_adapter_build_unavailable_section",
+      "app_adapter_calculate_app_output",
+      "app_adapter_configure_swiss_ephemeris",
+      "app_adapter_normalize_time_for_python",
+      "app_adapter_strip_forbidden_keys",
+      "app_admin_drafts_actions_ts",
+      "app_admin_layout_tsx",
+      "app_admin_news_actions_ts",
+      "app_admin_news_all_actions_ts",
+      "app_admin_news_id_edit_actions_ts",
+      "app_admin_news_id_edit_page_tsx",
+      "app_admin_news_new_actions_ts",
+      "app_admin_page_tsx",
+      "app_api_astro_v1_chart_profileid_route_ts",
+      "app_api_astro_v1_prediction_context_profileid_route_ts",
+      "app_api_cron_backup_route_ts",
+      "app_api_cron_daily_insight_route_ts",
+      "app_api_cron_daily_tasks_route_ts",
+      "app_api_cron_rss_ingest_route_ts",
+      "app_auth_callback_route_ts",
+      "layout_adminlayout",
+      "lib_admin_ts",
+      "page_admindashboard",
+      "page_editnewspostpage",
+      "route_fallbacksummary",
+      "route_get",
+      "route_summarizewithgroq",
+      "run_calculation_main",
+      "run_calculation_write_stderr_error",
+      "services_astro_engine_python_app_adapter_py",
+      "services_astro_engine_python_run_calculation_py"
+    ],
+    "3": [
+      "astro_engine_midpoint_ephemeris",
+      "astro_engine_output_tree",
+      "astro_engine_readme",
+      "astro_python_docker_verified",
+      "astro_python_integration_verification",
+      "astro_python_modes",
+      "astro_python_node_bridge",
+      "astro_python_rationale_shadow_first",
+      "claudenext_answer_contract",
+      "claudenext_bhairav_guru",
+      "claudenext_feature_flag_orchestrator",
+      "claudenext_follow_up_policy",
+      "claudenext_intent_classifier",
+      "claudenext_orchestrator",
+      "claudenext_rationale_backend_calculates",
+      "claudenext_rationale_confidence_penalties",
+      "claudenext_rationale_safe_fallback",
+      "claudenext_sse_events",
+      "missing_swiss_ephe_resolved",
+      "plan_chart_json_persistence",
+      "plan_master_astro_output",
+      "plan_panchang",
+      "plan_pii_encryption",
+      "plan_prediction_context",
+      "plan_rationale_additive_migrations",
+      "plan_rationale_no_raw_birth_to_llm",
+      "plan_rationale_swiss_ephem_required",
+      "plan_swiss_ephemeris_engine",
+      "plan_validation_suite",
+      "plan_vedic_engine",
+      "plan_vimshottari_dasha",
+      "requirements_pyswisseph",
+      "rework_plan_astro_v1_ui",
+      "rework_plan_docker_service",
+      "rework_plan_feature_flags",
+      "rework_plan_jyotishko_reference",
+      "rework_plan_kaalbhairav",
+      "rework_plan_old_routes",
+      "rework_plan_python_engine",
+      "rework_plan_rationale_infinite_redirect",
+      "rework_plan_rationale_python_ts_split",
+      "rework_plan_rationale_stub_default",
+      "rework_plan_security_issues",
+      "rework_plan_supabase_migrations",
+      "rework_plan_swiss_ephemeris",
+      "rework_plan_target_architecture",
+      "rework_plan_vercel_env_vars",
+      "swiss_ephe_data_source",
+      "swiss_ephe_files",
+      "swiss_ephe_license",
+      "swiss_ephe_rationale_include_in_repo",
+      "swiss_ephe_runtime_paths"
+    ],
+    "4": [
+      "lib_astro_profile_chart_json_adapter_ts",
+      "profile_chart_json_adapter_adaptaspects",
+      "profile_chart_json_adapter_adaptcurrenttimingfromvimshottari",
+      "profile_chart_json_adapter_adaptd1chart",
+      "profile_chart_json_adapter_adaptdailytransits",
+      "profile_chart_json_adapter_adapthouses",
+      "profile_chart_json_adapter_adaptlifeareas",
+      "profile_chart_json_adapter_adaptnavamsa",
+      "profile_chart_json_adapter_adaptpanchang",
+      "profile_chart_json_adapter_adaptplanets",
+      "profile_chart_json_adapter_askarana",
+      "profile_chart_json_adapter_asnakshatra",
+      "profile_chart_json_adapter_aspecttypefromoffset",
+      "profile_chart_json_adapter_asyoga",
+      "profile_chart_json_adapter_availablesectionhasdisplaydata",
+      "profile_chart_json_adapter_buildprofilechartjsonfrommasteroutput",
+      "profile_chart_json_adapter_buildprofileexpandedsectionsfrommasteroutput",
+      "profile_chart_json_adapter_buildprofileexpandedsectionsfromstoredchartjson",
+      "profile_chart_json_adapter_displaynumber",
+      "profile_chart_json_adapter_displaysectionhasdata",
+      "profile_chart_json_adapter_displaystring",
+      "profile_chart_json_adapter_filterstringarray",
+      "profile_chart_json_adapter_formatprofilechartstatus",
+      "profile_chart_json_adapter_housesignfromd1",
+      "profile_chart_json_adapter_isavailablesection",
+      "profile_chart_json_adapter_ismeaningfultext",
+      "profile_chart_json_adapter_mapchartstatus",
+      "profile_chart_json_adapter_normalizeavailablesection",
+      "profile_chart_json_adapter_normalizedisplaysection",
+      "profile_chart_json_adapter_nowiso",
+      "profile_chart_json_adapter_objectentriestorecords",
+      "profile_chart_json_adapter_occupantsforhouse",
+      "profile_chart_json_adapter_preferavailablesection",
+      "profile_chart_json_adapter_preferdisplaysection",
+      "profile_chart_json_adapter_statusrank",
+      "profile_chart_json_adapter_toarray",
+      "profile_chart_json_adapter_torecord"
+    ],
+    "5": [
+      "cli_main",
+      "core_angular_distance",
+      "core_aspects",
+      "core_assign_houses",
+      "core_calculate_chart",
+      "core_configure_zodiac",
+      "core_house_cusps",
+      "core_julian_day_ut",
+      "core_local_to_utc",
+      "core_planet_positions",
+      "core_resolve_timezone",
+      "exporters_export_astro_package_like",
+      "exporters_write_csv",
+      "exporters_write_json",
+      "formatting_decode_sign_code_cell",
+      "formatting_normalize_degrees",
+      "formatting_raw_midpoint_value",
+      "formatting_sign_info",
+      "midpoints_midpoint_ephemeris",
+      "midpoints_midpoint_records_for_datetime",
+      "midpoints_shortest_arc_midpoint",
+      "models_birthdetails",
+      "models_birthdetails_asdict",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_cli_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_constants_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_core_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_exporters_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_formatting_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_init_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_midpoints_py",
+      "services_astro_engine_python_astro_calculation_engine_astro_engine_models_py"
+    ],
+    "6": [
+      "actions_deleteaccount",
+      "actions_geocode",
+      "actions_savebirthchart",
+      "actions_saveentry",
+      "actions_toggleconfig",
+      "app_admin_controls_actions_ts",
+      "app_astro_chart_profileid_page_tsx",
+      "app_astro_setup_actions_ts",
+      "app_astro_v1_chat_profileid_page_tsx",
+      "app_settings_actions_ts",
+      "app_settings_page_tsx",
+      "app_sitemap_ts",
+      "app_still_actions_ts",
+      "app_still_journal_tsx",
+      "app_still_page_tsx",
+      "journal_handlesave",
+      "lib_supabase_server_ts",
+      "page_astrochartpage",
+      "page_chatpage",
+      "page_settingspage",
+      "page_stillpage",
+      "proxy_proxy",
+      "proxy_ts",
+      "server_createclient",
+      "server_createserviceclient",
+      "server_updatesession",
+      "sitemap_sitemap"
+    ],
+    "7": [
+      "answer_contract_parseandvalidate",
+      "confidence_scoring_computeconfidence",
+      "confidence_scoring_confidencelabel",
+      "follow_up_policy_evaluatefollowup",
+      "human_tone_buildsafecontext",
+      "human_tone_buildsystemprompt",
+      "human_tone_builduserprompt",
+      "human_tone_renderfinalanswer",
+      "intent_classifier_classifyintent",
+      "intent_classifier_detectemotionalstate",
+      "intent_classifier_detecthighriskflags",
+      "intent_classifier_detectspecificity",
+      "intent_classifier_detecttopic",
+      "intent_classifier_extractcontext",
+      "intent_classifier_normalize",
+      "lib_astro_conversation_answer_contract_ts",
+      "lib_astro_conversation_confidence_scoring_ts",
+      "lib_astro_conversation_follow_up_policy_ts",
+      "lib_astro_conversation_human_tone_ts",
+      "lib_astro_conversation_intent_classifier_ts",
+      "lib_astro_conversation_orchestrator_ts",
+      "lib_astro_conversation_types_ts",
+      "orchestrator_extractpriorstate",
+      "orchestrator_iscontinuation",
+      "orchestrator_runorchestrator"
+    ],
+    "8": [
+      "diagnostics_getenginediagnostics",
+      "diagnostics_getephemerisrangemetadata",
+      "diagnostics_runstartupvalidation",
+      "diagnostics_verifyconstants",
+      "lib_astro_engine_diagnostics_ts",
+      "lib_astro_engine_swiss_ts",
+      "swiss_calcplanet",
+      "swiss_checkephefiles",
+      "swiss_getascendant",
+      "swiss_getephemerisrange",
+      "swiss_getlahiriayanamsa",
+      "swiss_getsunriseorset",
+      "swiss_getsweph",
+      "swiss_getswephstatus",
+      "swiss_getsweversion",
+      "swiss_initswissephemeris",
+      "swiss_ismoshierfallback",
+      "swiss_isswissephemerisavailable",
+      "swiss_resolveephepath",
+      "swiss_swejulday"
+    ],
+    "9": [
+      "app_astro_v1_new_page_tsx",
+      "aspects_calculateaspects",
+      "aspects_targethouse",
+      "lib_astro_calculations_warnings_ts",
+      "life_areas_calculatelifeareasignatures",
+      "page_handlesubmit",
+      "page_set",
+      "warnings_collectwarnings",
+      "warnings_warn"
+    ],
+    "10": [
+      "next_svg_nextjs_logo",
+      "nextjs_framework",
+      "vercel_platform",
+      "vercel_svg_vercel_logo",
+      "window_svg_browser_window_icon"
+    ],
+    "11": [
+      "file_svg_document_icon",
+      "globe_svg_globe_icon",
+      "tarayai_brand_identity",
+      "tarayai_logo_brand_logo"
+    ],
+    "12": [
+      "app_astro_v1_chat_profileid_astrov1chat_tsx",
+      "astrov1chat_handlekeydown",
+      "astrov1chat_sendmessage"
+    ],
+    "13": [
+      "profile_chart_json_adapter_test_makemasteroutput",
+      "profile_chart_json_adapter_test_rowsof",
+      "tests_astro_profile_chart_json_adapter_test_ts"
+    ],
+    "14": [
+      "astro_engine_service_test_createrequest",
+      "astro_engine_service_test_createresponse",
+      "tests_astro_astro_engine_service_test_ts"
+    ],
+    "15": [
+      "astro_engine_import_extensions_test_readimports",
+      "astro_engine_import_extensions_test_resolvelocalimport",
+      "tests_astro_astro_engine_import_extensions_test_ts"
+    ],
+    "16": [
+      "reference_cases_countverifiedcases",
+      "reference_cases_todo",
+      "tests_astro_fixtures_reference_cases_ts"
+    ],
+    "17": [
+      "confidence_scoring_test_makecontext",
+      "confidence_scoring_test_makestate",
+      "tests_astro_conversation_confidence_scoring_test_ts"
+    ],
+    "18": [
+      "card_cardaction",
+      "card_cn",
+      "components_ui_card_tsx"
+    ],
+    "19": [
+      "agents_nextjs_agent_rules",
+      "claudemd_agents_ref",
+      "readme_nextjs_project"
+    ],
+    "20": [
+      "instrumentation_register",
+      "instrumentation_ts"
+    ],
+    "21": [
+      "app_robots_ts",
+      "robots_robots"
+    ],
+    "22": [
+      "app_layout_tsx",
+      "layout_rootlayout"
+    ],
+    "23": [
+      "app_global_error_tsx",
+      "global_error_globalerror"
+    ],
+    "24": [
+      "app_privacy_page_tsx",
+      "page_privacypage"
+    ],
+    "25": [
+      "app_terms_page_tsx",
+      "page_termspage"
+    ],
+    "26": [
+      "app_admin_drafts_page_tsx",
+      "page_sourcename"
+    ],
+    "27": [
+      "app_sign_in_sign_in_button_tsx",
+      "sign_in_button_signinbutton"
+    ],
+    "28": [
+      "app_astro_chat_tsx",
+      "chat_ask"
+    ],
+    "29": [
+      "app_astro_page_tsx",
+      "page_astropage"
+    ],
+    "30": [
+      "app_astro_v1_layout_tsx",
+      "layout_astrov1layout"
+    ],
+    "31": [
+      "app_astro_v1_profile_profileid_recalculatebutton_tsx",
+      "recalculatebutton_recalculatebutton"
+    ],
+    "32": [
+      "app_astro_chat_page_tsx",
+      "page_astrochatpage"
+    ],
+    "33": [
+      "app_astro_setup_page_tsx",
+      "page_astrosetuppage"
+    ],
+    "34": [
+      "app_astro_components_birthprofileform_tsx",
+      "birthprofileform_birthprofileform"
+    ],
+    "35": [
+      "app_astro_components_calculationstatus_tsx",
+      "calculationstatus_calculationstatus"
+    ],
+    "36": [
+      "master_calculation_test_findforbiddenkeypath",
+      "tests_astro_master_calculation_test_ts"
+    ],
+    "37": [
+      "orchestrator_test_makecontext",
+      "tests_astro_conversation_orchestrator_test_ts"
+    ],
+    "38": [
+      "follow_up_policy_test_makestate",
+      "tests_astro_conversation_follow_up_policy_test_ts"
+    ],
+    "39": [
+      "badge_badge",
+      "components_ui_badge_tsx"
+    ],
+    "40": [
+      "button_cn",
+      "components_ui_button_tsx"
+    ],
+    "41": [
+      "components_brand_yantra_tsx",
+      "yantra_rotatingyantra"
+    ],
+    "42": [
+      "components_brand_page_transition_tsx",
+      "page_transition_pagetransition"
+    ],
+    "43": [
+      "lib_utils_ts",
+      "utils_cn"
+    ],
+    "44": [
+      "astro_v1_isastrov1uienabled",
+      "lib_flags_astro_v1_ts"
+    ],
+    "45": [
+      "client_createclient",
+      "lib_supabase_client_ts"
+    ],
+    "46": [
+      "init_rationale_1",
+      "services_astro_engine_python_astro_calculation_engine_init_py"
+    ],
+    "47": [
+      "postcss_config_mjs"
+    ],
+    "48": [
+      "sentry_server_config_ts"
+    ],
+    "49": [
+      "next_env_d_ts"
+    ],
+    "50": [
+      "sentry_edge_config_ts"
+    ],
+    "51": [
+      "instrumentation_client_ts"
+    ],
+    "52": [
+      "vitest_config_ts"
+    ],
+    "53": [
+      "eslint_config_mjs"
+    ],
+    "54": [
+      "next_config_ts"
+    ],
+    "55": [
+      "app_opengraph_image_tsx"
+    ],
+    "56": [
+      "app_page_tsx"
+    ],
+    "57": [
+      "app_admin_controls_page_tsx"
+    ],
+    "58": [
+      "app_admin_news_page_tsx"
+    ],
+    "59": [
+      "app_admin_news_all_page_tsx"
+    ],
+    "60": [
+      "app_admin_news_new_page_tsx"
+    ],
+    "61": [
+      "app_news_page_tsx"
+    ],
+    "62": [
+      "app_news_slug_opengraph_image_tsx"
+    ],
+    "63": [
+      "app_news_slug_page_tsx"
+    ],
+    "64": [
+      "app_sign_in_page_tsx"
+    ],
+    "65": [
+      "app_astro_v1_page_tsx"
+    ],
+    "66": [
+      "app_astro_v1_profile_profileid_page_tsx"
+    ],
+    "67": [
+      "app_astro_components_warningslist_tsx"
+    ],
+    "68": [
+      "tests_astro_reference_jyotish_sections_test_ts"
+    ],
+    "69": [
+      "tests_astro_engine_real_test_ts"
+    ],
+    "70": [
+      "tests_astro_swiss_hardening_test_ts"
+    ],
+    "71": [
+      "tests_astro_remote_adapter_test_ts"
+    ],
+    "72": [
+      "tests_astro_chart_json_persistence_test_ts"
+    ],
+    "73": [
+      "tests_astro_calculate_route_remote_test_ts"
+    ],
+    "74": [
+      "tests_astro_fixtures_swiss_reference_values_ts"
+    ],
+    "75": [
+      "tests_astro_conversation_answer_contract_test_ts"
+    ],
+    "76": [
+      "tests_astro_conversation_intent_classifier_test_ts"
+    ],
+    "77": [
+      "lib_astro_schemas_chat_ts"
+    ],
+    "78": [
+      "lib_astro_schemas_profile_ts"
+    ]
+  },
+  "cohesion": {
+    "0": 0.08,
+    "1": 0.05,
+    "2": 0.07,
+    "3": 0.05,
+    "4": 0.16,
+    "5": 0.15,
+    "6": 0.08,
+    "7": 0.15,
+    "8": 0.23,
+    "9": 0.28,
+    "10": 0.5,
+    "11": 0.5,
+    "12": 1.0,
+    "13": 0.67,
+    "14": 0.67,
+    "15": 0.67,
+    "16": 0.67,
+    "17": 0.67,
+    "18": 0.67,
+    "19": 0.67,
+    "20": 1.0,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0,
+    "27": 1.0,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0,
+    "53": 1.0,
+    "54": 1.0,
+    "55": 1.0,
+    "56": 1.0,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0,
+    "60": 1.0,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 1.0,
+    "64": 1.0,
+    "65": 1.0,
+    "66": 1.0,
+    "67": 1.0,
+    "68": 1.0,
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0,
+    "72": 1.0,
+    "73": 1.0,
+    "74": 1.0,
+    "75": 1.0,
+    "76": 1.0,
+    "77": 1.0,
+    "78": 1.0
+  },
+  "gods": [
+    {
+      "id": "route_get",
+      "label": "GET()",
+      "degree": 35
+    },
+    {
+      "id": "master_calculatemasterastrooutput",
+      "label": "calculateMasterAstroOutput()",
+      "degree": 30
+    },
+    {
+      "id": "real_runenginereal",
+      "label": "runEngineReal()",
+      "degree": 30
+    },
+    {
+      "id": "route_post",
+      "label": "POST()",
+      "degree": 24
+    },
+    {
+      "id": "math_normalize360",
+      "label": "normalize360()",
+      "degree": 17
+    },
+    {
+      "id": "panchang_calculatepanchangresult",
+      "label": "calculatePanchangResult()",
+      "degree": 15
+    },
+    {
+      "id": "admin_requireadmin",
+      "label": "requireAdmin()",
+      "degree": 14
+    },
+    {
+      "id": "server_createclient",
+      "label": "createClient()",
+      "degree": 13
+    },
+    {
+      "id": "profile_chart_json_adapter_torecord",
+      "label": "toRecord()",
+      "degree": 13
+    },
+    {
+      "id": "app_adapter_calculate_app_output",
+      "label": "calculate_app_output()",
+      "degree": 13
+    }
+  ],
+  "surprises": [
+    {
+      "source": "sitemap()",
+      "target": "createClient()",
+      "source_files": [
+        "app/sitemap.ts",
+        "lib/supabase/server.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `sitemap()` unexpectedly reaches hub `createClient()`"
+    },
+    {
+      "source": "deleteAccount()",
+      "target": "createClient()",
+      "source_files": [
+        "app/settings/actions.ts",
+        "lib/supabase/server.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `deleteAccount()` unexpectedly reaches hub `createClient()`"
+    },
+    {
+      "source": "SettingsPage()",
+      "target": "createClient()",
+      "source_files": [
+        "app/settings/page.tsx",
+        "lib/supabase/server.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `SettingsPage()` unexpectedly reaches hub `createClient()`"
+    },
+    {
+      "source": "GET()",
+      "target": "createClient()",
+      "source_files": [
+        "app/api/cron/backup/route.ts",
+        "lib/supabase/server.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "GET()",
+      "target": "astroV1ApiEnabled()",
+      "source_files": [
+        "app/api/cron/backup/route.ts",
+        "lib/astro/feature-flags.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `GET()` connect `Admin News Workflow` to `API Routes And Engine Config`, `Python Engine Core`, `UI Actions And Pages`, `Life Areas And Warnings`?",
+      "why": "High betweenness centrality (0.151) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `POST()` connect `API Routes And Engine Config` to `Profile Chart Adapters`, `UI Actions And Pages`, `Conversation Pipeline`?",
+      "why": "High betweenness centrality (0.129) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `createClient()` connect `UI Actions And Pages` to `API Routes And Engine Config`, `Admin News Workflow`?",
+      "why": "High betweenness centrality (0.078) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 27 inferred relationships involving `GET()` (e.g. with `createClient()` and `approveDraft()`) actually correct?",
+      "why": "`GET()` has 27 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 27 inferred relationships involving `calculateMasterAstroOutput()` (e.g. with `calculateLifeAreas()` and `calculateGrahaDrishti()`) actually correct?",
+      "why": "`calculateMasterAstroOutput()` has 27 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 28 inferred relationships involving `runEngineReal()` (e.g. with `calculateLifeAreas()` and `calculateGrahaDrishti()`) actually correct?",
+      "why": "`runEngineReal()` has 28 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 17 inferred relationships involving `POST()` (e.g. with `createClient()` and `astroV1ApiEnabled()`) actually correct?",
+      "why": "`POST()` has 17 INFERRED edges - model-reasoned connections that need verification."
+    }
+  ]
+}
