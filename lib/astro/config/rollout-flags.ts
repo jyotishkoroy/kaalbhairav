@@ -16,7 +16,7 @@ export type AstroRolloutFlagState = {
     voiceEnabled: boolean;
   };
   llm: {
-    provider: "disabled" | "ollama";
+    provider: "disabled" | "ollama" | "groq";
     enabled: boolean;
   };
 };

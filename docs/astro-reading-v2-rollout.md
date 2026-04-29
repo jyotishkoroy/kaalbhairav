@@ -86,3 +86,15 @@ No paid AI or production LLM dependency is added.
 - `/astro/v2` route was added after the initial 404.
 - Production deployment should be rerun after env flag changes because `NEXT_PUBLIC_` flags are baked at build time.
 - `ASTRO_LLM_PROVIDER=enabled` is not a valid provider; use `disabled` or `ollama`.
+
+## Phase 18 — Optional Groq provider and safe LLM refinement
+
+- Adds `ASTRO_LLM_PROVIDER=groq`.
+- Adds `ASTRO_LLM_REFINER_ENABLED`.
+- Valid providers are `disabled`, `ollama`, and `groq`.
+- `enabled` is invalid and safely normalizes to disabled.
+- Groq only refines the already-safe deterministic Reading V2 answer.
+- Safety runs before and after Groq refinement.
+- If Groq fails, the deterministic safe answer is returned.
+- `GROQ_API_KEY` must stay in Vercel/project secrets only.
+- Groq API keys can expire; rotate them before expiry.

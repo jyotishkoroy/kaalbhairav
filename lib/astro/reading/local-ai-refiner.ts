@@ -13,36 +13,58 @@ export type LocalAIRefineResult = {
   provider: string
 }
 
+export type SafeLLMRefineInput = {
+  answer: string
+  question: string
+  provider?: LLMProvider
+  model?: string
+  maxTokens?: number
+  temperature?: number
+}
+
+export type SafeLLMRefineResult = {
+  answer: string
+  usedLLM: boolean
+  provider: string
+  model?: string
+  fallback: boolean
+}
+
 function buildSystemPrompt(): string {
   return [
     'You are a careful astrology writing assistant.',
-    'Rewrite only for clarity and warmth.',
+    'Rewrite only for warmth, clarity, and natural human flow.',
     'Do not add new predictions.',
-    'Do not add medical, legal, death, gemstone, or guaranteed claims.',
-    'Preserve the original meaning.',
+    'Do not add new astrology claims.',
+    'Do not add new remedies.',
+    'Do not add medical, legal, pregnancy, death, lifespan, gemstone, curse, miracle, or guaranteed claims.',
+    'Do not remove safety boundaries or disclaimers.',
+    'Do not mention AI.',
+    'Preserve the original meaning exactly.',
   ].join(' ')
 }
 
-function buildUserPrompt(input: LocalAIRefineInput): string {
+function buildUserPrompt(input: SafeLLMRefineInput): string {
   return [
     `Question: ${input.question}`,
-    'Original deterministic answer:',
+    'Original safe deterministic answer:',
     input.answer,
-    'Rewrite it to sound more natural while preserving all safety boundaries.',
+    'Rewrite the answer to sound more natural, caring, and human.',
+    'Preserve all safety boundaries and do not add any new factual claims.',
   ].join('\n\n')
 }
 
-export async function refineReadingWithLocalAI(
-  input: LocalAIRefineInput,
-): Promise<LocalAIRefineResult> {
+export async function refineReadingWithSafeLLM(
+  input: SafeLLMRefineInput,
+): Promise<SafeLLMRefineResult> {
   const provider = input.provider ?? getLLMProvider()
 
   try {
     const result = await provider.generate({
       system: buildSystemPrompt(),
       prompt: buildUserPrompt(input),
-      temperature: 0.2,
-      maxTokens: 900,
+      temperature: input.temperature ?? 0.2,
+      maxTokens: input.maxTokens ?? 900,
     })
 
     const text = result.text.trim()
@@ -52,6 +74,8 @@ export async function refineReadingWithLocalAI(
         answer: input.answer,
         usedLLM: false,
         provider: result.provider,
+        model: result.model,
+        fallback: true,
       }
     }
 
@@ -59,6 +83,8 @@ export async function refineReadingWithLocalAI(
       answer: text,
       usedLLM: true,
       provider: result.provider,
+      model: result.model,
+      fallback: false,
     }
   } catch (error) {
     if (isLLMProviderDisabledError(error)) {
@@ -66,6 +92,7 @@ export async function refineReadingWithLocalAI(
         answer: input.answer,
         usedLLM: false,
         provider: 'disabled',
+        fallback: true,
       }
     }
 
@@ -73,6 +100,19 @@ export async function refineReadingWithLocalAI(
       answer: input.answer,
       usedLLM: false,
       provider: provider.name,
+      fallback: true,
     }
+  }
+}
+
+export async function refineReadingWithLocalAI(
+  input: LocalAIRefineInput,
+): Promise<LocalAIRefineResult> {
+  const result = await refineReadingWithSafeLLM(input)
+
+  return {
+    answer: result.answer,
+    usedLLM: result.usedLLM,
+    provider: result.provider,
   }
 }

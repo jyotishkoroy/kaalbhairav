@@ -17,6 +17,8 @@ import { generateHumanReadingResult } from '@/lib/astro/reading/human-generator'
 import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
 import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
 import { applySafetyFilter } from '@/lib/astro/safety'
+import { getLLMProviderConfig, getLLMRefinerConfig } from '@/lib/llm/config'
+import { refineReadingWithSafeLLM } from '@/lib/astro/reading/local-ai-refiner'
 import type {
   AstrologyReadingInput,
   AstrologyReadingResult,
@@ -256,6 +258,8 @@ export async function generateReadingV2(
     })
     const monthlyRequested = detectsMonthlyGuidanceRequest(v2Input.question)
     const shouldIncludeMonthlyGuidance = monthlyEnabled || monthlyRequested
+    const llmConfig = getLLMProviderConfig()
+    const llmRefinerConfig = getLLMRefinerConfig()
     const result = generateHumanReadingResult({
       concern,
       evidence,
@@ -283,23 +287,46 @@ export async function generateReadingV2(
     const combinedAnswer = [result.answer, monthlyGuidanceText]
       .filter(Boolean)
       .join('\n\n')
-    const safety = applySafetyFilter({
+    const firstSafety = applySafetyFilter({
       question: v2Input.question,
       answer: combinedAnswer,
       concern,
     })
+    let finalSafety = firstSafety
+    let llmRefinerUsed = false
+    let llmRefinerFallback = false
+    let llmModel: string | undefined
+
+    if (llmRefinerConfig.enabled) {
+      const refined = await refineReadingWithSafeLLM({
+        question: v2Input.question,
+        answer: firstSafety.answer,
+        maxTokens: llmRefinerConfig.maxTokens,
+        temperature: llmRefinerConfig.temperature,
+      })
+
+      llmRefinerUsed = refined.usedLLM
+      llmRefinerFallback = refined.fallback
+      llmModel = refined.model
+
+      finalSafety = applySafetyFilter({
+        question: v2Input.question,
+        answer: refined.answer,
+        concern,
+      })
+    }
     await saveOptionalMemory({
       enabled: memoryEnabled,
       userId,
       topic: concern.topic,
       question: v2Input.question,
-      answer: safety.answer,
+      answer: finalSafety.answer,
       emotionalTone: concern.emotionalTone,
       birthDetails: input.birthDetails,
     })
 
     return {
-      answer: safety.answer,
+      answer: finalSafety.answer,
       meta: {
         ...result.meta,
         version: 'v2',
@@ -310,15 +337,27 @@ export async function generateReadingV2(
         routedBy: 'astro-reading-router',
         usedFallback: false,
         safetyLayer: 'enabled_phase_8',
-        safetyRiskNames: safety.riskNames,
-        safetyReplacedAnswer: safety.replaced,
-        forbiddenClaimsRemoved: safety.forbiddenClaimsRemoved,
+        safetyRiskNames: Array.from(
+          new Set([
+            ...firstSafety.riskNames,
+            ...finalSafety.riskNames,
+          ]),
+        ),
+        safetyReplacedAnswer: firstSafety.replaced || finalSafety.replaced,
+        forbiddenClaimsRemoved:
+          firstSafety.forbiddenClaimsRemoved ||
+          finalSafety.forbiddenClaimsRemoved,
         memoryLayer: memoryEnabled ? 'enabled_phase_7' : 'disabled',
         memorySummaryUsed: Boolean(memorySummary),
         remediesLayer: remediesEnabled ? 'enabled_phase_9' : 'disabled',
         remedyEvidenceIncluded,
         monthlyLayer: monthlyEnabled ? 'enabled_phase_11' : 'disabled',
         monthlyGuidanceIncluded,
+        llmProvider: llmConfig.provider,
+        llmRefinerEnabled: llmRefinerConfig.enabled,
+        llmRefinerUsed,
+        llmRefinerFallback,
+        llmModel,
       },
     }
   } catch (error) {

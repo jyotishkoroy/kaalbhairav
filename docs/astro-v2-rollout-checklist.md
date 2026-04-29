@@ -54,8 +54,21 @@ Use the env name that the current code actually reads.
 Valid values for `ASTRO_LLM_PROVIDER`:
 - disabled
 - ollama
+- groq
 
 Do not document or rely on `enabled` as a valid provider value. If the variable is set to `enabled`, the code treats it as disabled.
+
+### Phase 18 - Optional Groq provider and safe LLM refinement
+
+- Adds `ASTRO_LLM_PROVIDER=groq`.
+- Adds `ASTRO_LLM_REFINER_ENABLED`.
+- Groq is optional and disabled by default.
+- Groq only rewrites the already-safe deterministic Reading V2 answer.
+- Groq must not add predictions, remedies, medical/legal/death claims, gemstone claims, curse claims, or guarantees.
+- Safety filter runs again after Groq.
+- If Groq fails or rate-limits, the deterministic safe answer is returned.
+- `GROQ_API_KEY` must be stored only in Vercel/project secrets, never committed.
+- Groq API keys can expire; track expiration manually and rotate before expiry.
 
 ### Vercel
 

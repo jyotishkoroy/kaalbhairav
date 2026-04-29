@@ -16,7 +16,7 @@ export type LLMProvider = {
   generate(input: LLMGenerateInput): Promise<LLMGenerateResult>
 }
 
-export type LLMProviderName = 'disabled' | 'ollama'
+export type LLMProviderName = 'disabled' | 'ollama' | 'groq'
 
 export type LLMProviderConfig = {
   provider: LLMProviderName
