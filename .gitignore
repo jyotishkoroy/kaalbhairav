@@ -55,3 +55,6 @@ services/astro-engine/python/output/
 # Local reference packages
 astro_package*.zip
 graphify-out/
+myVedicReport.docx
+graphify-out.zip
+myVedicReport.docx
