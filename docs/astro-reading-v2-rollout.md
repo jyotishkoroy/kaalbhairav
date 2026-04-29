@@ -39,3 +39,10 @@ Enable one flag at a time:
 Phase 8 adds the deterministic safety layer to Reading V2. Safety runs on every normal V2 response and handles medical, death/lifespan, legal, pregnancy, self-harm, fear-based, and gemstone risks.
 
 The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
+
+## Phase 12
+
+UI components were added behind `NEXT_PUBLIC_ASTRO_READING_V2_UI_ENABLED`.
+The new UI layer includes `ReadingModeSelector`, `FollowUpChips`, `ReadingMemoryCard`, and optional safe cards.
+This UI flag does not enable the server-side V2 runtime.
+The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
