@@ -62,3 +62,11 @@ The disabled provider is the default and `ASTRO_LLM_PROVIDER=disabled`.
 An Ollama provider can be exercised locally with `ASTRO_LLM_PROVIDER=ollama`.
 Reading V2 is not wired to local AI by default.
 No paid AI or production LLM dependency is added.
+
+## Phase 15
+
+- Added rollout flag readiness checks.
+- Added integration readiness checks for Supabase, Upstash, legacy AI connector, Oracle VM/Python engine, and Vercel.
+- Added stable path guard tests.
+- Added manual rollout checklist.
+- All experimental flags remain disabled by default.
