@@ -26,9 +26,6 @@ export default async function AstroV1Page() {
         <p className="text-white/60 text-sm">
           Your birth chart is calculated by the backend. The Guru only explains — it never guesses.
         </p>
-        <p className="mt-3 inline-block px-3 py-1 rounded text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-700/50">
-          Engine mode: stub — real ephemeris not yet active
-        </p>
       </header>
 
       {profiles && profiles.length > 0 ? (

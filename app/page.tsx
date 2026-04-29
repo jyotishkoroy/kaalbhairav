@@ -30,7 +30,7 @@ export default async function HomePage() {
           <div className="flex gap-4 justify-center flex-wrap">
             {user ? (
               <>
-                <Link href="/astro" className="px-8 py-3 bg-orange-600 rounded-full hover:bg-orange-500">
+                <Link href="/astro/v1" className="px-8 py-3 bg-orange-600 rounded-full hover:bg-orange-500">
                   Ask the Guru
                 </Link>
                 <Link href="/still" className="px-8 py-3 border border-orange-500/40 rounded-full hover:bg-orange-500/10">

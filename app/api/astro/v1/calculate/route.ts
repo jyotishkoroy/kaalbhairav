@@ -382,12 +382,15 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({
+    const responsePayload: Record<string, unknown> = {
       ...mergedApiResponse,
       calculation_id: calc.id,
       chart_version_id: persistedChartVersionId,
       reused_cache: false,
-      debug_saved_chart_json: {
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      responsePayload.debug_saved_chart_json = {
         hasExpandedSections: !!mergedChartJson.expanded_sections,
         dailyStatus: mergedChartJson.expanded_sections?.daily_transits?.status ?? null,
         panchangStatus: mergedChartJson.expanded_sections?.panchang?.status ?? null,
@@ -400,8 +403,10 @@ export async function POST(req: NextRequest) {
         hasMasterPanchang: !!output.panchang,
         hasMasterVimshottari: !!output.vimshottari_dasha,
         savedChartVersionId: persistedChartVersionId,
-      },
-    })
+      }
+    }
+
+    return NextResponse.json(responsePayload)
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('[astro-v1-calculate-error]', error)
