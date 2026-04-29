@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { normalize360 } from './math.ts'
 import { TITHI_NAMES, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
 

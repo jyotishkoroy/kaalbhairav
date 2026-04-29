@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { readingModeOptions } from "@/components/astro/ReadingModeSelector";
 import { defaultFollowUpChips } from "@/components/astro/FollowUpChips";

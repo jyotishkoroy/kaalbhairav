@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { PlanetPosition } from './planets.ts'
 import type { LagnaResult } from './lagna.ts'
 import type { WholeSignHouse } from './houses.ts'

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { calcPlanet, SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, SE_MEAN_NODE, SE_TRUE_NODE } from '../engine/swiss.ts'
 import { normalize360 } from './math.ts'
 import { calculateSign } from './sign.ts'

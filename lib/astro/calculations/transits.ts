@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { calculateAllPlanets } from './planets.ts'
 import { calculateSign } from './sign.ts'
 import { calculateNakshatra } from './nakshatra.ts'

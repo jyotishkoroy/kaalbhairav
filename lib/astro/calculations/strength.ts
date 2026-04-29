@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { GrahaName } from './constants.ts'
 import type { PlanetPosition } from './planets.ts'
 import type { D1Chart } from './d1.ts'

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { AstroTopic, ConversationSpecificity, IntentClassification } from './types.ts'
 
 const TOPIC_KEYWORDS: Record<AstroTopic, string[]> = {

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { disabledLLMProvider } from '@/lib/llm/disabled'
 import { createGroqProvider } from '@/lib/llm/groq'
 import { createOllamaProvider } from '@/lib/llm/ollama'

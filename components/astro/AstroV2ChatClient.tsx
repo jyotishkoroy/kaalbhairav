@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { useMemo, useState } from "react";
 import { AstroReadingV2Panel } from "@/components/astro/AstroReadingV2Panel";
 import { ReadAloudButton } from "@/components/astro/ReadAloudButton";

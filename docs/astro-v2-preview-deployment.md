@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 Jyotishko Roy.
+Proprietary and confidential. All rights reserved.
+Project: TarayAI - https://tarayai.com
+-->
+
 ## Astro V2 Preview Deployment
 
 - Reading V2 answers now include chart basis, accuracy framing, and suggested follow-ups.

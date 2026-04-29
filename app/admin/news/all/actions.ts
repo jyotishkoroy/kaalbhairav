@@ -1,5 +1,11 @@
 'use server'
 
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin'
 

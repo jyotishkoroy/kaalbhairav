@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master.ts'
 import type { AstrologySettings, BirthProfileInput } from '../types.ts'
 import type { NormalizedBirthInput } from '../normalize.ts'

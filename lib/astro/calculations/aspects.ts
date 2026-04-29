@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { aspectOffsets } from './constants.ts'
 import type { D1Chart } from './d1.ts'
 import type { BasicAspects, Aspect, PlanetName } from '../engine/types.ts'

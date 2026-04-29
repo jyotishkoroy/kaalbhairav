@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { EmotionalTone, UserConcern } from '@/lib/astro/reading/reading-types'
 
 const OPENINGS_BY_TONE: Record<EmotionalTone, string[]> = {

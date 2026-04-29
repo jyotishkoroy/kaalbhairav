@@ -1,5 +1,11 @@
 'use client'
 
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { motion } from 'framer-motion'
 
 export function PageTransition({ children }: { children: React.ReactNode }) {

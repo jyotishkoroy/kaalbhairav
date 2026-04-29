@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { NAKSHATRA_MAP, NAKSHATRA_SPAN, PADA_SPAN } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNakshatraBoundary, nearPadaBoundary } from './boundary.ts'

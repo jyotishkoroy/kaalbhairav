@@ -1,4 +1,10 @@
 /**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
+/**
  * Section 28 mandatory test case definitions.
  *
  * These define the required test inputs from calculations.md §28.

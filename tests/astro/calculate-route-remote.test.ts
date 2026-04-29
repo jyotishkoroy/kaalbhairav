@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { remoteCall, supabaseState } = vi.hoisted(() => {

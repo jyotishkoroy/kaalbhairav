@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { DateTime } from 'luxon'
 
 export type TimezoneDisambiguation = 'not_needed' | 'earlier' | 'later' | 'rejected'

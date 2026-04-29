@@ -1,4 +1,10 @@
 /**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
+/**
  * Swiss Ephemeris regression anchors.
  *
  * These values were computed by sweph@2.10.3-5 with sepl_18.se1 + semo_18.se1

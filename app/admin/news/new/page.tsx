@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/admin'
 import { createPost } from './actions'

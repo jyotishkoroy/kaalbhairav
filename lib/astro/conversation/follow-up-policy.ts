@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { ConversationState, AstroTopic } from './types.ts'
 
 const MAX_SUB_QUESTIONS = 3

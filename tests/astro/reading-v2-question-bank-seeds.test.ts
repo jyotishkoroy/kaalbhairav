@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import seedCases from '../fixtures/astro-v2-question-bank-seeds.json'
 import { describe, expect, it } from 'vitest'
 import { generateReadingV2 } from '@/lib/astro/reading/reading-orchestrator-v2'

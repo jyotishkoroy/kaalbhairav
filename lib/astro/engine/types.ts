@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { SignPlacement } from '../calculations/sign.ts'
 import type { NakshatraPlacement } from '../calculations/nakshatra.ts'
 import type { TithiResult } from '../calculations/tithi.ts'

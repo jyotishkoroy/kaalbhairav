@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 // Versioned constants for all Jyotish calculations.
 
 export const CONSTANTS_VERSION = '1.0.0'

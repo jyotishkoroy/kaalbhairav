@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 Jyotishko Roy.
+Proprietary and confidential. All rights reserved.
+Project: TarayAI - https://tarayai.com
+-->
+
 ## Astro Reading V2 Rollout
 
 - Source benchmark: `birth_chart_life_question_bank_jyotishko.md`

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { isAstroReadingV2UiEnabled } from "@/lib/astro/reading/ui-feature-flags";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
 import { ReadAloudButton } from "@/components/astro/ReadAloudButton";

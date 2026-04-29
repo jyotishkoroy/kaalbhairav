@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 export function astroV1ApiEnabled(): boolean {
   return process.env.ASTRO_V1_API_ENABLED === 'true'
 }

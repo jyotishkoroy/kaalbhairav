@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { BOUNDARY_THRESHOLD_DEGREES, NAKSHATRA_SPAN, PADA_SPAN, SIGN_SPAN_DEGREES } from './constants.ts'
 import { normalize360 } from './math.ts'
 

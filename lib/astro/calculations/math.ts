@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 // Math utilities for Jyotish calculations. All inputs/outputs in degrees.
 
 export function normalize360(degrees: number): number {

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 const STYLE_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bBased on the data provided\b/gi, 'What I am seeing here'],
   [/\baccording to the information provided\b/gi, 'from what is visible here'],

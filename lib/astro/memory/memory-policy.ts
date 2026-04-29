@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { AstrologyUserMemory } from "@/lib/astro/memory/memory-types";
 
 const SENSITIVE_PATTERNS = [

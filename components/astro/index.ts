@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 export * from "@/components/astro/AstroReadingV2Panel";
 export * from "@/components/astro/AstroV2ChatClient";
 export * from "@/components/astro/BirthProfileCard";

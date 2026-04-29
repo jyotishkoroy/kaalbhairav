@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { DateTime } from 'luxon'
 import { getSunriseOrSet, SE_CALC_RISE, SE_CALC_SET } from '../engine/swiss.ts'
 import { calculateJulianDay } from './julian-day.ts'

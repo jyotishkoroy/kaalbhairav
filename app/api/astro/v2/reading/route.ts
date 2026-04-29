@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { NextResponse } from "next/server";
 import { generateReadingV2 } from "@/lib/astro/reading/reading-orchestrator-v2";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";

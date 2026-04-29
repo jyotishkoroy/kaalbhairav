@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { DASHA_SEQUENCE, DASHA_YEARS, NAKSHATRA_MAP, NAKSHATRA_SPAN, DASHA_YEAR_DAYS, VIMSHOTTARI_TOTAL_YEARS, type DashaLord } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNakshatraBoundary } from './boundary.ts'

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { describe, it, expect } from 'vitest'
 import { runOrchestrator } from '../../../lib/astro/conversation/orchestrator'
 import type { OrchestratorInput } from '../../../lib/astro/conversation/types'

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 export type AstroFeatureFlags = {
   readingV2Enabled: boolean
   memoryEnabled: boolean

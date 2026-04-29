@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { describe, it, expect } from 'vitest'
 import { parseAndValidate, SAFE_FALLBACK_ANSWER, SAFE_FALLBACK_RENDERED } from '../../../lib/astro/conversation/answer-contract'
 

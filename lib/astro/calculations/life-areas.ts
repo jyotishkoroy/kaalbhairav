@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { LIFE_AREA_HOUSE, SIGN_LORD_BY_SIGN_INDEX, RASHI_MAP } from './constants.ts'
 import type { D1Chart } from './d1.ts'
 import type { GrahaDrishti } from './aspects.ts'

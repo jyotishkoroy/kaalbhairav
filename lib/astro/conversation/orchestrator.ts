@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import type { OrchestratorInput, OrchestratorOutput, ConversationState, AstroTopic } from './types.ts'
 import type { PredictionContext } from '../types.ts'
 import { classifyIntent } from './intent-classifier.ts'

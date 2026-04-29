@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { runOrchestrator } from '@/lib/astro/conversation/orchestrator'

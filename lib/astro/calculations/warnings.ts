@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 export type WarningCode =
   | 'UNKNOWN_BIRTH_TIME' | 'APPROXIMATE_BIRTH_TIME' | 'INVALID_TIMEZONE'
   | 'AMBIGUOUS_TIMEZONE' | 'NONEXISTENT_LOCAL_TIME' | 'NEAR_SIGN_BOUNDARY'

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildChartJson } from '../../lib/astro/chart-json'

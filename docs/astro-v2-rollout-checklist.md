@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 Jyotishko Roy.
+Proprietary and confidential. All rights reserved.
+Project: TarayAI - https://tarayai.com
+-->
+
 ## Astro V2 Rollout Checklist
 
 - Verify the 52,000-case bank generation.

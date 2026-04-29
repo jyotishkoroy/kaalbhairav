@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { createClient } from '@/lib/supabase/server'
 import { RotatingYantra } from '@/components/brand/yantra'
 import Link from 'next/link'

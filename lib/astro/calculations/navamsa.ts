@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy.
+ * Proprietary and confidential. All rights reserved.
+ * Project: TarayAI - https://tarayai.com
+ */
+
 import { RASHI_MAP, NAVAMSA_START } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNavamsaBoundary } from './boundary.ts'

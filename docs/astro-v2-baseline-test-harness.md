@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 Jyotishko Roy.
+Proprietary and confidential. All rights reserved.
+Project: TarayAI - https://tarayai.com
+-->
+
 # Astro V2 Baseline Test Harness
 
 This document records the Phase 1 regression harness.
