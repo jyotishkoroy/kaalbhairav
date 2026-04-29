@@ -11,6 +11,7 @@ import { classifyUserConcern } from '@/lib/astro/reading/concern-classifier'
 import { generateHumanReadingResult } from '@/lib/astro/reading/human-generator'
 import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
 import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
+import { applySafetyFilter } from '@/lib/astro/safety'
 import type {
   AstrologyReadingInput,
   AstrologyReadingResult,
@@ -167,10 +168,7 @@ function toReadingV2Input(input: AstrologyReadingInput): ReadingV2Input {
  * Reading Orchestrator V2.
  *
  * This composes the zero-cost V2 stack:
- * concern classifier -> evidence engine -> human template generator.
- *
- * It intentionally does not implement persistent memory or the final safety layer yet.
- * Those are Phase 7 and Phase 8.
+ * concern classifier -> evidence engine -> memory -> human template generator -> safety.
  *
  * This function is only reached through the existing router when
  * ASTRO_READING_V2_ENABLED=true. Stable path remains default.
@@ -234,18 +232,23 @@ export async function generateReadingV2(
       language,
       memorySummary,
     })
+    const safety = applySafetyFilter({
+      question: v2Input.question,
+      answer: result.answer,
+      concern,
+    })
     await saveOptionalMemory({
       enabled: memoryEnabled,
       userId,
       topic: concern.topic,
       question: v2Input.question,
-      answer: result.answer,
+      answer: safety.answer,
       emotionalTone: concern.emotionalTone,
       birthDetails: input.birthDetails,
     })
 
     return {
-      answer: result.answer,
+      answer: safety.answer,
       meta: {
         ...result.meta,
         version: 'v2',
@@ -255,7 +258,10 @@ export async function generateReadingV2(
         evidenceCount: evidence.length,
         routedBy: 'astro-reading-router',
         usedFallback: false,
-        safetyLayer: 'not_enabled_phase_7',
+        safetyLayer: 'enabled_phase_8',
+        safetyRiskNames: safety.riskNames,
+        safetyReplacedAnswer: safety.replaced,
+        forbiddenClaimsRemoved: safety.forbiddenClaimsRemoved,
         memoryLayer: memoryEnabled ? 'enabled_phase_7' : 'disabled',
         memorySummaryUsed: Boolean(memorySummary),
       },

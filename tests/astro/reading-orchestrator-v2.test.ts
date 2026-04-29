@@ -110,11 +110,41 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.usedFallback).toBe(true)
   })
 
-  it('marks memory and safety layers as not enabled in phase 6', async () => {
+  it('marks memory layer status and safety layer status', async () => {
     const result = await generateReadingV2(makeInput())
 
     expect(result.meta?.memoryLayer).toBe('disabled')
-    expect(result.meta?.safetyLayer).toBe('not_enabled_phase_7')
+    expect(result.meta?.safetyLayer).toBe('enabled_phase_8')
+  })
+
+  it('runs safety layer on medical questions', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Do I have a serious disease according to my chart?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(result.meta?.safetyLayer).toBe('enabled_phase_8')
+    expect(result.meta?.['safetyRiskNames']).toContain('medical')
+    expect(result.meta?.['safetyReplacedAnswer']).toBe(true)
+    expect(answer).toContain('qualified doctor')
+  })
+
+  it('runs safety layer on death questions', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Can my chart tell when I will die?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(result.meta?.safetyLayer).toBe('enabled_phase_8')
+    expect(result.meta?.['safetyRiskNames']).toContain('death')
+    expect(result.meta?.['safetyReplacedAnswer']).toBe(true)
+    expect(answer).toContain('I would not predict death')
   })
 
   it('does not use memory when ASTRO_MEMORY_ENABLED is false', async () => {

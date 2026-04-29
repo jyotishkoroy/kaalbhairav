@@ -36,4 +36,6 @@ Enable one flag at a time:
 
 ## Current phase
 
-Phase 0 only adds routing and feature flags. The V2 orchestrator still falls back to the stable generator.
+Phase 8 adds the deterministic safety layer to Reading V2. Safety runs on every normal V2 response and handles medical, death/lifespan, legal, pregnancy, self-harm, fear-based, and gemstone risks.
+
+The stable path remains the default because `ASTRO_READING_V2_ENABLED=false`.
