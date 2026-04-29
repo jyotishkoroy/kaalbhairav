@@ -70,3 +70,12 @@ No paid AI or production LLM dependency is added.
 - Added stable path guard tests.
 - Added manual rollout checklist.
 - All experimental flags remain disabled by default.
+
+## Phase 16 — Preview deployment verification
+
+- Added preview verification utility.
+- Added `npm run verify:astro-preview`.
+- Added preview deployment checklist.
+- Preview deployment uses `npx vercel`.
+- Production deployment is intentionally deferred.
+- Stable path remains default.

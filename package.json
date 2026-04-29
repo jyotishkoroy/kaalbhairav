@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "verify:astro-preview": "node scripts/verify-astro-preview.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

@@ -204,4 +204,24 @@ Before enabling production:
 - no raw report files are committed
 - no secrets are logged
 
+## Phase 16 — Preview deployment verification
+
+Before enabling production:
+
+1. Run `npm run verify:astro-preview`.
+2. Create a Vercel preview deployment with `npx vercel`.
+3. Keep all Astro V2 flags disabled first.
+4. Verify stable chat path.
+5. Verify chart calculation path.
+6. Verify Supabase auth/profile/session behavior.
+7. Verify Upstash rate limiting.
+8. Verify Oracle VM / Python engine calculation.
+9. Verify Groq / legacy AI connector fallback if used.
+10. Enable only `ASTRO_READING_V2_ENABLED=true` in preview.
+11. Redeploy preview.
+12. Run manual V2 questions.
+13. Enable UI, memory, remedies, monthly, and voice one at a time only after backend V2 passes.
+14. Keep `ASTRO_LLM_PROVIDER=disabled` in Vercel unless explicitly testing a controlled local-compatible endpoint.
+15. Do not run production deployment from this phase.
+
 Do not edit PLAN.md.
