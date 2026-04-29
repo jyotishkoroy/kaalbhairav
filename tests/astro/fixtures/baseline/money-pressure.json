@@ -1,0 +1,18 @@
+{
+  "id": "money-pressure",
+  "userId": "baseline-user-money",
+  "question": "Money pressure is increasing. Will my financial condition improve?",
+  "birthDetails": {
+    "date": "1999-06-14",
+    "time": "09:58:00",
+    "place": "Kolkata",
+    "timezone": 5.5,
+    "latitude": 22.5667,
+    "longitude": 88.3667
+  },
+  "expected": {
+    "topic": "money",
+    "safetyRisk": false,
+    "minAnswerLength": 80
+  }
+}

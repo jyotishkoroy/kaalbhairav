@@ -1,0 +1,18 @@
+{
+  "id": "career-delay",
+  "userId": "baseline-user-career",
+  "question": "I am working hard but not getting promotion. When will things improve?",
+  "birthDetails": {
+    "date": "1999-06-14",
+    "time": "09:58:00",
+    "place": "Kolkata",
+    "timezone": 5.5,
+    "latitude": 22.5667,
+    "longitude": 88.3667
+  },
+  "expected": {
+    "topic": "career",
+    "safetyRisk": false,
+    "minAnswerLength": 80
+  }
+}

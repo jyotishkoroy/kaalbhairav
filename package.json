@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:astro": "vitest run tests/astro",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

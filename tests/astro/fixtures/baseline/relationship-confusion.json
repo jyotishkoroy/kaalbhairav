@@ -1,0 +1,18 @@
+{
+  "id": "relationship-confusion",
+  "userId": "baseline-user-relationship",
+  "question": "I am confused about my relationship. Should I continue or move on?",
+  "birthDetails": {
+    "date": "1999-06-14",
+    "time": "09:58:00",
+    "place": "Kolkata",
+    "timezone": 5.5,
+    "latitude": 22.5667,
+    "longitude": 88.3667
+  },
+  "expected": {
+    "topic": "relationship",
+    "safetyRisk": false,
+    "minAnswerLength": 80
+  }
+}
