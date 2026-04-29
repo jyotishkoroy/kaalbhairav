@@ -53,8 +53,8 @@ services/astro-engine/python/output/
 # Swiss Ephemeris data files are intentionally committed for this project.
 
 # Local reference packages
+myVedicReport.docx.docx
 astro_package*.zip
 graphify-out/
 myVedicReport.docx
 graphify-out.zip
-myVedicReport.docx

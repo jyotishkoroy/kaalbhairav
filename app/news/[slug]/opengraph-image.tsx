@@ -1,12 +1,14 @@
 import { ImageResponse } from 'next/og'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-export const runtime = 'edge'
 export const alt = 'tarayai — spiritual reflection'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.tarayai.com'
-const logoUrl = new URL('/tarayai-logo.png', siteUrl).toString()
+const logoUrl = `data:image/png;base64,${readFileSync(
+  join(process.cwd(), 'public', 'tarayai-logo.png')
+).toString('base64')}`
 
 export default async function OGImage() {
   return new ImageResponse(

@@ -12,7 +12,20 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+  process.env.VERCEL_URL ||
+  'https://tarayai.com'
+
+function normalizeMetadataBase(url: string): URL {
+  const withProtocol = /^https?:\/\//i.test(url) ? url : `https://${url}`
+  return new URL(withProtocol)
+}
+
 export const metadata: Metadata = {
+  metadataBase: normalizeMetadataBase(siteUrl),
   title: 'tarayai',
   description: 'Spiritual news and tools for Kaal Bhairav devotees.',
 }
