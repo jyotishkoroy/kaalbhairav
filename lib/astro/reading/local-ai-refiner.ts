@@ -46,6 +46,8 @@ function buildSystemPrompt(): string {
     'Do not add monthly guidance unless it already exists in the original answer.',
     'Do not add remedies unless they already exist in the original answer or the question explicitly asks for remedies.',
     'Do not turn a specific timing answer into a generic monthly report.',
+    'Preserve chart anchors, chart basis, accuracy language, and follow-up text.',
+    'Do not shorten away the evidence structure.',
     'Do not add separate career and relationship sections unless they were already present.',
     'Keep any specific date phrase unchanged.',
     'Do not add medical, legal, pregnancy, death, lifespan, gemstone, curse, miracle, or guaranteed claims.',
@@ -91,6 +93,25 @@ function containsTopicText(text: string, question: string): boolean {
   return terms.some((term) => lowerText.includes(term) || lowerQuestion.includes(term))
 }
 
+function extractKeyAnchors(text: string): string[] {
+  const anchors = [
+    'leo lagna',
+    'gemini',
+    'mrigasira',
+    'sun in taurus',
+    'moon in gemini',
+    'mercury in gemini',
+    'jupiter in aries',
+    'venus in cancer',
+    'saturn in aries',
+    'rahu in cancer',
+    'ketu in capricorn',
+    'chart basis',
+  ]
+
+  return anchors.filter((anchor) => text.includes(anchor))
+}
+
 export function shouldAcceptRefinedAnswer(input: {
   originalAnswer: string
   refinedAnswer: string
@@ -126,6 +147,18 @@ export function shouldAcceptRefinedAnswer(input: {
     containsTopicText(original, question) &&
     !containsTopicText(refined, question)
   ) {
+    return false
+  }
+
+  if (extractKeyAnchors(original).length > 0 && extractKeyAnchors(refined).length === 0) {
+    return false
+  }
+
+  if (refined.length < original.length * 0.6 && original.includes('chart basis')) {
+    return false
+  }
+
+  if (/\b(career|relationship|money|health|death)\b.*\b(career|relationship|money|health|death)\b/i.test(refined) && !/\bchart basis\b/i.test(refined)) {
     return false
   }
 

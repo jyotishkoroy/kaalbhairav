@@ -1,26 +1,10 @@
-# Astro Reading V2 Rollout
+## Astro Reading V2 Rollout
 
-## Relevance Fix
+- Source benchmark: `birth_chart_life_question_bank_jyotishko.md`
+- Added compact chart-anchor map and 26 domain profiles.
+- Added a deterministic 52,000-case local question bank generator.
+- Added a compact committed seed fixture for regression tests.
+- Added answer-quality evaluation helpers for chart-anchored checks.
+- Added local bank check script and updated live response shape for follow-ups.
+- Raw uploaded files and large generated artifacts are kept out of git.
 
-Reading V2 now uses stricter topic classification and topic-aware evidence generation so unrelated prompts do not collapse into the same generic output.
-
-## Key Rules
-
-- Monthly guidance is a feature-available flag, not an always-append block.
-- Remedies are a feature-available flag, not an always-append block.
-- Memory is topic-aware and session-scoped.
-- The Groq refiner only polishes relevant answers and falls back if it broadens the topic.
-
-## Coverage
-
-- Career and work
-- Timing and date questions
-- Remedy prompts
-- Relationship and marriage
-- Money and finance
-- Education
-- Health, death, and legal safety
-
-## Live Check
-
-- `npm run check:astro-v2-live`

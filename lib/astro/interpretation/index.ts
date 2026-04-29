@@ -9,6 +9,7 @@ import { interpretRelationship } from "@/lib/astro/interpretation/relationship";
 import { interpretRemedies } from "@/lib/astro/interpretation/remedies";
 import { interpretSpirituality } from "@/lib/astro/interpretation/spirituality";
 import { interpretTiming } from "@/lib/astro/interpretation/timing";
+import { getChartProfileForTopic, JYOTISHKO_CHART_ANCHORS } from "@/lib/astro/reading/chart-anchors";
 
 export type * from "@/lib/astro/interpretation/evidence";
 export type * from "@/lib/astro/interpretation/context";
@@ -34,7 +35,26 @@ function dedupeEvidence(evidence: AstroEvidence[]): AstroEvidence[] {
 }
 
 export function buildAstroEvidence(ctx: AstroInterpretationContext): AstroEvidence[] {
+  const profile = getChartProfileForTopic(ctx.concern.topic) ?? getChartProfileForTopic(ctx.concern.subtopic ?? '') 
+  const anchorEvidence: AstroEvidence[] = profile
+    ? [
+        {
+          id: `chart-anchor-${profile.id}`,
+          topic: ctx.concern.topic,
+          factor: `${JYOTISHKO_CHART_ANCHORS.identity.lagna} Lagna, ${JYOTISHKO_CHART_ANCHORS.identity.rasi} Rasi, ${JYOTISHKO_CHART_ANCHORS.identity.currentMahadasha}`,
+          humanMeaning: profile.coreLogic,
+          likelyExperience: `This question should be read through ${profile.domain.toLowerCase()} rather than generic astrology.`,
+          guidance: `Keep the answer tied to ${profile.mustUseAnchors.slice(0, 2).join(' and ')}.`,
+          caution: profile.risks[0],
+          timingHint: ctx.concern.questionType === 'timing' ? 'Use broad timing tendency language, not a fixed event promise.' : undefined,
+          confidence: 'high',
+          visibleToUser: true,
+        },
+      ]
+    : []
+
   const evidence = [
+    ...anchorEvidence,
     ...interpretCareer(ctx),
     ...interpretMarriage(ctx),
     ...interpretRelationship(ctx),

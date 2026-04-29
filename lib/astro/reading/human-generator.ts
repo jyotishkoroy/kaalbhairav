@@ -9,6 +9,7 @@ import { applyLanguageTone } from '@/lib/astro/reading/language-transformer'
 import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
 import { detectPreferredLanguage } from '@/lib/astro/reading/language-style'
 import { lintHumanStyle } from '@/lib/astro/reading/style-linter'
+import { getChartProfileForTopic } from '@/lib/astro/reading/chart-anchors'
 import {
   pickOpening,
   pickTopicOpening,
@@ -80,48 +81,63 @@ function echoQuestionKeyword(question?: string): string {
 
 function buildOpening(concern: UserConcern, question?: string): string {
   const datePhrase = question ? extractDatePhrase(question) : undefined
+  const questionSnippet = question ? `Question focus: ${question.trim()}.` : ''
 
   if (concern.topic === 'career') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and your career${echoQuestionKeyword(question)}. I would read this as a work-and-progress question first.`
-      : `You are asking about career progress${echoQuestionKeyword(question)}, so I would focus on work, effort, timing, and practical next steps.`
+      ? `You are asking about ${datePhrase} and your career${echoQuestionKeyword(question)}. I would read this as a work-and-progress question first. ${questionSnippet}`
+      : `You are asking about career progress${echoQuestionKeyword(question)}, so I would focus on work, effort, timing, and practical next steps. ${questionSnippet}`
   }
 
   if (concern.topic === 'money') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and money${echoQuestionKeyword(question)}. I would read this as a financial timing question first.`
-      : `You are asking about money${echoQuestionKeyword(question)}, so the useful answer is about stability, planning, and cash-flow discipline.`
+      ? `You are asking about ${datePhrase} and money${echoQuestionKeyword(question)}. I would read this as a financial timing question first. ${questionSnippet}`
+      : `You are asking about money${echoQuestionKeyword(question)}, so the useful answer is about stability, planning, and cash-flow discipline. ${questionSnippet}`
   }
 
   if (concern.topic === 'relationship' || concern.topic === 'marriage') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and your relationship or marriage${echoQuestionKeyword(question)}. I would read this as a timing-and-connection question first.`
-      : `You are asking about a relationship or marriage${echoQuestionKeyword(question)}, so the useful answer is about consistency, clarity, and emotional steadiness.`
+      ? `You are asking about ${datePhrase} and your relationship or marriage${echoQuestionKeyword(question)}. I would read this as a timing-and-connection question first. ${questionSnippet}`
+      : `You are asking about a relationship or marriage${echoQuestionKeyword(question)}, so the useful answer is about consistency, clarity, and emotional steadiness. ${questionSnippet}`
   }
 
   if (concern.topic === 'education') {
-    return `You are asking about education${echoQuestionKeyword(question)}, so the useful answer is about study, preparation, and the right environment.`
+    return `You are asking about education${echoQuestionKeyword(question)}, so the useful answer is about study, preparation, and the right environment. ${questionSnippet}`
   }
 
   if (concern.topic === 'health') {
-    return 'You are asking about health or wellbeing, so I will keep this safe, practical, and non-diagnostic.'
+    return `You are asking about health or wellbeing, so I will keep this safe, practical, and non-diagnostic. ${questionSnippet}`
   }
 
   if (concern.topic === 'death') {
-    return 'You are asking about death or lifespan, so I will keep this safe and refuse to make a fatal prediction.'
+    return `You are asking about death or lifespan, so I will keep this safe and refuse to make a fatal prediction. ${questionSnippet}`
   }
 
   if (concern.questionType === 'timing') {
     return datePhrase
-      ? `You are asking about ${datePhrase}${echoQuestionKeyword(question)}, so I will keep this focused on timing and what to prepare for.`
-      : `You are asking about timing${echoQuestionKeyword(question)}, so I will keep this focused on when, how long, and what to prepare for.`
+      ? `You are asking about ${datePhrase}${echoQuestionKeyword(question)}, so I will keep this focused on timing and what to prepare for. ${questionSnippet}`
+      : `You are asking about timing${echoQuestionKeyword(question)}, so I will keep this focused on when, how long, and what to prepare for. ${questionSnippet}`
   }
 
   if (concern.questionType === 'remedy' || concern.topic === 'remedy') {
-    return 'You are asking for a remedy, so I will keep this safe, practical, and not fear-based.'
+    return `You are asking for a remedy, so I will keep this safe, practical, and not fear-based. ${questionSnippet}`
   }
 
-  return `You are asking for guidance on a specific situation${echoQuestionKeyword(question)}, so I will keep the answer focused and practical.`
+  return `You are asking for guidance on a specific situation${echoQuestionKeyword(question)}, so I will keep the answer focused and practical. ${questionSnippet}`
+}
+
+function buildChartBasis(concern: UserConcern, question?: string): string {
+  const profile = getChartProfileForTopic(concern.subtopic ?? concern.topic)
+  if (!profile) {
+    return 'Chart basis: I am using the chart patterns available in the reading, with uncertainty where the evidence is broad.'
+  }
+
+  const anchors = profile.mustUseAnchors.slice(0, 4).join(', ')
+  const timing = concern.questionType === 'timing' || /tomorrow|today|when|date|month/i.test(question ?? '')
+    ? 'Timing is a tendency reading, not a guaranteed event.'
+    : 'This is a tendency reading, not a fixed fate claim.'
+
+  return `Chart basis: ${profile.coreLogic} Key anchors: ${anchors}. ${timing}`
 }
 
 function shouldRenderTopicBlock(topic: string, concern: UserConcern): boolean {
@@ -159,6 +175,20 @@ export function generateHumanReading(input: HumanReadingInput): string {
       : ''
   const guidance = renderGuidance(visibleEvidence)
   const caution = renderCaution(visibleEvidence)
+  const chartBasis = buildChartBasis(input.concern, input.question)
+  const dashaSignal = visibleEvidence.some((item) =>
+    /saturn|shani/i.test(`${item.factor} ${item.humanMeaning} ${item.likelyExperience} ${item.guidance}`),
+  )
+    ? 'Dasha note: Saturn is part of the evidence, so responsibility, delay, and disciplined effort matter here.'
+    : ''
+  const accuracyLine = input.concern.topic === 'health' || input.concern.topic === 'death'
+    ? 'Accuracy: this is supportive reflection only, not diagnosis or lifespan prediction.'
+    : 'Accuracy: partially accurate as a chart-based tendency, not a guaranteed outcome.'
+  const followUpQuestion = input.concern.topic === 'career'
+    ? 'Suggested follow-up: Which part matters most - role, boss, visibility, or income?'
+    : input.concern.questionType === 'timing'
+      ? 'Suggested follow-up: Which time window do you want me to anchor - today, tomorrow, 2026, or 2027?'
+      : 'Suggested follow-up: Which sub-area should I narrow next?'
   const closing = renderClosing(input.concern)
 
   const raw = [
@@ -167,9 +197,13 @@ export function generateHumanReading(input: HumanReadingInput): string {
     memoryBridge,
     mainSignal,
     experience,
+    chartBasis,
     timingHint,
     guidance,
     caution,
+    dashaSignal,
+    accuracyLine,
+    followUpQuestion,
     closing,
   ]
     .filter(Boolean)

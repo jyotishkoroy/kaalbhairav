@@ -19,6 +19,8 @@ export type AstroV2ChatRequestInput = {
 export type AstroV2ChatDisplayResponse = {
   answer: string;
   meta: Record<string, unknown>;
+  followUpQuestion?: string;
+  followUpAnswer?: string;
   raw: unknown;
 };
 
@@ -269,6 +271,18 @@ export function extractAstroV2ChatResponse(
   return {
     answer,
     meta,
+    followUpQuestion:
+      typeof payload.followUpQuestion === 'string'
+        ? payload.followUpQuestion
+        : typeof meta.followUpQuestion === 'string'
+          ? meta.followUpQuestion
+          : undefined,
+    followUpAnswer:
+      typeof payload.followUpAnswer === 'string'
+        ? payload.followUpAnswer
+        : typeof meta.followUpAnswer === 'string'
+          ? meta.followUpAnswer
+          : undefined,
     raw: payload,
   };
 }

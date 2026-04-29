@@ -36,6 +36,8 @@ const SAFE_META_KEYS = [
   "llmRefinerUsed",
   "llmRefinerFallback",
   "llmModel",
+  "followUpQuestion",
+  "followUpAnswer",
 ] as const;
 
 type SafeMetaKey = (typeof SAFE_META_KEYS)[number];
@@ -86,6 +88,8 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
   const [showBirthDetails, setShowBirthDetails] = useState(false);
   const [answer, setAnswer] = useState("");
   const [meta, setMeta] = useState<Record<string, unknown>>({});
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | undefined>();
+  const [followUpAnswer, setFollowUpAnswer] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => {
@@ -225,6 +229,8 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
 
       setAnswer(parsed.answer);
       setMeta(parsed.meta);
+      setFollowUpQuestion(parsed.followUpQuestion);
+      setFollowUpAnswer(parsed.followUpAnswer);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -408,6 +414,18 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
           <div className="mb-2 text-sm font-medium text-white/70">Answer</div>
           <div className="whitespace-pre-wrap text-sm leading-7 text-white/90">
             {answer}
+          </div>
+        </article>
+      ) : null}
+
+      {followUpQuestion ? (
+        <article className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="mb-2 text-sm font-medium text-white/70">
+            Suggested follow-up
+          </div>
+          <div className="whitespace-pre-wrap text-sm leading-7 text-white/90">
+            {followUpQuestion}
+            {followUpAnswer ? `\n\n${followUpAnswer}` : ""}
           </div>
         </article>
       ) : null}

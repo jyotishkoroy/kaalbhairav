@@ -4,6 +4,10 @@ import type {
   UserConcern,
 } from '@/lib/astro/reading/reading-types'
 import type { ReadingTopic } from '@/lib/astro/interpretation/evidence'
+import {
+  getChartDomainProfiles,
+  getChartProfileForTopic,
+} from '@/lib/astro/reading/chart-anchors'
 
 const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
   career: [
@@ -146,7 +150,7 @@ const DECISION_WORDS = ['should i', 'continue', 'move on', 'leave', 'change', 's
 
 const EXPLANATION_WORDS = ['why', 'reason', 'explain', 'understand', 'meaning', 'what is happening']
 
-const REMEDY_WORDS = ['remedy', 'remedies', 'upay', 'solution', 'mantra', 'puja', 'pooja', 'gemstone', 'stone', 'donation', 'fast', 'vrat']
+const REMEDY_WORDS = ['remedy', 'remedies', 'upay', 'mantra', 'puja', 'pooja', 'gemstone', 'stone', 'donation', 'fast', 'vrat']
 
 const SAD_WORDS = ['tired', 'hopeless', 'sad', 'crying', 'lonely', 'alone', 'exhausted', 'waiting', 'broken', 'hurt']
 
@@ -326,12 +330,18 @@ export function classifyUserConcern(message: string): UserConcern {
   const emotionalTone = detectEmotionalTone(lower)
   const questionType = detectQuestionType(lower)
   const highRiskFlags = detectHighRiskFlags(lower)
+  const profile =
+    getChartProfileForTopic(lower) ??
+    getChartDomainProfiles().find((item) => item.topicKeys.includes(topic))
 
   return {
     topic,
+    subtopic: profile?.domain,
     emotionalTone,
     questionType,
-    needsReassurance: ['anxious', 'sad', 'urgent', 'confused'].includes(emotionalTone) || highRiskFlags.length > 0,
+    needsReassurance:
+      ['anxious', 'sad', 'urgent', 'confused'].includes(emotionalTone) ||
+      highRiskFlags.length > 0,
     wantsTechnicalAstrology: detectsTechnicalRequest(lower),
     wantsPracticalSteps: detectsPracticalNeed(lower),
     highRiskFlags,

@@ -145,6 +145,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       answer: result.answer,
+      followUpQuestion: result.meta?.followUpQuestion,
+      followUpAnswer: result.meta?.followUpAnswer,
       meta: {
         ...result.meta,
         source: "astro-v2-page",

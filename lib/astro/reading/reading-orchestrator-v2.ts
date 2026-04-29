@@ -19,6 +19,8 @@ import { selectReadingMode } from '@/lib/astro/reading/reading-modes'
 import { applySafetyFilter } from '@/lib/astro/safety'
 import { getLLMProviderConfig, getLLMRefinerConfig } from '@/lib/llm/config'
 import { refineReadingWithSafeLLM } from '@/lib/astro/reading/local-ai-refiner'
+import { getChartProfileForTopic } from '@/lib/astro/reading/chart-anchors'
+import { answerExactChartFact } from '@/lib/astro/reading/chart-facts'
 import type {
   AstrologyReadingInput,
   AstrologyReadingResult,
@@ -267,6 +269,44 @@ export async function generateReadingV2(
     const dasha = getDashaSource(input)
     const transits = getTransitSource(input)
     const mode = selectReadingMode(concern)
+    const exactFact = answerExactChartFact(v2Input.question)
+    if (exactFact) {
+      const exactAnswer = [
+        `Direct answer:\n${exactFact.answer}`,
+        `How this is derived:\n${exactFact.reasoning}`,
+        `Accuracy:\nTotally accurate — this is directly read from the report or deterministically derived from listed chart data.`,
+        exactFact.followUpQuestion ? `Suggested follow-up:\n${exactFact.followUpQuestion}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+      const safety = applySafetyFilter({
+        question: v2Input.question,
+        answer: exactAnswer,
+        concern,
+      })
+      return {
+        answer: safety.answer,
+        meta: {
+          version: 'v2',
+          topic: exactFact.topic,
+          domainName: exactFact.domainName,
+          accuracyClass: exactFact.accuracy,
+          chartAnchorsUsed: exactFact.anchors,
+          evidenceCount: exactFact.anchors.length,
+          questionBankAligned: true,
+          exactFactAnswered: true,
+          llmRefinerUsed: false,
+          routedBy: 'astro-reading-router',
+          usedFallback: false,
+          safetyLayer: 'enabled_phase_8',
+          safetyRiskNames: safety.riskNames,
+          safetyReplacedAnswer: safety.replaced,
+          forbiddenClaimsRemoved: safety.forbiddenClaimsRemoved,
+          followUpQuestion: exactFact.followUpQuestion,
+        },
+      }
+    }
+    const chartProfile = getChartProfileForTopic(concern.subtopic ?? concern.topic)
     const shouldAddRemedyEvidence =
       remediesEnabled &&
       hasExplicitRemedyIntent(v2Input.question, mode) &&
@@ -393,8 +433,18 @@ export async function generateReadingV2(
         ...result.meta,
         version: 'v2',
         topic: concern.topic,
+        domainId: chartProfile?.id,
+        domainName: chartProfile?.domain,
         mode,
         language,
+        accuracyClass:
+          concern.topic === 'health' || concern.topic === 'death'
+            ? 'supportive-only'
+            : concern.questionType === 'timing'
+              ? 'tendency'
+              : 'partial',
+        readingStyle: concern.questionType === 'timing' ? 'timing' : concern.wantsPracticalSteps ? 'practical' : 'chart-anchored',
+        chartAnchorsUsed: chartProfile?.mustUseAnchors ?? [],
         evidenceCount: evidence.length,
         routedBy: 'astro-reading-router',
         usedFallback: false,
@@ -420,6 +470,19 @@ export async function generateReadingV2(
         llmRefinerUsed,
         llmRefinerFallback,
         llmModel,
+        followUpQuestion:
+          concern.topic === 'career'
+            ? 'Which part matters most: role, boss, visibility, or income?'
+            : concern.questionType === 'timing'
+              ? 'Which exact window should I anchor: tomorrow, this week, 2026, or 2027?'
+              : 'Which sub-area should I narrow next?',
+        followUpAnswer:
+          concern.topic === 'career'
+            ? 'Focus on visibility, steady execution, and the kind of responsibility that fits Sun in the 10th with Moon-Mercury support in the 11th.'
+            : 'Read the timing as a tendency window, not a fixed promise.',
+        followUpReason:
+          'Follow-up questions make the reading more specific and reduce generic advice.',
+        questionBankAligned: true,
       },
     }
   } catch (error) {
