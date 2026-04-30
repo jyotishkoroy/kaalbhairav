@@ -175,3 +175,26 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 24 Full validation pass
+Branch: phase-rag-foundation
+Runtime behavior changed: no, unless fixes were required
+UI changed: no, unless fixes were required
+DB changed: no, unless fixes were required
+Validation:
+- npm test: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- verify astro preview: passed
+- check astro rag smoke: skipped in Codex shell because `npx tsx` required registry access and `tsx` is not installed locally; local dev server start was also blocked by sandbox `EPERM`
+- check astro rag live: skipped in Codex shell because `npx tsx` required registry access and `tsx` is not installed locally
+- compare local/live: skipped in Codex shell because `npx tsx` required registry access and `tsx` is not installed locally
+- local ollama health: skipped in Codex shell because `npx tsx` required registry access and `tsx` is not installed locally
+- focused RAG suites: passed
+- old route/UI/provider suites: passed
+Private file check:
+- no new private files staged
+Deployment:
+- skipped
+Remaining blockers:
+- none in repo code; local smoke scripts need installed `tsx` or a shell path to run without network lookup
