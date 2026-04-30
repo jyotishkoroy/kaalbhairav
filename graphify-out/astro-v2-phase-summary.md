@@ -1,25 +1,32 @@
-Phase: 12 Sufficiency checker
+Phase: 13 Answer contract builder
 Branch: phase-rag-foundation
 Runtime behavior changed: no route/app integration
 UI changed: no
 DB changed: no new migration
 Groq runtime call added: no
-Groq integration tests/contracts: checked if present; otherwise full suite passed and Groq writer not implemented yet
+Groq integration tests/contracts: checked if present; provider/full suite passed
 Ollama live call added: no
 Ollama/proxy/analyzer integration contracts: checked through existing proxy/local-analyzer tests
 Supabase live call added: no
 Supabase schema/retrieval contracts: checked through existing tests
-Sufficiency:
-- lib/astro/rag/sufficiency-checker.ts
+Contracts:
+- lib/astro/rag/answer-contract-types.ts
+- lib/astro/rag/answer-contract-builder.ts
+- lib/astro/rag/contracts/common.ts
+- lib/astro/rag/contracts/career.ts
+- lib/astro/rag/contracts/sleep.ts
+- lib/astro/rag/contracts/marriage.ts
+- lib/astro/rag/contracts/money.ts
+- lib/astro/rag/contracts/safety.ts
+- lib/astro/rag/contracts/general.ts
 - deterministic only
-- uses AnalyzerResult, RagSafetyGateResult, RequiredDataPlan, RetrievalContext, ReasoningPath, TimingContext
-- safety always wins
-- vague questions ask follow-up
-- missing required facts fallback
-- missing timing source prevents timing claims
-- partial retrieval can answer only if critical facts are present
-- gates Groq/critic eligibility
+- safety/exact/follow-up/fallback disable Groq
+- interpretive/remedy/timing only allow Groq when sufficiency allows
+- forbidden claims include invented facts, invented timing, guarantees, medical/legal/financial unsafe claims, gemstone certainty, expensive puja pressure
+- storeAnswerContract supports caller-provided Supabase client only
 Validation:
+- answer contract builder test:
+- contract domain tests:
 - sufficiency checker test:
 - python timing adapter test:
 - timing engine test:
@@ -30,7 +37,8 @@ Validation:
 - proxy test:
 - rag safety gate test:
 - exact fact tests:
-- extractor/repository tests:
+- extractor test:
+- repository test:
 - schema test:
 - feature flag test:
 - groq/provider tests if present:
