@@ -29,6 +29,11 @@ const RAG_SUCCESS: RagReadingOrchestratorResult = {
   followUpQuestion: "rag follow up?",
   followUpAnswer: "rag follow up answer",
   status: "answer_now",
+  sections: {
+    direct_answer: "direct answer",
+    reasoning: "reasoning",
+    suggested_follow_up: "rag follow up?",
+  },
   meta: {
     engine: "rag_llm",
     ragEnabled: true,
@@ -190,6 +195,9 @@ describe("/api/astro/v2/reading rag integration", () => {
       ["returns followUpAnswer"],
       ["returns safe meta fields"],
       ["does not return artifacts"],
+      ["passes safe sections through"],
+      ["omits unsafe meta details"],
+      ["response shape remains UI compatible"],
     ])("%s", async (label) => {
       void label;
       const ragOrchestrator = vi.fn(async () => RAG_SUCCESS);
@@ -217,18 +225,17 @@ describe("/api/astro/v2/reading rag integration", () => {
       expect(payload.answer).toBe("rag answer");
       expect(payload.followUpQuestion).toBe("rag follow up?");
       expect(payload.followUpAnswer).toBe("rag follow up answer");
+      expect(payload.sections).toMatchObject({
+        direct_answer: "direct answer",
+        reasoning: "reasoning",
+      });
       expect(payload.meta).toMatchObject({
         engine: "rag_llm",
         ragEnabled: true,
         exactFactAnswered: false,
         safetyGatePassed: true,
         safetyBlocked: false,
-        ollamaAnalyzerUsed: true,
         deterministicAnalyzerUsed: false,
-        supabaseRetrievalUsed: true,
-        reasoningGraphUsed: true,
-        timingEngineUsed: true,
-        answerContractBuilt: true,
         groqUsed: true,
         groqRetryUsed: false,
         ollamaCriticUsed: true,
@@ -245,6 +252,8 @@ describe("/api/astro/v2/reading rag integration", () => {
         },
       });
       expect(JSON.stringify(payload)).not.toContain("artifacts");
+      expect(JSON.stringify(payload)).not.toContain("supabaseRetrievalUsed");
+      expect(JSON.stringify(payload)).not.toContain("reasoningGraphUsed");
       expect(ragOrchestrator).toHaveBeenCalledTimes(1);
       expect(ragOrchestrator).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -337,6 +346,50 @@ describe("/api/astro/v2/reading rag integration", () => {
       expect(JSON.stringify(payload)).not.toContain("GROQ_API_KEY");
       expect(JSON.stringify(payload)).not.toContain("TARAYAI_LOCAL_SECRET");
       expect(JSON.stringify(payload)).not.toContain("127.0.0.1:8787");
+    });
+  });
+
+  describe("section sanitization", () => {
+    it.each([
+      ["strips debug key", { debug_trace: "nope", direct_answer: "ok" }],
+      ["strips artifact key", { artifacts: "nope", direct_answer: "ok" }],
+      ["strips raw key", { raw_chart_facts: "nope", direct_answer: "ok" }],
+      ["strips env key", { env_payload: "nope", direct_answer: "ok" }],
+      ["strips secret key", { secret_notes: "nope", direct_answer: "ok" }],
+      ["strips payload key", { payload_dump: "nope", direct_answer: "ok" }],
+      ["strips supabase key", { supabase_rows: "nope", direct_answer: "ok" }],
+      ["strips groq key", { groq_payload: "nope", direct_answer: "ok" }],
+      ["strips ollama key", { ollama_payload: "nope", direct_answer: "ok" }],
+      ["strips token key", { token_value: "nope", direct_answer: "ok" }],
+      ["strips api key", { api_key: "nope", direct_answer: "ok" }],
+      ["strips password key", { password_hint: "nope", direct_answer: "ok" }],
+      ["strips credential key", { credential_blob: "nope", direct_answer: "ok" }],
+      ["strips url key", { local_proxy_url: "nope", direct_answer: "ok" }],
+      ["strips endpoint key", { endpoint_url: "nope", direct_answer: "ok" }],
+      ["strips proxy key", { proxy_url: "nope", direct_answer: "ok" }],
+      ["strips header key", { header_dump: "nope", direct_answer: "ok" }],
+      ["strips cookie key", { cookie_dump: "nope", direct_answer: "ok" }],
+      ["strips non-string values", { direct_answer: "ok", timing: 123 as never, accuracy: null as never }],
+      ["omits unknown safe keys", { direct_answer: "ok", extra_note: "nope" }],
+    ])("%s", async (label, sections) => {
+      void label;
+      const deps = makeDeps({
+        flags: vi.fn(() => ({ ragEnabled: true } as never)),
+        ragOrchestrator: vi.fn(async () =>
+          ({
+            ...RAG_SUCCESS,
+            sections,
+          }) as RagReadingOrchestratorResult,
+        ),
+      }) as NonNullable<RouteDeps>;
+
+      const response = await handleAstroV2ReadingRequest(
+        createRequest({ question: "What is my Lagna?" }),
+        deps,
+      );
+      const payload = await readJson(response);
+
+      expect(payload.sections).toEqual({ direct_answer: "ok" });
     });
   });
 

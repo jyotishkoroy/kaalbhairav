@@ -84,3 +84,30 @@ Pending manual local browser smoke on `/astro/v2`.
 - Database rollback path: no database changes.
 - Feature flag disable path: keep `ASTRO_RAG_ENABLED=false`.
 - Production fallback path: UI renders plain answer if sections are absent.
+
+## Phase 20 Fix Pass
+Reviewed and tightened the UI/API integration without starting Phase 21.
+
+What was fixed:
+- Structured section rendering now ignores unsafe internal keys and non-string values.
+- Raw meta JSON is not rendered in the panel.
+- Follow-up text is deduplicated when `suggested_follow_up` repeats `followUpQuestion`.
+- The old plain-answer fallback still renders when sections are missing, empty, or fully unsafe.
+
+Security hardening:
+- Denylist includes `debug`, `artifact`, `artifacts`, `env`, `secret`, `raw`, `payload`, `supabase`, `groq`, `ollama`, `token`, `key`, `password`, `credential`, `url`, `endpoint`, `proxy`, `header`, and `cookie`.
+- Route responses keep only safe meta fields on the RAG branch.
+- No `dangerouslySetInnerHTML` is used.
+- HTML-looking answer text is rendered as text.
+
+Validation:
+- `npx vitest run tests/astro/rag/rag-ui.test.tsx`
+- `npx vitest run tests/astro/rag/rag-api-route.test.ts`
+- Existing astro UI/provider suites were re-run successfully.
+
+Visual smoke:
+- Codex sandbox browser smoke could not bind `127.0.0.1:3000` due `listen EPERM`.
+- Use a normal Mac terminal for `npm run dev:local` and local browser verification.
+
+Deployment:
+- Not performed in this fix pass.

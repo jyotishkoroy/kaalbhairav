@@ -87,6 +87,7 @@ const SAFE_SECTION_KEYS = [
 const UNSAFE_SECTION_PATTERNS = [
   "debug",
   "artifact",
+  "artifacts",
   "env",
   "secret",
   "raw",
@@ -94,7 +95,32 @@ const UNSAFE_SECTION_PATTERNS = [
   "supabase",
   "groq",
   "ollama",
+  "token",
+  "key",
+  "password",
+  "credential",
+  "url",
+  "endpoint",
+  "proxy",
+  "header",
+  "cookie",
 ];
+
+const SAFE_META_KEYS = [
+  "engine",
+  "ragEnabled",
+  "exactFactAnswered",
+  "safetyGatePassed",
+  "safetyBlocked",
+  "followupAsked",
+  "fallbackUsed",
+  "validationPassed",
+  "groqUsed",
+  "groqRetryUsed",
+  "ollamaCriticUsed",
+  "deterministicAnalyzerUsed",
+  "timingsAvailable",
+] as const;
 
 function normalizeSections(value: unknown): Record<string, string> | undefined {
   if (!isRecord(value)) return undefined;
@@ -104,12 +130,22 @@ function normalizeSections(value: unknown): Record<string, string> | undefined {
       .filter(([key, sectionValue]) => {
         const lower = key.toLowerCase();
         if (UNSAFE_SECTION_PATTERNS.some((pattern) => lower.includes(pattern))) return false;
-        return SAFE_SECTION_KEYS.includes(key as never) && typeof sectionValue === "string";
+        return SAFE_SECTION_KEYS.includes(key as never) && typeof sectionValue === "string" && sectionValue.trim().length > 0;
       })
       .map(([key, sectionValue]) => [key, (sectionValue as string).trim()]),
   );
 
   return Object.keys(sections).length ? sections : undefined;
+}
+
+function normalizeMeta(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const meta = Object.fromEntries(
+    SAFE_META_KEYS.map((key) => [key, value[key]]).filter(([, fieldValue]) => fieldValue !== undefined),
+  );
+
+  return Object.keys(meta).length ? meta : undefined;
 }
 
 function parseBirthDetails(value: unknown) {
@@ -130,9 +166,7 @@ function parseBirthDetails(value: unknown) {
 
 function parseMetadata(value: unknown): Record<string, unknown> | undefined {
   if (!isRecord(value)) return undefined;
-  return removeUndefinedFields({
-    ...value,
-  });
+  return removeUndefinedFields({ ...value });
 }
 
 type AstroV2ReadingDependencies = {
@@ -181,26 +215,8 @@ function normalizeRagRouteResponse(
 ): AstroV2ReadingResponse {
   const answer = typeof result.answer === "string" ? result.answer.trim() : "";
   const safeMeta: Record<string, unknown> = {
-    ...(existingMeta ?? {}),
-    engine: result.meta.engine,
-    ragEnabled: result.meta.ragEnabled,
-    exactFactAnswered: result.meta.exactFactAnswered,
-    safetyGatePassed: result.meta.safetyGatePassed,
-    safetyBlocked: result.meta.safetyBlocked,
-    ollamaAnalyzerUsed: result.meta.ollamaAnalyzerUsed,
-    deterministicAnalyzerUsed: result.meta.deterministicAnalyzerUsed,
-    supabaseRetrievalUsed: result.meta.supabaseRetrievalUsed,
-    reasoningGraphUsed: result.meta.reasoningGraphUsed,
-    timingEngineUsed: result.meta.timingEngineUsed,
-    sufficiencyStatus: result.meta.sufficiencyStatus,
-    answerContractBuilt: result.meta.answerContractBuilt,
-    groqUsed: result.meta.groqUsed,
-    groqRetryUsed: result.meta.groqRetryUsed,
-    ollamaCriticUsed: result.meta.ollamaCriticUsed,
-    validationPassed: result.meta.validationPassed,
-    fallbackUsed: result.meta.fallbackUsed,
-    followupAsked: result.meta.followupAsked,
-    timingsAvailable: result.meta.timingsAvailable,
+    ...(normalizeMeta(existingMeta) ?? {}),
+    ...(normalizeMeta(result.meta) ?? {}),
     rag: {
       status: result.status,
       exactFactAnswered: result.meta.exactFactAnswered,

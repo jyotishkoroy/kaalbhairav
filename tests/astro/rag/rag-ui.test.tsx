@@ -91,18 +91,53 @@ describe("rag ui", () => {
   describe("security/no unsafe render", () => {
     it.each([
       ["does not use/render raw artifacts", { answer: "Plain answer", sections: { direct_answer: "ok" } }, "artifacts"],
-      ["does not render section keys containing secret", { answer: "Plain answer", sections: { secret_notes: "hidden" } }, "hidden"],
+      ["does not render section keys containing debug", { answer: "Plain answer", sections: { debug_trace: "hidden" } }, "hidden"],
+      ["does not render section keys containing artifact", { answer: "Plain answer", sections: { artifacts: "hidden" } }, "hidden"],
+      ["does not render section keys containing raw", { answer: "Plain answer", sections: { raw_chart_facts: "hidden" } }, "hidden"],
       ["does not render section keys containing env", { answer: "Plain answer", sections: { env_payload: "hidden" } }, "hidden"],
+      ["does not render section keys containing secret", { answer: "Plain answer", sections: { secret_notes: "hidden" } }, "hidden"],
       ["does not render section keys containing payload", { answer: "Plain answer", sections: { payload_dump: "hidden" } }, "hidden"],
       ["does not render section keys containing supabase", { answer: "Plain answer", sections: { supabase_rows: "hidden" } }, "hidden"],
       ["does not render section keys containing groq", { answer: "Plain answer", sections: { groq_payload: "hidden" } }, "hidden"],
       ["does not render section keys containing ollama", { answer: "Plain answer", sections: { ollama_payload: "hidden" } }, "hidden"],
+      ["does not render section keys containing token", { answer: "Plain answer", sections: { token_value: "hidden" } }, "hidden"],
+      ["does not render section keys containing key", { answer: "Plain answer", sections: { api_key: "hidden" } }, "hidden"],
+      ["does not render section keys containing password", { answer: "Plain answer", sections: { password_hint: "hidden" } }, "hidden"],
+      ["does not render section keys containing credential", { answer: "Plain answer", sections: { credential_blob: "hidden" } }, "hidden"],
+      ["does not render section keys containing url", { answer: "Plain answer", sections: { local_proxy_url: "hidden" } }, "hidden"],
+      ["does not render section keys containing endpoint", { answer: "Plain answer", sections: { endpoint_url: "hidden" } }, "hidden"],
+      ["does not render section keys containing proxy", { answer: "Plain answer", sections: { proxy_url: "hidden" } }, "hidden"],
+      ["does not render section keys containing header", { answer: "Plain answer", sections: { header_dump: "hidden" } }, "hidden"],
+      ["does not render section keys containing cookie", { answer: "Plain answer", sections: { cookie_dump: "hidden" } }, "hidden"],
       ["does not render script tag as HTML", { answer: "<script>alert(1)</script>", sections: {} }, "<script>alert(1)</script>"],
       ["does not use dangerouslySetInnerHTML", { answer: "Plain answer", sections: {} }, "dangerouslySetInnerHTML"],
       ["escapes HTML-looking answer text", { answer: "<b>text</b>", sections: {} }, "<b>text</b>"],
     ])("%s", (_, props, forbidden) => {
       const html = renderPanel(props as never);
       expect(html).not.toContain(forbidden);
+    });
+
+    it("falls back to plain answer when sections are all unsafe", () => {
+      const unsafeSections = { debug_trace: "hidden", api_key: "hidden" } as never;
+      const html = renderPanel({
+        answer: "Plain answer",
+        sections: unsafeSections,
+        meta: {},
+      });
+      expect(html).toContain("Plain answer");
+      expect(html).not.toContain("hidden");
+      expect(html).not.toContain("debug_trace");
+      expect(html).not.toContain("api_key");
+    });
+
+    it("does not duplicate identical follow-up text", () => {
+      const html = renderPanel({
+        answer: "Plain answer",
+        sections: { suggested_follow_up: "Ask later?" },
+        followUpQuestion: "Ask later?",
+        meta: {},
+      });
+      expect(html.match(/Ask later\?/g)).toHaveLength(1);
     });
   });
 

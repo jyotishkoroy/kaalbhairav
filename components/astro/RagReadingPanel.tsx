@@ -72,6 +72,7 @@ const SECTION_LABELS: Record<RagReadingSectionKey, string> = {
 const UNSAFE_KEY_PATTERNS = [
   "debug",
   "artifact",
+  "artifacts",
   "env",
   "secret",
   "raw",
@@ -79,6 +80,15 @@ const UNSAFE_KEY_PATTERNS = [
   "supabase",
   "groq",
   "ollama",
+  "token",
+  "key",
+  "password",
+  "credential",
+  "url",
+  "endpoint",
+  "proxy",
+  "header",
+  "cookie",
 ];
 
 function isDisplayableText(value: unknown): value is string {
@@ -107,6 +117,10 @@ function getDisplayableSections(sections?: RagReadingSections | null): RagReadin
   }
 
   return displayable;
+}
+
+function normalizeComparableText(value: string | null | undefined): string {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : "";
 }
 
 function getSafeStatus(meta?: RagReadingMeta | null): string | null {
@@ -154,6 +168,9 @@ export function RagReadingPanel({
   const displayableSections = getDisplayableSections(sections);
   const safeStatus = getSafeStatus(meta);
   const hasStructuredContent = Object.keys(displayableSections).length > 0;
+  const normalizedFollowUpQuestion = followUpQuestion
+    ? normalizeComparableText(followUpQuestion)
+    : null;
 
   return (
     <article
@@ -172,6 +189,14 @@ export function RagReadingPanel({
         <div className="grid gap-3">
           {SECTION_ORDER.map((key) => {
             const text = displayableSections[key];
+            if (
+              key === "suggested_follow_up" &&
+              text &&
+              normalizedFollowUpQuestion &&
+              normalizeComparableText(text) === normalizedFollowUpQuestion
+            ) {
+              return null;
+            }
             return text ? renderSection(key, text) : null;
           })}
         </div>

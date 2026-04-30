@@ -277,7 +277,7 @@ export function extractAstroV2ChatResponse(
 
   const sections = isRecord(payload.sections)
     ? (Object.fromEntries(
-        Object.entries(payload.sections).filter(([, value]) => typeof value === "string"),
+        Object.entries(payload.sections).filter(([, value]) => typeof value === "string" && value.trim().length > 0),
       ) as Record<string, string>)
     : undefined;
 
