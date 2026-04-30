@@ -27,6 +27,7 @@
     "check:astro-companion-env": "node --experimental-strip-types scripts/check-astro-companion-env.ts",
     "check:astro-companion-live": "node --experimental-strip-types scripts/check-astro-companion-live.ts",
     "check:astro-companion-live-100": "node --experimental-strip-types scripts/check-astro-companion-live-100.ts",
+    "check:astro-companion-live-100:prod": "NODE_OPTIONS=\"--dns-result-order=ipv4first\" node --experimental-strip-types scripts/check-astro-companion-live-100.ts --base-url https://www.tarayai.com --fail-on-network-block",
     "compare:astro-companion-local-live": "node --experimental-strip-types scripts/compare-astro-companion-local-live.ts",
     "check:astro-companion-production-smoke": "node --experimental-strip-types scripts/check-astro-companion-production-smoke.ts",
     "compare:astro-v2-local-live": "node scripts/compare-astro-v2-local-vs-live.mjs",

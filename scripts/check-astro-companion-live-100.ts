@@ -6,6 +6,7 @@ repository or any part of it without prior written permission from Jyotishko Roy
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   classifyFetchFailure,
   classifyFetchFailureErrorCode,
@@ -26,6 +27,18 @@ type Args = {
   fallbackBaseUrls: string[];
   outputDir: string;
   timeoutMs: number;
+  failOnNetworkBlock: boolean;
+  allowNetworkWarnings: boolean;
+};
+
+type NetworkPreflightResult = {
+  baseUrl: string;
+  status: number;
+  answer: string;
+  meta: Record<string, unknown>;
+  error?: string;
+  latencyMs: number;
+  blocked: boolean;
 };
 
 function parseArgs(argv: string[]): Args {
@@ -34,6 +47,8 @@ function parseArgs(argv: string[]): Args {
     fallbackBaseUrls: normalizeFallbackBaseUrls(process.env.ASTRO_COMPANION_LIVE_FALLBACK_BASE_URLS || process.env.ASTRO_COMPANION_LIVE_BASE_FALLBACK_URLS),
     outputDir: path.join(process.cwd(), "artifacts"),
     timeoutMs: 30000,
+    failOnNetworkBlock: true,
+    allowNetworkWarnings: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const current = argv[i];
@@ -42,6 +57,8 @@ function parseArgs(argv: string[]): Args {
     else if (current === "--fallback-base-url" && next) { args.fallbackBaseUrls = [next]; i += 1; }
     else if (current === "--output-dir" && next) { args.outputDir = next; i += 1; }
     else if (current === "--timeout-ms" && next) { args.timeoutMs = Number(next) || args.timeoutMs; i += 1; }
+    else if (current === "--fail-on-network-block") { args.failOnNetworkBlock = true; }
+    else if (current === "--allow-network-warnings") { args.allowNetworkWarnings = true; args.failOnNetworkBlock = false; }
   }
   return args;
 }
@@ -101,6 +118,17 @@ async function fetchWithFallback(baseUrls: string[], route: string, timeoutMs: n
   return { baseUrl: baseUrls.at(-1) ?? "", result: lastResult ?? { ok: false, status: 0, latencyMs: 0, answer: "", meta: {}, rawShape: "invalid" as const, error: "network_fetch_failure" } };
 }
 
+async function preflightReadingEndpoint(baseUrls: string[], timeoutMs: number): Promise<NetworkPreflightResult> {
+  const payload = { question: "What is my Lagna?", message: "What is my Lagna?", mode: "exact_fact" as const };
+  const live = await fetchWithFallback(baseUrls, "/api/astro/v2/reading", timeoutMs, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const blocked = live.result.status === 0 && String(live.result.error ?? "").startsWith("network_");
+  return { baseUrl: live.baseUrl, status: live.result.status, answer: live.result.answer, meta: live.result.meta, error: live.result.error, latencyMs: live.result.latencyMs, blocked };
+}
+
 function snippet(value: string): string {
   const trimmed = value.replace(/\s+/g, " ").trim();
   return redactLiveParityText(trimmed.slice(0, 180));
@@ -140,11 +168,12 @@ function writeResultFile(outputDir: string, results: CompanionLive100Result[]) {
   fs.mkdirSync(outputDir, { recursive: true });
   const reportPath = path.join(outputDir, "astro-companion-live-100-report.json");
   const summaryPath = path.join(outputDir, "astro-companion-live-100-summary.md");
+  const promptResults = results.filter((item) => item.number > 0);
   const summary = {
     total: results.length,
-    passed: results.filter((item) => item.passFailWarning === "pass").length,
-    failed: results.filter((item) => item.passFailWarning === "fail").length,
-    warnings: results.filter((item) => item.passFailWarning === "warning").length,
+    passed: promptResults.filter((item) => item.passFailWarning === "pass").length,
+    failed: promptResults.filter((item) => item.passFailWarning === "fail").length,
+    warnings: promptResults.filter((item) => item.passFailWarning === "warning").length,
   };
   fs.writeFileSync(reportPath, JSON.stringify({ summary, results }, null, 2));
   fs.writeFileSync(summaryPath, [
@@ -160,22 +189,90 @@ function writeResultFile(outputDir: string, results: CompanionLive100Result[]) {
   return { reportPath, summaryPath };
 }
 
-async function run() {
-  const args = parseArgs(process.argv.slice(2));
+function printRecoveryCommands() {
+  console.log("Recovery: cd ~/Documents/kaalbhairav");
+  console.log(`Recovery: curl -4 -sS -L -X POST https://www.tarayai.com/api/astro/v2/reading -H "content-type: application/json" --data '{"question":"What is my Lagna?","message":"What is my Lagna?","mode":"exact_fact"}' | jq`);
+  console.log('Recovery: NODE_OPTIONS="--dns-result-order=ipv4first" npm run check:astro-companion-live-100 -- --base-url https://www.tarayai.com --fail-on-network-block');
+}
+
+export async function runCompanionLive100(argv = process.argv.slice(2)) {
+  const args = parseArgs(argv);
   const baseUrl = normalizeBaseUrl(args.baseUrl) ?? "https://www.tarayai.com";
   const baseUrls = [baseUrl, ...args.fallbackBaseUrls.map((item) => normalizeBaseUrl(item)).filter((item): item is string => Boolean(item))];
   const results: CompanionLive100Result[] = [];
-  const ui = await fetchWithFallback(baseUrls, "/astro/v2", args.timeoutMs, { method: "GET" });
+  const preflight = await preflightReadingEndpoint(baseUrls, args.timeoutMs);
+  if (preflight.blocked) {
+    results.push({
+      number: 0,
+      prompt: "POST /api/astro/v2/reading connectivity preflight",
+      host: preflight.baseUrl,
+      route: "API",
+      httpStatus: preflight.status,
+      answerSnippet: snippet(preflight.answer),
+      passFailWarning: "warning",
+      failures: [],
+      warnings: [String(preflight.error ?? "network_dns_failure"), "network_blocked"],
+    });
+    const { reportPath, summaryPath } = writeResultFile(args.outputDir, results);
+    console.log(JSON.stringify(results[0]));
+    console.log(`baseUrl=${baseUrl} passed=no failed=0 warnings=1 networkBlocked=true`);
+    console.log(`Report JSON: ${redactLiveParityText(reportPath)}`);
+    console.log(`Report Markdown: ${redactLiveParityText(summaryPath)}`);
+    printRecoveryCommands();
+    if (args.failOnNetworkBlock && !args.allowNetworkWarnings) process.exitCode = 1;
+    return { results, networkBlocked: true };
+  }
+  if (preflight.status !== 200) {
+    results.push({
+      number: 0,
+      prompt: "POST /api/astro/v2/reading connectivity preflight",
+      host: preflight.baseUrl,
+      route: "API",
+      httpStatus: preflight.status,
+      answerSnippet: snippet(preflight.answer),
+      passFailWarning: "fail",
+      failures: [preflight.status === 404 ? "route_missing" : preflight.status >= 500 ? "route_failure" : "preflight_failed"],
+      warnings: [],
+    });
+    const { reportPath, summaryPath } = writeResultFile(args.outputDir, results);
+    console.log(JSON.stringify(results[0]));
+    console.log(`baseUrl=${baseUrl} passed=no failed=1 warnings=0 networkBlocked=false`);
+    console.log(`Report JSON: ${redactLiveParityText(reportPath)}`);
+    console.log(`Report Markdown: ${redactLiveParityText(summaryPath)}`);
+    process.exitCode = 1;
+    return { results, networkBlocked: false };
+  }
+  if (!/leo/i.test(preflight.answer)) {
+    results.push({
+      number: 0,
+      prompt: "POST /api/astro/v2/reading connectivity preflight",
+      host: preflight.baseUrl,
+      route: "API",
+      httpStatus: preflight.status,
+      answerSnippet: snippet(preflight.answer),
+      passFailWarning: "fail",
+      failures: ["preflight_answer_missing_leo"],
+      warnings: [],
+    });
+    const { reportPath, summaryPath } = writeResultFile(args.outputDir, results);
+    console.log(JSON.stringify(results[0]));
+    console.log(`baseUrl=${baseUrl} passed=no failed=1 warnings=0 networkBlocked=false`);
+    console.log(`Report JSON: ${redactLiveParityText(reportPath)}`);
+    console.log(`Report Markdown: ${redactLiveParityText(summaryPath)}`);
+    process.exitCode = 1;
+    return { results, networkBlocked: false };
+  }
+
   results.push({
     number: 0,
-    prompt: "UI reachability check",
-    host: ui.baseUrl,
-    route: "UI",
-    httpStatus: ui.result.status,
-    answerSnippet: snippet(ui.result.answer),
-    passFailWarning: ui.result.status === 0 ? "warning" : ui.result.status >= 500 || ui.result.status === 404 ? "fail" : "pass",
-    failures: ui.result.status === 404 ? ["route_missing:/astro/v2"] : [],
-    warnings: ui.result.status === 0 ? [String(ui.result.error ?? "network_fetch_failure")] : [],
+    prompt: "POST /api/astro/v2/reading connectivity preflight",
+    host: preflight.baseUrl,
+    route: "API",
+    httpStatus: preflight.status,
+    answerSnippet: snippet(preflight.answer),
+    passFailWarning: "pass",
+    failures: [],
+    warnings: [],
   });
 
   for (const prompt of getCompanionLive100Prompts()) {
@@ -187,7 +284,10 @@ async function run() {
     const classed = classifyResult({ status: live.result.status, answer: live.result.answer, route: "API", promptNumber: prompt.number, error: live.result.error });
     const failures = [...classed.failures];
     const warnings = [...classed.warnings];
-    if (live.result.status === 0) warnings.push("network_blocked");
+    if (live.result.status === 0) {
+      warnings.push("network_blocked");
+      if (!args.allowNetworkWarnings) failures.push("network_blocked");
+    }
     const passFailWarning: CompanionLive100Result["passFailWarning"] = failures.length ? "fail" : warnings.length ? "warning" : "pass";
     results.push({
       number: prompt.number,
@@ -201,17 +301,33 @@ async function run() {
       warnings,
     });
     console.log(JSON.stringify(results[results.length - 1]));
+    if (live.result.status === 0 && args.failOnNetworkBlock && !args.allowNetworkWarnings) {
+      const { reportPath, summaryPath } = writeResultFile(args.outputDir, results);
+      const failCount = results.filter((item) => item.passFailWarning === "fail").length;
+      const warningCount = results.filter((item) => item.passFailWarning === "warning").length;
+      console.log(`baseUrl=${baseUrl} passed=no failed=${failCount} warnings=${warningCount} networkBlocked=true`);
+      console.log(`Report JSON: ${redactLiveParityText(reportPath)}`);
+      console.log(`Report Markdown: ${redactLiveParityText(summaryPath)}`);
+      printRecoveryCommands();
+      process.exitCode = 1;
+      return { results, networkBlocked: true };
+    }
   }
 
   const { reportPath, summaryPath } = writeResultFile(args.outputDir, results);
-  const passCount = results.filter((item) => item.passFailWarning === "pass").length;
-  const failCount = results.filter((item) => item.passFailWarning === "fail").length;
-  const warningCount = results.filter((item) => item.passFailWarning === "warning").length;
-  const summaryText = `baseUrl=${baseUrl} passed=${passCount > 0 && failCount === 0 ? "yes" : "no"} failed=${failCount} warnings=${warningCount}`;
+  const promptResults = results.filter((item) => item.number > 0);
+  const passCount = promptResults.filter((item) => item.passFailWarning === "pass").length;
+  const failCount = promptResults.filter((item) => item.passFailWarning === "fail").length;
+  const warningCount = promptResults.filter((item) => item.passFailWarning === "warning").length;
+  const summaryText = `baseUrl=${baseUrl} passed=${passCount === 100 && failCount === 0 ? "yes" : "no"} failed=${failCount} warnings=${warningCount}`;
   console.log(summaryText);
   console.log(`Report JSON: ${redactLiveParityText(reportPath)}`);
   console.log(`Report Markdown: ${redactLiveParityText(summaryPath)}`);
-  if (failCount > 0) process.exitCode = 1;
+  if (failCount > 0 || (args.failOnNetworkBlock && warningCount > 0 && !args.allowNetworkWarnings)) process.exitCode = 1;
+  return { results, networkBlocked: false };
 }
 
-await run();
+const isMain = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
+if (isMain) {
+  await runCompanionLive100();
+}
