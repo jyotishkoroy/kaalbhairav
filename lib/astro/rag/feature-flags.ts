@@ -7,6 +7,7 @@
 export type AstroRagFlags = {
   ragEnabled: boolean;
   reasoningGraphEnabled: boolean;
+  listeningAnalyzerEnabled?: boolean;
   askFollowupWhenInsufficient: boolean;
   ragFallbackDeterministic: boolean;
   exactFactsDeterministic: boolean;
@@ -31,6 +32,7 @@ export type AstroRagFlags = {
   oracleVmTimingEnabled: boolean;
   validateLlmOutput: boolean;
   storeValidationResults: boolean;
+  companionPipelineEnabled?: boolean;
   companionMemoryEnabled?: boolean;
   companionMemoryStoreEnabled?: boolean;
   companionMemoryRetrieveEnabled?: boolean;
@@ -65,6 +67,7 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
   return {
     ragEnabled: readBool(env.ASTRO_RAG_ENABLED, false),
     reasoningGraphEnabled: readBool(env.ASTRO_REASONING_GRAPH_ENABLED, false),
+    listeningAnalyzerEnabled: readBool(env.ASTRO_LISTENING_ANALYZER_ENABLED, false),
     askFollowupWhenInsufficient: readBool(env.ASTRO_ASK_FOLLOWUP_WHEN_INSUFFICIENT, true),
     ragFallbackDeterministic: readBool(env.ASTRO_RAG_FALLBACK_DETERMINISTIC, true),
     exactFactsDeterministic: readBool(env.ASTRO_EXACT_FACTS_DETERMINISTIC, true),
@@ -92,6 +95,7 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
     oracleVmTimingEnabled: readBool(env.ASTRO_ORACLE_VM_TIMING_ENABLED, false),
     validateLlmOutput: readBool(env.ASTRO_VALIDATE_LLM_OUTPUT, true),
     storeValidationResults: readBool(env.ASTRO_STORE_VALIDATION_RESULTS, true),
+    companionPipelineEnabled: readBool(env.ASTRO_COMPANION_PIPELINE_ENABLED, false),
     companionMemoryEnabled: readBool(env.ASTRO_COMPANION_MEMORY_ENABLED, false),
     companionMemoryStoreEnabled: readBool(env.ASTRO_COMPANION_MEMORY_STORE_ENABLED, false),
     companionMemoryRetrieveEnabled: readBool(env.ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED, false),

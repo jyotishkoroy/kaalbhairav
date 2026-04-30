@@ -14,6 +14,7 @@ describe("getAstroRagFlags", () => {
 
     expect(flags.ragEnabled).toBe(false);
     expect(flags.reasoningGraphEnabled).toBe(false);
+    expect(flags.listeningAnalyzerEnabled).toBe(false);
     expect(flags.localAnalyzerEnabled).toBe(false);
     expect(flags.localCriticEnabled).toBe(false);
     expect(flags.llmAnswerEngineEnabled).toBe(false);
@@ -21,6 +22,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.exactFactsDeterministic).toBe(true);
     expect(flags.validateLlmOutput).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(false);
+    expect(flags.companionPipelineEnabled).toBe(false);
     expect(flags.companionMemoryStoreEnabled).toBe(false);
     expect(flags.companionMemoryRetrieveEnabled).toBe(false);
     expect(flags.companionMemoryMaxChars).toBe(1200);
@@ -30,11 +32,13 @@ describe("getAstroRagFlags", () => {
     const flags = getAstroRagFlags({
       ASTRO_RAG_ENABLED: "true",
       ASTRO_REASONING_GRAPH_ENABLED: "true",
+      ASTRO_LISTENING_ANALYZER_ENABLED: "true",
       ASTRO_LOCAL_ANALYZER_ENABLED: "true",
       ASTRO_LOCAL_CRITIC_ENABLED: "true",
       ASTRO_LLM_ANSWER_ENGINE_ENABLED: "true",
       ASTRO_TIMING_ENGINE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_ENABLED: "true",
+      ASTRO_COMPANION_PIPELINE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_STORE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_MAX_CHARS: "2400",
@@ -42,11 +46,13 @@ describe("getAstroRagFlags", () => {
 
     expect(flags.ragEnabled).toBe(true);
     expect(flags.reasoningGraphEnabled).toBe(true);
+    expect(flags.listeningAnalyzerEnabled).toBe(true);
     expect(flags.localAnalyzerEnabled).toBe(true);
     expect(flags.localCriticEnabled).toBe(true);
     expect(flags.llmAnswerEngineEnabled).toBe(true);
     expect(flags.timingEngineEnabled).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(true);
+    expect(flags.companionPipelineEnabled).toBe(true);
     expect(flags.companionMemoryStoreEnabled).toBe(true);
     expect(flags.companionMemoryRetrieveEnabled).toBe(true);
     expect(flags.companionMemoryMaxChars).toBe(2400);

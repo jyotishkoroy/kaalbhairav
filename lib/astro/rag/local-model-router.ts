@@ -156,8 +156,9 @@ function getTaskEnabled(task: LocalAiTask, env: LocalModelRouterEnv): boolean {
   const keys = TASK_ENABLED_ENV[task] ?? [];
   if (task === "listening_analyzer") {
     const listening = parseLocalBoolean(env.ASTRO_LISTENING_ANALYZER_ENABLED, false);
+    const localAnalyzerEnabled = parseLocalBoolean(env.ASTRO_LOCAL_ANALYZER_ENABLED, false);
     if (env.ASTRO_LISTENING_ANALYZER_ENABLED === "false") return false;
-    return listening || parseLocalBoolean(env.ASTRO_LOCAL_ANALYZER_ENABLED, false);
+    return listening && localAnalyzerEnabled;
   }
   return parseLocalBoolean(readFirstValue(env, keys), false);
 }

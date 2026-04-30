@@ -85,6 +85,7 @@ describe("local model router task routing", () => {
   it("intent analyzer disabled when ASTRO_LOCAL_ANALYZER_ENABLED=false", () => expect(routeLocalModelTask("intent_analyzer", { ASTRO_LOCAL_ANALYZER_ENABLED: "false" }).useLocal).toBe(false));
   it("intent analyzer enabled when ASTRO_LOCAL_ANALYZER_ENABLED=true", () => expect(routeLocalModelTask("intent_analyzer", { ASTRO_LOCAL_ANALYZER_ENABLED: "true" }).useLocal).toBe(true));
   it("listening analyzer disabled when ASTRO_LISTENING_ANALYZER_ENABLED=false", () => expect(routeLocalModelTask("listening_analyzer", { ASTRO_LISTENING_ANALYZER_ENABLED: "false", ASTRO_LOCAL_ANALYZER_ENABLED: "true" }).useLocal).toBe(false));
+  it("listening analyzer disabled when only ASTRO_LOCAL_ANALYZER_ENABLED=true", () => expect(routeLocalModelTask("listening_analyzer", { ASTRO_LOCAL_ANALYZER_ENABLED: "true" }).useLocal).toBe(false));
   it("listening analyzer enabled only when listening flag true and analyzer available", () => expect(routeLocalModelTask("listening_analyzer", { ASTRO_LISTENING_ANALYZER_ENABLED: "true", ASTRO_LOCAL_ANALYZER_ENABLED: "true" }).useLocal).toBe(true));
   it("query expander disabled by default", () => expect(routeLocalModelTask("query_expander", {}).useLocal).toBe(false));
   it("query expander enabled by ASTRO_LOCAL_QUERY_EXPANDER_ENABLED=true", () => expect(routeLocalModelTask("query_expander", { ASTRO_LOCAL_QUERY_EXPANDER_ENABLED: "true" }).useLocal).toBe(true));
