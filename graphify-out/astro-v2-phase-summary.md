@@ -156,3 +156,37 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 6 Local Ubuntu Ollama analyzer proxy
+Branch: phase-rag-foundation
+Runtime behavior changed: no main app integration
+UI changed: no
+DB changed: no
+Groq touched: no
+Ollama touched: local proxy code only; tests use fake Ollama
+Proxy:
+- local-services/ollama-analyzer-proxy
+- GET /health
+- POST /analyze-question
+- POST /critic
+- secret header required for POST
+- 20 KB body limit
+- 15s timeout
+- concurrency 1
+- queue size 5
+- binds 127.0.0.1 by default
+Validation:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor test:
+- repository test:
+- schema test:
+- feature flag test:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers

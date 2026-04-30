@@ -1,0 +1,21 @@
+[Unit]
+Description=tarayai Ollama Analyzer Proxy
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tarayai-ollama-proxy
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+Environment=OLLAMA_BASE_URL=http://127.0.0.1:11434
+Environment=OLLAMA_MODEL=qwen2.5:3b
+Environment=TARAYAI_LOCAL_SECRET=replace-with-long-random-secret
+Environment=REQUEST_TIMEOUT_MS=15000
+Environment=CONCURRENCY_LIMIT=1
+Environment=QUEUE_LIMIT=5
+
+[Install]
+WantedBy=multi-user.target
