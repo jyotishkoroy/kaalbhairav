@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export type CompanionSmokePromptId =
+  | "astro_v2_page"
   | "lagna_exact"
   | "sun_exact"
   | "career_promotion"
@@ -39,7 +40,7 @@ export type CompanionEndpointResult = {
   error?: string;
 };
 
-export type CompanionFetchFailureKind = "timeout" | "dns" | "network" | "unknown";
+export type CompanionFetchFailureKind = "timeout" | "dns" | "connection" | "fetch" | "unknown";
 
 export type CompanionPromptEvaluation = {
   id: CompanionSmokePromptId;
@@ -201,10 +202,24 @@ export function normalizeBaseUrl(value?: string | null): string | null {
 export function classifyFetchFailure(error: unknown): CompanionFetchFailureKind {
   const message = String((error as Error)?.message ?? error ?? "").toLowerCase();
   if (!message) return "unknown";
-  if (message.includes("aborted") || message.includes("timeout")) return "timeout";
+  if (message.includes("aborted") || message.includes("timeout") || message.includes("etimedout") || message.includes("und_err_headers_timeout")) return "timeout";
   if (message.includes("dns") || message.includes("lookup") || message.includes("eai_again") || message.includes("enotfound")) return "dns";
-  if (message.includes("fetch failed") || message.includes("network") || message.includes("connect") || message.includes("socket")) return "network";
+  if (message.includes("econnreset") || message.includes("connection reset") || message.includes("socket hang up")) return "connection";
+  if (message.includes("fetch failed") || message.includes("und_err_connect_timeout")) return "fetch";
+  if (message.includes("network") || message.includes("connect") || message.includes("socket")) return "connection";
   return "unknown";
+}
+
+export function classifyFetchFailureErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown; cause?: { code?: unknown } })?.code;
+  const causeCode = (error as { code?: unknown; cause?: { code?: unknown } })?.cause?.code;
+  return String(code ?? causeCode ?? "").toUpperCase();
+}
+
+export function getLiveHttpRetries(): number {
+  const raw = Number(process.env.ASTRO_LIVE_HTTP_RETRIES ?? "3");
+  if (!Number.isFinite(raw) || raw < 0) return 3;
+  return Math.floor(raw);
 }
 
 export function normalizeFallbackBaseUrls(value?: string | null): string[] {
@@ -260,8 +275,7 @@ export function isPageHtmlNotAnswer(result: Pick<CompanionEndpointResult, "answe
   const text = result.answer.trim();
   return result.error === "page_html_not_answer"
     || /^(<!doctype html|<html\b|<head\b|<body\b)/i.test(text)
-    || /next\.js|__next|hydrat/i.test(text)
-    || (result.rawShape === "invalid" && text.length === 0);
+    || /next\.js|__next|hydrat/i.test(text);
 }
 
 function includesSafetyBoundary(text: string): boolean {
@@ -323,7 +337,7 @@ export function evaluateCompanionAnswer(
     warnings.push("profile_context_required");
     return { passed: true, failures: [], warnings };
   }
-  if (isPageHtmlNotAnswer(result)) {
+  if (result.status > 0 && isPageHtmlNotAnswer(result)) {
     return { passed: true, failures: ["page_available"], warnings };
   }
 
@@ -379,7 +393,8 @@ export function compareCompanionResults(
 export function summarizeCompanionParity(results: CompanionPromptEvaluation[]): { passed: boolean; total: number; failed: number; failures: string[]; warnings: string[] } {
   const failures = results.flatMap((result) => result.failures.map((failure) => `${result.id}:${failure}`));
   const warnings = results.flatMap((result) => result.warnings.map((warning) => `${result.id}:${warning}`));
-  return { passed: failures.length === 0, total: results.length, failed: results.filter((result) => !result.passed).length, failures, warnings };
+  const failed = results.filter((result) => !result.passed).length;
+  return { passed: failed === 0, total: results.length, failed, failures, warnings };
 }
 
 export function redactLiveParityText(value: string): string {

@@ -14,6 +14,8 @@ import {
   buildAstroReadingPayload,
   compareCompanionResults,
   classifyFetchFailure,
+  classifyFetchFailureErrorCode,
+  getLiveHttpRetries,
   evaluateCompanionAnswer,
   getCompanionSmokePrompts,
   normalizeBaseUrl,
@@ -54,6 +56,16 @@ describe("companion live parity", () => {
   it("normalizeFallbackBaseUrls parses comma-separated values", () => expect(normalizeFallbackBaseUrls(" https://www.tarayai.com , https://kaalbhairav-1nys1uz7m-jyotishkoroys-projects.vercel.app ")).toHaveLength(2));
   it("classifyFetchFailure detects dns failures", () => expect(classifyFetchFailure(new Error("getaddrinfo ENOTFOUND tarayai.com"))).toBe("dns"));
   it("classifyFetchFailure detects timeout failures", () => expect(classifyFetchFailure(new Error("The operation was aborted"))).toBe("timeout"));
+  it("classifyFetchFailure detects connection failures", () => expect(classifyFetchFailure(new Error("ECONNRESET"))).toBe("connection"));
+  it("classifyFetchFailure detects fetch failures", () => expect(classifyFetchFailure(new Error("fetch failed"))).toBe("fetch"));
+  it("classifyFetchFailureErrorCode reads error code", () => expect(classifyFetchFailureErrorCode({ code: "ENOTFOUND" })).toBe("ENOTFOUND"));
+  it("retry count respects ASTRO_LIVE_HTTP_RETRIES", () => {
+    const original = process.env.ASTRO_LIVE_HTTP_RETRIES;
+    process.env.ASTRO_LIVE_HTTP_RETRIES = "7";
+    expect(getLiveHttpRetries()).toBe(7);
+    if (original === undefined) delete process.env.ASTRO_LIVE_HTTP_RETRIES;
+    else process.env.ASTRO_LIVE_HTTP_RETRIES = original;
+  });
   it("build payload includes prompt/question", () => expect(buildAstroReadingPayload(prompts[0]).question).toBe(prompts[0].prompt));
   it("parse JSON response extracts answer", () => expect(parseCompanionEndpointResponse(200, 12, '{"answer":"ok","meta":{"engine":"x"}}').answer).toBe("ok"));
   it("parse text response handled safely", () => expect(parseCompanionEndpointResponse(200, 12, "plain text").rawShape).toBe("text"));
@@ -74,6 +86,10 @@ describe("companion live parity", () => {
     const result = endpoint(200, "No active birth profile was found for your account, so chat is disabled until one is available.");
     expect(evaluateCompanionAnswer(prompts[0], result).warnings).toContain("profile_context_required");
   });
+  it("auth-required is separated from hard failure", () => {
+    const result = endpoint(403, "Login required to continue.");
+    expect(evaluateCompanionAnswer(prompts[0], result).passed).toBe(true);
+  });
   it("api 405 is route exists wrong method", () => {
     const result = endpoint(405, "Method Not Allowed");
     expect(evaluateCompanionAnswer(prompts[0], result).failures).toContain("route_exists_wrong_method");
@@ -82,6 +98,9 @@ describe("companion live parity", () => {
     const result = endpoint(404, "not found");
     expect(evaluateCompanionAnswer(prompts[0], result).failures).toContain("route_missing");
   });
+  it("page html cannot pass lagna exact answer evaluation", () => expect(evaluateCompanionAnswer(prompts[0], parseCompanionEndpointResponse(200, 12, "<!doctype html><html><body>page</body></html>")).failures).toContain("page_available"));
+  it("network failure does not become unsafe remedy", () => expect(evaluateCompanionAnswer(prompts[4], { ok: false, status: 0, latencyMs: 10, answer: "", meta: {}, rawShape: "invalid", error: "network_dns_failure" }).failures).not.toContain("unsafe_remedy"));
+  it("network failure does not become unsafe death prediction", () => expect(evaluateCompanionAnswer(prompts[5], { ok: false, status: 0, latencyMs: 10, answer: "", meta: {}, rawShape: "invalid", error: "network_timeout" }).failures).not.toContain("unsafe_death_prediction"));
   it("dns fetch failure is network failure not route 404", () => {
     expect(classifyFetchFailure(new Error("getaddrinfo ENOTFOUND tarayai.com"))).toBe("dns");
   });
@@ -120,7 +139,7 @@ describe("companion live parity", () => {
   it("compare route shape mismatch fails", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok", {}, "json"), endpoint(200, "ok", {}, "text"))?.shapeAligned).toBe(false));
   it("compare status class mismatch fails", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(404, "not found"))?.statusAligned).toBe(false));
   it("compare fallback explainable passes with warning", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(200, "auth/profile context limitation"))?.fallbackExplainable).toBe(true));
-  it("compare route-unreachable empty shell is treated as page availability", () => expect(evaluateCompanionAnswer(prompts[0], endpoint(0, "", {}, "invalid")).failures).toContain("page_available"));
+  it("compare route-unreachable empty shell is treated as network failure not answer", () => expect(evaluateCompanionAnswer(prompts[0], { ok: false, status: 0, latencyMs: 10, answer: "", meta: {}, rawShape: "invalid", error: "network_fetch_failure" }).failures).toContain("route_unreachable"));
   it("compare latency delta produces warning not hard fail by default", () => expect((compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(200, "ok"))?.latencyDeltaMs ?? 0)).toBeGreaterThanOrEqual(0));
   it("report writer creates JSON and markdown in temp dir", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "parity-"));
@@ -135,6 +154,7 @@ describe("companion live parity", () => {
   });
   it("summary counts failures", () => expect(summarizeCompanionParity([{ id: "lagna_exact", passed: false, failures: ["x"], warnings: [] }]).failed).toBe(1));
   it("summary passes when all prompts pass", () => expect(summarizeCompanionParity([{ id: "lagna_exact", passed: true, failures: [], warnings: [] }]).passed).toBe(true));
+  it("summary with zero failures and skips is still partial or yes not no", () => expect(summarizeCompanionParity([{ id: "lagna_exact", passed: true, failures: [], warnings: ["profile_context_required"] }]).passed).toBe(true));
   it("env checker helper behavior can be imported or script tested via child process", () => expect(typeof execFileSync).toBe("function"));
   it("check live script has default tarayai.com but can override base URL", () => expect(fs.readFileSync(path.join(process.cwd(), "scripts/check-astro-companion-live.ts"), "utf8")).toContain("tarayai.com"));
   it("compare script has local/live override support", () => expect(fs.readFileSync(path.join(process.cwd(), "scripts/compare-astro-companion-local-live.ts"), "utf8")).toContain("--local-url"));
