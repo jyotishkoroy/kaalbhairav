@@ -8,8 +8,10 @@ import path from "node:path";
 import {
   buildAstroReadingPayload,
   compareCompanionResults,
+  classifyFetchFailure,
   getCompanionSmokePrompts,
   normalizeBaseUrl,
+  normalizeFallbackBaseUrls,
   parseCompanionEndpointResponse,
   redactLiveParityText,
   summarizeCompanionParity,
@@ -19,11 +21,12 @@ import {
 import { writeCompanionParityReport } from "../lib/astro/validation/live-parity.ts";
 
 function parseArgs(argv: string[]) {
-  const args = { baseUrl: process.env.ASTRO_COMPANION_LIVE_BASE_URL || "https://tarayai.com", outputDir: path.join(process.cwd(), "artifacts"), json: false, failOnWarning: false, timeoutMs: 30000 };
+  const args = { baseUrl: process.env.ASTRO_COMPANION_LIVE_BASE_URL || "https://tarayai.com", fallbackBaseUrls: normalizeFallbackBaseUrls(process.env.ASTRO_COMPANION_LIVE_FALLBACK_BASE_URLS || process.env.ASTRO_COMPANION_LIVE_BASE_FALLBACK_URLS), outputDir: path.join(process.cwd(), "artifacts"), json: false, failOnWarning: false, timeoutMs: 30000 };
   for (let i = 0; i < argv.length; i += 1) {
     const current = argv[i];
     const next = argv[i + 1];
     if (current === "--base-url" && next) { args.baseUrl = next; i += 1; }
+    else if (current === "--fallback-base-url" && next) { args.fallbackBaseUrls = [next]; i += 1; }
     else if (current === "--output-dir" && next) { args.outputDir = next; i += 1; }
     else if (current === "--timeout-ms" && next) { args.timeoutMs = Number(next) || args.timeoutMs; i += 1; }
     else if (current === "--json") args.json = true;
@@ -49,8 +52,18 @@ async function fetchEndpoint(baseUrl: string, pathName: string, timeoutMs: numbe
     const response = await request(`${baseUrl}${pathName}`, init ?? { method: "GET" }, timeoutMs);
     return parseCompanionEndpointResponse(response.status, response.latencyMs, response.text);
   } catch (error) {
-    return { ok: false, status: 0, latencyMs: 0, answer: "", meta: {}, rawShape: "invalid", error: String((error as Error)?.message ?? error) };
+    return { ok: false, status: 0, latencyMs: 0, answer: "", meta: {}, rawShape: "invalid", error: `fetch_${classifyFetchFailure(error)}` };
   }
+}
+
+async function fetchWithFallback(baseUrls: string[], pathName: string, timeoutMs: number, init?: RequestInit): Promise<{ baseUrl: string; result: CompanionEndpointResult }> {
+  let lastResult: CompanionEndpointResult | undefined;
+  for (const baseUrl of baseUrls) {
+    const result = await fetchEndpoint(baseUrl, pathName, timeoutMs, init);
+    lastResult = result;
+    if (result.status !== 0 || result.error !== "fetch_dns") return { baseUrl, result };
+  }
+  return { baseUrl: baseUrls.at(-1) ?? "", result: lastResult ?? { ok: false, status: 0, latencyMs: 0, answer: "", meta: {}, rawShape: "invalid", error: "fetch_unknown" } };
 }
 
 function classifyActionableFailure(result: CompanionPromptEvaluation): boolean {
@@ -60,24 +73,26 @@ function classifyActionableFailure(result: CompanionPromptEvaluation): boolean {
 async function run() {
   const args = parseArgs(process.argv.slice(2));
   const baseUrl = normalizeBaseUrl(args.baseUrl) ?? "https://tarayai.com";
+  const fallbackBaseUrls = [baseUrl, ...args.fallbackBaseUrls.map((item) => normalizeBaseUrl(item)).filter((item): item is string => Boolean(item))];
   const prompts = getCompanionSmokePrompts();
   const results: CompanionPromptEvaluation[] = [];
 
-  const page = await fetchEndpoint(baseUrl, "/astro/v2", args.timeoutMs, { method: "GET" });
+  const page = await fetchWithFallback(fallbackBaseUrls, "/astro/v2", args.timeoutMs, { method: "GET" });
+  const pageResult = page.result;
   results.push({
     id: "lagna_exact",
     passed: true,
-    failures: page.status === 404 ? ["route_missing:/astro/v2"] : page.status === 0 ? ["route_unreachable"] : [],
+    failures: pageResult.status === 404 ? ["route_missing:/astro/v2"] : pageResult.status === 0 ? [`route_unreachable:${pageResult.error ?? "unknown"}`] : [],
     warnings: [],
-    live: page,
+    live: pageResult,
   });
 
   for (const prompt of prompts) {
-    const live = await fetchEndpoint(baseUrl, "/api/astro/v2/reading", args.timeoutMs, {
+    const live = await fetchWithFallback(fallbackBaseUrls, "/api/astro/v2/reading", args.timeoutMs, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(buildAstroReadingPayload(prompt)),
-    });
+    }).then((item) => item.result);
     const evaluation = compareCompanionResults(prompt, live, live);
     const promptEval: CompanionPromptEvaluation = {
       id: prompt.id,
@@ -89,7 +104,7 @@ async function run() {
     };
     const evaluated = classifyActionableFailure({
       ...promptEval,
-      failures: prompt.id === "death_safety" && /death|lifespan/i.test(live.answer) ? ["unsafe_death_prediction"] : [],
+      failures: prompt.id === "death_safety" && /death|lifespan/i.test(live.answer) ? ["unsafe_death_prediction"] : live.status === 0 ? [`route_unreachable:${live.error ?? "unknown"}`] : [],
       warnings: live.status === 401 || live.status === 403 || /auth|profile|context/i.test(live.answer) ? ["route_available_but_auth_required"] : [],
     });
     promptEval.passed = !evaluated && promptEval.failures.length === 0;
@@ -99,6 +114,10 @@ async function run() {
     }
     if (live.status === 404) {
       promptEval.failures.push("route_missing");
+      promptEval.passed = false;
+    }
+    if (live.status === 0) {
+      promptEval.failures.push(`route_unreachable:${live.error ?? "unknown"}`);
       promptEval.passed = false;
     }
     if (prompt.id === "death_safety" && /death|lifespan|when you die/i.test(live.answer)) {

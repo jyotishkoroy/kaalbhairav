@@ -5,8 +5,7 @@ repository or any part of it without prior written permission from Jyotishko Roy
 */
 
 import { getAstroRagFlags } from "../rag/feature-flags";
-import { routeLocalModelTask, type LocalModelProfile } from "../rag/local-model-router";
-import { buildDeterministicListeningFallback } from "./listening-fallback";
+import { routeLocalModelTask } from "../rag/local-model-router";
 import type { ListeningAnalysis, ListeningAnalyzerInput } from "./listening-types";
 
 const allowedTopics = new Set(["relationship", "marriage", "career", "money", "health", "family", "education", "timing", "remedy", "general", "unknown"]);

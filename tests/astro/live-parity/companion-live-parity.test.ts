@@ -13,9 +13,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildAstroReadingPayload,
   compareCompanionResults,
+  classifyFetchFailure,
   evaluateCompanionAnswer,
   getCompanionSmokePrompts,
   normalizeBaseUrl,
+  normalizeFallbackBaseUrls,
   parseCompanionEndpointResponse,
   redactLiveParityText,
   summarizeCompanionParity,
@@ -49,6 +51,9 @@ describe("companion live parity", () => {
   it("normalizeBaseUrl accepts https URL", () => expect(normalizeBaseUrl("https://tarayai.com/")).toBe("https://tarayai.com"));
   it("normalizeBaseUrl accepts localhost", () => expect(normalizeBaseUrl("http://127.0.0.1:3000/")).toBe("http://127.0.0.1:3000"));
   it("normalizeBaseUrl rejects invalid URL", () => expect(normalizeBaseUrl("notaurl")).toBeNull());
+  it("normalizeFallbackBaseUrls parses comma-separated values", () => expect(normalizeFallbackBaseUrls(" https://www.tarayai.com , https://kaalbhairav-1nys1uz7m-jyotishkoroys-projects.vercel.app ")).toHaveLength(2));
+  it("classifyFetchFailure detects dns failures", () => expect(classifyFetchFailure(new Error("getaddrinfo ENOTFOUND tarayai.com"))).toBe("dns"));
+  it("classifyFetchFailure detects timeout failures", () => expect(classifyFetchFailure(new Error("The operation was aborted"))).toBe("timeout"));
   it("build payload includes prompt/question", () => expect(buildAstroReadingPayload(prompts[0]).question).toBe(prompts[0].prompt));
   it("parse JSON response extracts answer", () => expect(parseCompanionEndpointResponse(200, 12, '{"answer":"ok","meta":{"engine":"x"}}').answer).toBe("ok"));
   it("parse text response handled safely", () => expect(parseCompanionEndpointResponse(200, 12, "plain text").rawShape).toBe("text"));
@@ -84,6 +89,7 @@ describe("companion live parity", () => {
   it("compare route shape mismatch fails", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok", {}, "json"), endpoint(200, "ok", {}, "text"))?.shapeAligned).toBe(false));
   it("compare status class mismatch fails", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(404, "not found"))?.statusAligned).toBe(false));
   it("compare fallback explainable passes with warning", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(200, "auth/profile context limitation"))?.fallbackExplainable).toBe(true));
+  it("compare route-unreachable result remains unsafe", () => expect(evaluateCompanionAnswer(prompts[0], endpoint(0, "", {}, "invalid")).passed).toBe(false));
   it("compare latency delta produces warning not hard fail by default", () => expect((compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(200, "ok"))?.latencyDeltaMs ?? 0)).toBeGreaterThanOrEqual(0));
   it("report writer creates JSON and markdown in temp dir", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "parity-"));

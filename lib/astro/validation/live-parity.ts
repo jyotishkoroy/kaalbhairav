@@ -39,6 +39,8 @@ export type CompanionEndpointResult = {
   error?: string;
 };
 
+export type CompanionFetchFailureKind = "timeout" | "dns" | "network" | "unknown";
+
 export type CompanionPromptEvaluation = {
   id: CompanionSmokePromptId;
   passed: boolean;
@@ -194,6 +196,20 @@ export function normalizeBaseUrl(value?: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+export function classifyFetchFailure(error: unknown): CompanionFetchFailureKind {
+  const message = String((error as Error)?.message ?? error ?? "").toLowerCase();
+  if (!message) return "unknown";
+  if (message.includes("aborted") || message.includes("timeout")) return "timeout";
+  if (message.includes("dns") || message.includes("lookup") || message.includes("eai_again") || message.includes("enotfound")) return "dns";
+  if (message.includes("fetch failed") || message.includes("network") || message.includes("connect") || message.includes("socket")) return "network";
+  return "unknown";
+}
+
+export function normalizeFallbackBaseUrls(value?: string | null): string[] {
+  if (value == null) return [];
+  return value.split(",").map((item) => normalizeBaseUrl(item)).filter((item): item is string => Boolean(item));
 }
 
 export function buildAstroReadingPayload(prompt: CompanionSmokePrompt): Record<string, unknown> {
