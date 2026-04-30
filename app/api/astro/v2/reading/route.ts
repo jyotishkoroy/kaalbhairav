@@ -71,6 +71,47 @@ function removeUndefinedFields<T extends Record<string, unknown>>(value: T): Par
   ) as Partial<T>;
 }
 
+const SAFE_SECTION_KEYS = [
+  "safety_response",
+  "direct_answer",
+  "chart_basis",
+  "reasoning",
+  "timing",
+  "what_to_do",
+  "safe_remedies",
+  "accuracy",
+  "limitations",
+  "suggested_follow_up",
+] as const;
+
+const UNSAFE_SECTION_PATTERNS = [
+  "debug",
+  "artifact",
+  "env",
+  "secret",
+  "raw",
+  "payload",
+  "supabase",
+  "groq",
+  "ollama",
+];
+
+function normalizeSections(value: unknown): Record<string, string> | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const sections = Object.fromEntries(
+    Object.entries(value)
+      .filter(([key, sectionValue]) => {
+        const lower = key.toLowerCase();
+        if (UNSAFE_SECTION_PATTERNS.some((pattern) => lower.includes(pattern))) return false;
+        return SAFE_SECTION_KEYS.includes(key as never) && typeof sectionValue === "string";
+      })
+      .map(([key, sectionValue]) => [key, (sectionValue as string).trim()]),
+  );
+
+  return Object.keys(sections).length ? sections : undefined;
+}
+
 function parseBirthDetails(value: unknown) {
   if (!isRecord(value)) return undefined;
 
@@ -105,6 +146,7 @@ type AstroV2ReadingResponse =
       answer: string;
       followUpQuestion?: string | null;
       followUpAnswer?: string | null;
+      sections?: Record<string, string>;
       meta?: Record<string, unknown>;
     }
   | {
@@ -172,6 +214,7 @@ function normalizeRagRouteResponse(
     answer,
     followUpQuestion: result.followUpQuestion,
     followUpAnswer: result.followUpAnswer,
+    sections: normalizeSections(result.sections),
     meta: safeMeta,
   };
 }
@@ -286,6 +329,7 @@ async function handleAstroV2ReadingRequest(
       answer: result.answer,
       followUpQuestion: result.meta?.followUpQuestion,
       followUpAnswer: result.meta?.followUpAnswer,
+      sections: normalizeSections((result as { sections?: unknown }).sections),
       meta: {
         ...result.meta,
         source: "astro-v2-page",

@@ -8,6 +8,13 @@
 
 import { useMemo, useState } from "react";
 import { AstroReadingV2Panel } from "@/components/astro/AstroReadingV2Panel";
+import {
+  RagReadingPanel,
+  getDisplayableRagSections,
+  getSafeRagStatus,
+  type RagReadingMeta,
+  type RagReadingSections,
+} from "@/components/astro/RagReadingPanel";
 import { ReadAloudButton } from "@/components/astro/ReadAloudButton";
 import { VoiceInputButton } from "@/components/astro/VoiceInputButton";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
@@ -86,6 +93,46 @@ type AstroV2ChatClientProps = {
   profileId?: string;
 };
 
+type AssistantReadingMessage = {
+  answer: string;
+  sections?: RagReadingSections | null;
+  meta?: Record<string, unknown> | null;
+  followUpQuestion?: string | null;
+  followUpAnswer?: string | null;
+};
+
+function hasDisplayableRagContent(message?: AssistantReadingMessage | null): boolean {
+  if (!message) return false;
+  if (message.followUpQuestion || message.followUpAnswer) return true;
+  if (getSafeRagStatus(message.meta)) return true;
+  return Object.keys(getDisplayableRagSections(message.sections)).length > 0;
+}
+
+function toRagReadingMeta(meta: Record<string, unknown> | null | undefined): RagReadingMeta | null {
+  if (!meta) return null;
+
+  const pickBoolean = (key: keyof RagReadingMeta): boolean | undefined =>
+    typeof meta[key] === "boolean" ? (meta[key] as boolean) : undefined;
+
+  const ragMeta: RagReadingMeta = {
+    engine: typeof meta.engine === "string" ? meta.engine : undefined,
+    ragEnabled: pickBoolean("ragEnabled"),
+    exactFactAnswered: pickBoolean("exactFactAnswered"),
+    safetyGatePassed: pickBoolean("safetyGatePassed"),
+    safetyBlocked: pickBoolean("safetyBlocked"),
+    followupAsked: pickBoolean("followupAsked"),
+    fallbackUsed: pickBoolean("fallbackUsed"),
+    validationPassed: pickBoolean("validationPassed"),
+    groqUsed: pickBoolean("groqUsed"),
+    groqRetryUsed: pickBoolean("groqRetryUsed"),
+    ollamaCriticUsed: pickBoolean("ollamaCriticUsed"),
+    deterministicAnalyzerUsed: pickBoolean("deterministicAnalyzerUsed"),
+    timingsAvailable: pickBoolean("timingsAvailable"),
+  };
+
+  return ragMeta;
+}
+
 export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
   const [question, setQuestion] = useState("");
   const [mode, setMode] = useState<ReadingMode>("practical_guidance");
@@ -96,6 +143,7 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
   const [meta, setMeta] = useState<Record<string, unknown>>({});
   const [followUpQuestion, setFollowUpQuestion] = useState<string | undefined>();
   const [followUpAnswer, setFollowUpAnswer] = useState<string | undefined>();
+  const [sections, setSections] = useState<RagReadingSections | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => {
@@ -108,6 +156,20 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
   });
 
   const safeMeta = useMemo(() => pickSafeMeta(meta), [meta]);
+  const assistantMessage = useMemo<AssistantReadingMessage | null>(
+    () =>
+      answer
+        ? {
+            answer,
+            sections,
+            meta: safeMeta,
+            followUpQuestion,
+            followUpAnswer,
+          }
+        : null,
+    [answer, sections, safeMeta, followUpQuestion, followUpAnswer],
+  );
+  const renderStructuredPanel = hasDisplayableRagContent(assistantMessage);
   const canSubmit = shouldSubmitAstroV2Question(question) && !isLoading && Boolean(profileId);
 
   function updateBirthDetails<K extends keyof AstroV2BirthDetailsForm>(
@@ -237,6 +299,7 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
       setMeta(parsed.meta);
       setFollowUpQuestion(parsed.followUpQuestion);
       setFollowUpAnswer(parsed.followUpAnswer);
+      setSections(parsed.sections);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -416,45 +479,53 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
       ) : null}
 
       {answer ? (
-        <article className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="mb-2 text-sm font-medium text-white/70">Answer</div>
-          <div className="whitespace-pre-wrap text-sm leading-7 text-white/90">
-            {answer}
-          </div>
-        </article>
-      ) : null}
-
-      {followUpQuestion ? (
-        <article className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="mb-2 text-sm font-medium text-white/70">
-            Suggested follow-up
-          </div>
-          <div className="whitespace-pre-wrap text-sm leading-7 text-white/90">
-            {followUpQuestion}
-            {followUpAnswer ? `\n\n${followUpAnswer}` : ""}
-          </div>
-        </article>
-      ) : null}
-
-      {Object.keys(safeMeta).length > 0 ? (
-        <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="mb-3 text-sm font-medium text-white/70">
-            Safe metadata
-          </div>
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            {Object.entries(safeMeta).map(([key, value]) => (
-              <div
-                key={key}
-                className="rounded-lg border border-white/10 bg-black/20 p-2"
-              >
-                <dt className="text-xs text-white/45">{key}</dt>
-                <dd className="mt-1 break-words text-white/85">
-                  {stringifyMetaValue(value)}
-                </dd>
+        renderStructuredPanel ? (
+          <RagReadingPanel
+            answer={answer}
+            sections={sections}
+            followUpQuestion={followUpQuestion}
+            followUpAnswer={followUpAnswer}
+            meta={toRagReadingMeta(safeMeta)}
+          />
+        ) : (
+          <article className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="mb-2 text-sm font-medium text-white/70">Answer</div>
+            <div className="whitespace-pre-wrap text-sm leading-7 text-white/90">
+              {answer}
+            </div>
+            {followUpQuestion ? (
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="mb-2 text-sm font-medium text-white/70">
+                  Suggested follow-up
+                </div>
+                <div className="whitespace-pre-wrap text-sm leading-7 text-white/90">
+                  {followUpQuestion}
+                  {followUpAnswer ? `\n\n${followUpAnswer}` : ""}
+                </div>
               </div>
-            ))}
-          </dl>
-        </section>
+            ) : null}
+            {Object.keys(safeMeta).length > 0 ? (
+              <section className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
+                <div className="mb-3 text-sm font-medium text-white/70">
+                  Safe metadata
+                </div>
+                <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                  {Object.entries(safeMeta).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="rounded-lg border border-white/10 bg-black/20 p-2"
+                    >
+                      <dt className="text-xs text-white/45">{key}</dt>
+                      <dd className="mt-1 break-words text-white/85">
+                        {stringifyMetaValue(value)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : null}
+          </article>
+        )
       ) : null}
     </section>
   );

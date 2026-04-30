@@ -27,6 +27,7 @@ export type AstroV2ChatDisplayResponse = {
   meta: Record<string, unknown>;
   followUpQuestion?: string;
   followUpAnswer?: string;
+  sections?: Record<string, string>;
   raw: unknown;
 };
 
@@ -274,21 +275,28 @@ export function extractAstroV2ChatResponse(
       ? payload.metadata
       : {};
 
+  const sections = isRecord(payload.sections)
+    ? (Object.fromEntries(
+        Object.entries(payload.sections).filter(([, value]) => typeof value === "string"),
+      ) as Record<string, string>)
+    : undefined;
+
   return {
     answer,
     meta,
     followUpQuestion:
-      typeof payload.followUpQuestion === 'string'
+      typeof payload.followUpQuestion === "string"
         ? payload.followUpQuestion
-        : typeof meta.followUpQuestion === 'string'
+        : typeof meta.followUpQuestion === "string"
           ? meta.followUpQuestion
           : undefined,
     followUpAnswer:
-      typeof payload.followUpAnswer === 'string'
+      typeof payload.followUpAnswer === "string"
         ? payload.followUpAnswer
-        : typeof meta.followUpAnswer === 'string'
+        : typeof meta.followUpAnswer === "string"
           ? meta.followUpAnswer
           : undefined,
+    sections,
     raw: payload,
   };
 }

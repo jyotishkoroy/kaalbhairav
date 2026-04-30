@@ -43,3 +43,52 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 20 UI integration
+Branch: phase-rag-foundation
+Runtime behavior changed: /astro/v2 can render structured RAG sections when API returns them
+Old UI fallback: preserved for plain answer responses
+DB changed: no migration
+Groq live call added: no
+Ollama live call added: no
+Supabase live call added in tests: no
+UI:
+- components/astro/RagReadingPanel.tsx
+- components/astro/AstroV2ChatClient.tsx
+- renders direct answer, chart basis, reasoning, timing, what to do, safe remedies, accuracy, limitations, suggested follow-up, safety response
+- hides debug/internal metadata
+- does not expose artifacts/secrets/raw facts
+- does not hardcode answer content
+Validation:
+- rag UI test: passed
+- rag API route test:
+- rag reading orchestrator test:
+- fallback/retry tests:
+- groq answer prompt/writer tests:
+- critic tests:
+- validator tests:
+- answer contract tests:
+- sufficiency checker test:
+- timing tests:
+- reasoning graph tests:
+- retrieval service/repository tests:
+- required data tests:
+- analyzer/local analyzer tests:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor/repository tests:
+- schema test:
+- feature flag test:
+- existing UI tests:
+- existing groq/provider tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Visual:
+- local: pending
+- live: not run
+Deployment:
+- skipped
+Remaining blockers:
+- none

@@ -7,9 +7,9 @@ import type { RagReadingOrchestratorResult } from "@/lib/astro/rag/rag-reading-o
 import { handleAstroV2ReadingRequest } from "@/app/api/astro/v2/reading/route";
 
 type RouteDeps = Parameters<typeof handleAstroV2ReadingRequest>[1];
-type OldRoute = NonNullable<RouteDeps>["oldRoute"];
+type OldRoute = Exclude<NonNullable<RouteDeps>["oldRoute"], undefined>;
 type OldRouteResult = Awaited<ReturnType<OldRoute>>;
-type RagOrchestrator = NonNullable<RouteDeps>["ragOrchestrator"];
+type RagOrchestrator = Exclude<NonNullable<RouteDeps>["ragOrchestrator"], undefined>;
 type RagOrchestratorResult = Awaited<ReturnType<RagOrchestrator>>;
 
 const OLD_RESPONSE = {
