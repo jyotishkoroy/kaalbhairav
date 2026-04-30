@@ -128,3 +128,50 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 23 Validation scripts and live smoke
+Branch: phase-rag-foundation
+Runtime behavior changed: no app runtime change
+UI changed: no
+DB changed: no
+Groq live call added in tests: no
+Ollama live call added in tests: no; health script supports optional live proxy check
+Supabase live call in tests: no
+Validation scripts:
+- scripts/astro-rag-smoke-utils.ts
+- scripts/check-astro-rag-smoke.ts
+- scripts/check-astro-rag-live.ts
+- scripts/compare-astro-rag-local-vs-live.ts
+- scripts/check-local-ollama-health.ts
+- validates exact facts, career grounding, sleep remedy safety, death safety, vague follow-up, old route/page availability
+- redacts secrets and does not write reports by default
+Validation:
+- smoke script tests:
+- companion memory tests:
+- benchmark parser/ingestion tests:
+- rag API route test:
+- rag UI test:
+- orchestrator tests:
+- fallback/retry tests:
+- groq answer prompt/writer tests:
+- critic tests:
+- validator tests:
+- answer contract tests:
+- sufficiency checker test:
+- timing tests:
+- reasoning graph tests:
+- retrieval service tests:
+- feature flag tests:
+- schema test:
+- existing groq/provider tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local smoke:
+- live smoke:
+- local ollama health:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers
