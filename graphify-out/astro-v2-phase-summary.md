@@ -1,30 +1,28 @@
-Phase: 17 Retry and fallback controller
+Phase: 18 RAG reading orchestrator
 Branch: phase-rag-foundation
 Runtime behavior changed: no route/app integration
 UI changed: no
-DB changed: no new migration
-Local dev smoke fix:
-- `npm run dev:local` binds to `127.0.0.1`
-- `npm run verify:astro-local` binds to `127.0.0.1:3001`
-- sandbox still returns EPERM on socket bind, so localhost smoke is documented even though the sandbox cannot open the port
-Groq live call added: no; retry tests use mocked writer
-Ollama live call added: no; critic tests use mocked critic/proxy
-Supabase live call added: no
-Retry/fallback:
-- `lib/astro/rag/retry-controller.ts`
-- `lib/astro/rag/fallback-answer.ts`
-- retries Groq once max only for repairable issues
-- never returns unvalidated Groq output
-- fatal deterministic validator failures go directly to fallback
-- critic is advisory and cannot override deterministic fallback
-- fallback answers are deterministic and safe
+DB changed: no migration
+Groq live call added: no; orchestrator tests use mocked writer
+Ollama live call added: no; orchestrator tests use mocked analyzer/critic
+Supabase live call added: no; orchestrator tests use mocked retrieval
+Orchestrator:
+- `lib/astro/rag/rag-reading-orchestrator.ts`
+- enforces strict pipeline order
+- safety and exact facts short-circuit before analyzer/Groq
+- analyzer/planner/retrieval/reasoning/timing/sufficiency/contract run before writer
+- Groq output validated before final answer
+- critic advisory only
+- retry/fallback controller produces final safe answer
+- exposes metadata and artifacts for Phase 19 API integration
 Validation:
-- `tests/astro/rag/fallback-answer.test.ts`: passed
-- `tests/astro/rag/retry-controller.test.ts`: passed
-- `tests/astro/rag/groq-answer-prompt.test.ts`: passed
-- `tests/astro/rag/groq-answer-writer.test.ts`: passed
-- `tests/astro/rag/critic-schema.test.ts`: passed
-- `tests/astro/rag/local-critic.test.ts`: passed
+- `tests/astro/rag/rag-reading-orchestrator.test.ts`: passed
+- `tests/astro/rag/fallback-answer.test.ts`: pending
+- `tests/astro/rag/retry-controller.test.ts`: pending
+- `tests/astro/rag/groq-answer-prompt.test.ts`: pending
+- `tests/astro/rag/groq-answer-writer.test.ts`: pending
+- `tests/astro/rag/critic-schema.test.ts`: pending
+- `tests/astro/rag/local-critic.test.ts`: pending
 - `tests/astro/rag/fact-validator.test.ts`: pending
 - `tests/astro/rag/safety-validator.test.ts`: pending
 - `tests/astro/rag/timing-validator.test.ts`: pending
@@ -61,4 +59,4 @@ Validation:
 Deployment:
 - skipped
 Remaining blockers:
-- sandbox EPERM still prevents an actual local dev socket bind here
+- none or exact blockers
