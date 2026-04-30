@@ -1,5 +1,25 @@
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
+
 import type { ChartFact } from "./chart-fact-extractor";
 import type { RequiredDataPlan } from "./required-data-planner";
+import type { QueryExpansionDomain } from "./local-query-expander";
+
+export type RetrievalQueryExpansionMeta = {
+  used: boolean;
+  mode: "deterministic" | "local_model" | "disabled" | "fallback";
+  source: "deterministic" | "ollama" | "disabled";
+  domains: QueryExpansionDomain[];
+  searchTerms: string[];
+  chartAnchors: string[];
+  requiredEvidence: string[];
+  safetyNotes: string[];
+  fallbackReason?: string;
+  warnings: string[];
+};
 
 export type SupabaseQueryResult<T> = {
   data: T[] | null;
@@ -84,18 +104,24 @@ export type RetrievalContext = {
   timingWindows: TimingWindow[];
   safeRemedies: SafeRemedy[];
   memorySummary?: string;
+  queryExpansion?: RetrievalQueryExpansionMeta;
+  expandedSearchTerms?: string[];
+  requiredEvidenceHints?: string[];
+  chartAnchorHints?: string[];
   metadata: {
     userId: string;
     profileId: string | null;
     domain: RequiredDataPlan["domain"];
     requestedFactKeys: string[];
     retrievalTags: string[];
+    expandedSearchTerms?: string[];
     errors: string[];
     partial: boolean;
   };
 };
 
 export type RetrievalServiceInput = {
+  question?: string;
   supabase: SupabaseLikeClient;
   userId: string;
   profileId?: string | null;
@@ -105,6 +131,11 @@ export type RetrievalServiceInput = {
   includeTiming?: boolean;
   includeRemedies?: boolean;
   memorySummary?: string;
+  exactFactMatched?: boolean;
+  safetyRisks?: string[];
+  availableChartAnchors?: string[];
+  queryExpansionClient?: import("./local-query-expander").LocalQueryExpanderClient;
+  env?: Record<string, string | undefined>;
 };
 
 export type RepositoryResult<T> = {

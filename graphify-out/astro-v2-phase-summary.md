@@ -70,3 +70,39 @@ Remaining blockers:
 - none
 Next:
 - Phase 29 Wire query expansion into retrieval
+Phase: 29 Wire query expansion into retrieval
+Branch: phase-rag-foundation
+Runtime behavior changed: optional retrieval query expansion behind ASTRO_LOCAL_QUERY_EXPANDER_ENABLED
+UI changed: no
+DB changed: no
+Query expansion:
+- original question remains primary
+- expanded terms supplement retrieval only
+- deterministic fallback first
+- optional local client path mocked in tests
+- exact fact path does not call local model
+- safety topics stay conservative
+- no invented chart facts/timing/remedies
+Validation:
+- query expansion retrieval tests:
+- local query expander tests:
+- retrieval service tests:
+- exact fact tests:
+- safety gate/validator tests:
+- rag API route tests:
+- rag UI tests:
+- orchestrator tests:
+- smoke script tests:
+- rollout validation tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local smoke:
+Deployment:
+- skipped
+Remaining blockers:
+- none
+Next:
+- Phase 30 Strengthen local critic

@@ -1,7 +1,14 @@
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
+
 import type { ChartFact } from "./chart-fact-extractor";
 import type { RequiredDataPlan } from "./required-data-planner";
 import type {
   RetrievalContext,
+  RetrievalQueryExpansionMeta,
   RetrievalServiceInput,
   RepositoryResult,
   SafeRemedy,
@@ -9,6 +16,7 @@ import type {
   SupabaseQueryResult,
 } from "./retrieval-types";
 import { compactRecord, normalizeStringArray, snakeToCamelRecord } from "./retrieval-types";
+import { buildDeterministicQueryExpansion, expandQueryWithLocalModel, sanitizeQueryExpansionTerms } from "./local-query-expander";
 import { fetchBenchmarkExamples } from "./benchmark-repository";
 import { fetchReasoningRules } from "./reasoning-rule-repository";
 import { fetchTimingWindows } from "./timing-repository";
@@ -22,6 +30,97 @@ export type FetchChartFactsInput = {
   tags: string[];
   limit?: number;
 };
+
+type RetrievalExpansionInput = {
+  question: string;
+  env?: Record<string, string | undefined>;
+  exactFactMatched?: boolean;
+  safetyRisks?: string[];
+  availableChartAnchors?: string[];
+  queryExpansionClient?: NonNullable<RetrievalServiceInput["queryExpansionClient"]>;
+  maxTerms?: number;
+};
+
+function clampList(values: string[], limit: number): string[] {
+  return sanitizeQueryExpansionTerms(values).slice(0, limit);
+}
+
+function buildQueryExpansionMeta(
+  output: ReturnType<typeof buildDeterministicQueryExpansion>,
+  used: boolean,
+): RetrievalQueryExpansionMeta {
+  return {
+    used,
+    mode: output.mode,
+    source: output.source,
+    domains: output.domains,
+    searchTerms: clampList(output.searchTerms, 12),
+    chartAnchors: clampList(output.chartAnchors, 12),
+    requiredEvidence: clampList(output.requiredEvidence, 12),
+    safetyNotes: clampList(output.safetyNotes, 12),
+    fallbackReason: output.fallbackReason,
+    warnings: clampList(output.warnings, 12),
+  };
+}
+
+async function resolveQueryExpansion(input: RetrievalExpansionInput): Promise<{ meta: RetrievalQueryExpansionMeta; expandedSearchTerms: string[]; requiredEvidenceHints: string[]; chartAnchorHints: string[] }> {
+  const deterministic = buildDeterministicQueryExpansion({
+    question: input.question,
+    exactFactMatched: input.exactFactMatched,
+    safetyRisks: input.safetyRisks,
+    availableChartAnchors: input.availableChartAnchors,
+    maxTerms: input.maxTerms,
+    env: input.env,
+  });
+
+  if (!input.env?.ASTRO_LOCAL_QUERY_EXPANDER_ENABLED || input.env.ASTRO_LOCAL_QUERY_EXPANDER_ENABLED !== "true") {
+    return {
+      meta: buildQueryExpansionMeta({ ...deterministic, mode: "disabled", source: "disabled", shouldUseExpandedQuery: false }, false),
+      expandedSearchTerms: [],
+      requiredEvidenceHints: [],
+      chartAnchorHints: [],
+    };
+  }
+
+  if (input.exactFactMatched) {
+    return {
+      meta: buildQueryExpansionMeta({ ...deterministic, mode: "disabled", source: "disabled", shouldUseExpandedQuery: false, fallbackReason: "exact_fact_matched" }, false),
+      expandedSearchTerms: [],
+      requiredEvidenceHints: [],
+      chartAnchorHints: [],
+    };
+  }
+
+  if (!input.queryExpansionClient) {
+    return {
+      meta: buildQueryExpansionMeta(
+        { ...deterministic, mode: "fallback", source: "deterministic", fallbackReason: "local_client_missing" },
+        Boolean(deterministic.shouldUseExpandedQuery && deterministic.searchTerms.length && deterministic.domains[0] !== "general" && deterministic.domains[0] !== "exact_fact"),
+      ),
+      expandedSearchTerms: clampList(deterministic.searchTerms, 12),
+      requiredEvidenceHints: clampList(deterministic.requiredEvidence, 12),
+      chartAnchorHints: clampList(deterministic.chartAnchors, 12),
+    };
+  }
+
+  const local = await expandQueryWithLocalModel({
+    question: input.question,
+    exactFactMatched: input.exactFactMatched,
+    safetyRisks: input.safetyRisks,
+    availableChartAnchors: input.availableChartAnchors,
+    maxTerms: input.maxTerms,
+    env: input.env,
+    client: input.queryExpansionClient,
+  });
+  const merged = local.mode === "disabled" ? deterministic : local;
+  const used = Boolean(merged.shouldUseExpandedQuery && merged.searchTerms.length && merged.domains[0] !== "general" && merged.domains[0] !== "exact_fact");
+  return {
+    meta: buildQueryExpansionMeta(merged, used),
+    expandedSearchTerms: clampList(merged.searchTerms, 12),
+    requiredEvidenceHints: clampList(merged.requiredEvidence, 12),
+    chartAnchorHints: clampList(merged.chartAnchors, 12),
+  };
+}
 
 function asErrorMessage(error: unknown): string {
   if (typeof error === "string") return error;
@@ -207,6 +306,18 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
   const includeBenchmarks = input.includeBenchmarks !== false;
   const includeTiming = input.includeTiming !== false;
   const includeRemedies = input.includeRemedies !== false;
+  const question = input.question ?? `${plan.domain} ${plan.retrievalTags.join(" ")} ${plan.requiredFacts.join(" ")}`.trim();
+  const expansion = await resolveQueryExpansion({
+    question,
+    env: input.env ?? process.env,
+    exactFactMatched: input.exactFactMatched,
+    safetyRisks: input.safetyRisks,
+    availableChartAnchors: input.availableChartAnchors,
+    queryExpansionClient: input.queryExpansionClient,
+    maxTerms: input.limit ?? 80,
+  });
+  const expandedSearchTerms = expansion.expandedSearchTerms;
+  const expandedTags = [...new Set([...plan.retrievalTags, ...expandedSearchTerms])].slice(0, 24);
 
   const [facts, rules, benchmarks, timing] = await Promise.all([
     safeRepository(
@@ -216,25 +327,25 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
         profileId: input.profileId ?? null,
         requiredFacts: plan.requiredFacts,
         optionalFacts: plan.optionalFacts,
-        tags: plan.retrievalTags,
+        tags: expandedTags,
         limit: input.limit ?? 80,
       }),
     ),
-    safeRepository(fetchReasoningRules({ supabase: input.supabase, domains: plan.reasoningRuleDomains, tags: plan.retrievalTags, limit: 12 })),
+    safeRepository(fetchReasoningRules({ supabase: input.supabase, domains: plan.reasoningRuleDomains, tags: expandedTags, limit: 12 })),
     includeBenchmarks
-      ? safeRepository(fetchBenchmarkExamples({ supabase: input.supabase, domains: plan.benchmarkDomains, tags: plan.retrievalTags, limit: 6 }))
+      ? safeRepository(fetchBenchmarkExamples({ supabase: input.supabase, domains: plan.benchmarkDomains, tags: expandedTags, limit: 6 }))
       : Promise.resolve(emptyRepositoryResult<Awaited<ReturnType<typeof fetchBenchmarkExamples>> extends RepositoryResult<infer T> ? T : never>()),
     includeTiming && (plan.requiresTimingSource || plan.needsTiming || plan.timingAllowed)
       ? safeRepository(
-          fetchTimingWindows({
-            supabase: input.supabase,
-            userId: input.userId,
-            profileId: input.profileId ?? null,
-            domain: plan.domain,
-            tags: plan.retrievalTags,
-            limit: 8,
-          }),
-        )
+        fetchTimingWindows({
+          supabase: input.supabase,
+          userId: input.userId,
+          profileId: input.profileId ?? null,
+          domain: plan.domain,
+          tags: expandedTags,
+          limit: 8,
+        }),
+      )
       : Promise.resolve(emptyRepositoryResult<Awaited<ReturnType<typeof fetchTimingWindows>> extends RepositoryResult<infer T> ? T : never>()),
   ]);
 
@@ -248,12 +359,17 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
     timingWindows: timing.data,
     safeRemedies,
     memorySummary: input.memorySummary && input.memorySummary.trim() ? input.memorySummary : undefined,
+    queryExpansion: expansion.meta,
+    expandedSearchTerms,
+    requiredEvidenceHints: expansion.requiredEvidenceHints,
+    chartAnchorHints: expansion.chartAnchorHints,
     metadata: {
       userId: input.userId,
       profileId: input.profileId ?? null,
       domain: plan.domain,
       requestedFactKeys: [...plan.requiredFacts],
       retrievalTags: [...plan.retrievalTags],
+      expandedSearchTerms,
       errors,
       partial: Boolean(facts.partial || rules.partial || benchmarks.partial || timing.partial || errors.length),
     },

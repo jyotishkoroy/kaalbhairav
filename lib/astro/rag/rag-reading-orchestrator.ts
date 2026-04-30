@@ -436,11 +436,16 @@ export async function ragReadingOrchestrator(
   }
 
   const context = await (input.dependencies?.retrieveContext ?? retrieveAstroRagContext)({
+    question,
     supabase: input?.supabase,
     userId: input.userId,
     profileId: input.profileId ?? null,
     plan,
     memorySummary: companionMemory?.memorySummary ?? input.memorySummary,
+    exactFactMatched: false,
+    safetyRisks: safety.riskFlags,
+    availableChartAnchors: [...plan.requiredFacts, ...plan.optionalFacts],
+    env: input?.env,
   } as never);
   meta.supabaseRetrievalUsed = true;
   withStep(meta, "retrieval", true);
