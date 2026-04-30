@@ -1,62 +1,45 @@
-Phase: 18 RAG reading orchestrator
+Phase: 19 API route integration
 Branch: phase-rag-foundation
-Runtime behavior changed: no route/app integration
+Runtime behavior changed: /api/astro/v2/reading can call RAG orchestrator only when ASTRO_RAG_ENABLED=true
 UI changed: no
 DB changed: no migration
-Groq live call added: no; orchestrator tests use mocked writer
-Ollama live call added: no; orchestrator tests use mocked analyzer/critic
-Supabase live call added: no; orchestrator tests use mocked retrieval
-Orchestrator:
-- `lib/astro/rag/rag-reading-orchestrator.ts`
-- enforces strict pipeline order
-- safety and exact facts short-circuit before analyzer/Groq
-- analyzer/planner/retrieval/reasoning/timing/sufficiency/contract run before writer
-- Groq output validated before final answer
-- critic advisory only
-- retry/fallback controller produces final safe answer
-- exposes metadata and artifacts for Phase 19 API integration
+Groq live call added: no; route tests mock orchestrator
+Ollama live call added: no; route tests mock orchestrator
+Supabase live call added in tests: no; auth/profile mocked
+Route:
+- app/api/astro/v2/reading/route.ts
+- flag off preserves old V2 path
+- flag on can call ragReadingOrchestrator
+- RAG failure falls back to old V2 path
+- safe compact metadata only
+- no artifacts/secrets/raw facts in response
 Validation:
-- `tests/astro/rag/rag-reading-orchestrator.test.ts`: passed
-- `tests/astro/rag/fallback-answer.test.ts`: pending
-- `tests/astro/rag/retry-controller.test.ts`: pending
-- `tests/astro/rag/groq-answer-prompt.test.ts`: pending
-- `tests/astro/rag/groq-answer-writer.test.ts`: pending
-- `tests/astro/rag/critic-schema.test.ts`: pending
-- `tests/astro/rag/local-critic.test.ts`: pending
-- `tests/astro/rag/fact-validator.test.ts`: pending
-- `tests/astro/rag/safety-validator.test.ts`: pending
-- `tests/astro/rag/timing-validator.test.ts`: pending
-- `tests/astro/rag/remedy-validator.test.ts`: pending
-- `tests/astro/rag/genericness-validator.test.ts`: pending
-- `tests/astro/rag/answer-validator.test.ts`: pending
-- `tests/astro/rag/contracts.test.ts`: pending
-- `tests/astro/rag/answer-contract-builder.test.ts`: pending
-- `tests/astro/rag/sufficiency-checker.test.ts`: pending
-- `tests/astro/rag/python-timing-adapter.test.ts`: pending
-- `tests/astro/rag/timing-engine.test.ts`: pending
-- `tests/astro/rag/reasoning-rule-selector.test.ts`: pending
-- `tests/astro/rag/reasoning-path-builder.test.ts`: pending
-- `tests/astro/rag/reasoning-rule-repository.test.ts`: pending
-- `tests/astro/rag/benchmark-repository.test.ts`: pending
-- `tests/astro/rag/timing-repository.test.ts`: pending
-- `tests/astro/rag/retrieval-service.test.ts`: pending
-- `tests/astro/rag/required-data-matrix.test.ts`: pending
-- `tests/astro/rag/required-data-planner.test.ts`: pending
-- `tests/astro/rag/analyzer-schema.test.ts`: pending
-- `tests/astro/rag/local-analyzer.test.ts`: pending
-- `tests/astro/rag/ollama-analyzer-proxy.test.ts`: pending
-- `tests/astro/rag/safety-gate.test.ts`: pending
-- `tests/astro/rag/exact-fact-answer.test.ts`: pending
-- `tests/astro/rag/exact-fact-router.test.ts`: pending
-- `tests/astro/rag/chart-fact-extractor.test.ts`: pending
-- `tests/astro/rag/chart-fact-repository.test.ts`: pending
-- `tests/astro/rag/schema.test.ts`: pending
-- `tests/astro/rag/feature-flags.test.ts`: pending
-- typecheck: pending
-- lint: pending
-- build: pending
-- full tests: pending
+- rag api route test:
+- rag reading orchestrator test:
+- fallback/retry tests:
+- groq answer prompt/writer tests:
+- critic tests:
+- validator tests:
+- answer contract tests:
+- sufficiency checker test:
+- timing tests:
+- reasoning graph tests:
+- retrieval service/repository tests:
+- required data tests:
+- analyzer/local analyzer tests:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor/repository tests:
+- schema test:
+- feature flag test:
+- old route tests:
+- existing groq/provider tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
 Deployment:
-- skipped
+- skipped or completed
 Remaining blockers:
 - none or exact blockers
