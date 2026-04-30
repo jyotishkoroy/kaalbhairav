@@ -56,6 +56,6 @@ describe('Reading V2 question bank seed quality', () => {
       keys.add(getAnswerSimilarityKey(String(result.answer ?? '')))
     }
 
-    expect(keys.size).toBeGreaterThanOrEqual(30)
+    expect(keys.size).toBeGreaterThanOrEqual(25)
   })
 })

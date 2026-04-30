@@ -112,6 +112,8 @@ const TOPIC_KEYWORDS: Record<ReadingTopic, string[]> = {
   education: ['education', 'study', 'studies', 'exam', 'college', 'school', 'degree', 'course', 'student', 'marks', 'result', 'admission'],
   spirituality: ['spiritual', 'spirituality', 'god', 'mantra', 'puja', 'pooja', 'meditation', 'karma', 'dharma', 'sadhana', 'moksha'],
   remedy: ['remedy', 'remedies', 'upay', 'solution', 'mantra', 'gemstone', 'stone', 'puja', 'pooja', 'donation', 'fast', 'vrat', 'what should i do', 'उपाय', 'प्रार्थना'],
+  foreign: ['foreign', 'abroad', 'relocation', 'relocate', 'visa', 'immigration', 'overseas', 'move abroad'],
+  legal: ['legal', 'law', 'court', 'case', 'lawsuit', 'judge', 'attorney', 'lawyer', 'police', 'jail'],
   death: ['death', 'die', 'lifespan', 'life span', 'when will i die', 'will i die', 'death date', 'longevity', 'मृत्यु', 'মৃত্যু', 'मौत'],
   general: [],
 }
@@ -231,6 +233,8 @@ export function detectTopic(message: string): ReadingTopic {
   if (hasAny(lower, TOPIC_KEYWORDS.family)) return 'family'
   if (hasAny(lower, TOPIC_KEYWORDS.relationship)) return 'relationship'
   if (hasAny(lower, TOPIC_KEYWORDS.spirituality)) return 'spirituality'
+  if (hasAny(lower, TOPIC_KEYWORDS.foreign)) return 'foreign'
+  if (hasAny(lower, TOPIC_KEYWORDS.legal)) return 'legal'
   if (hasAny(lower, TOPIC_KEYWORDS.remedy)) {
     return hasAny(lower, TOPIC_KEYWORDS.career) ? 'career' : 'remedy'
   }

@@ -14,6 +14,8 @@ export type ReadingTopic =
   | 'education'
   | 'spirituality'
   | 'remedy'
+  | 'foreign'
+  | 'legal'
   | 'death'
   | 'general'
 

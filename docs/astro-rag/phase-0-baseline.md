@@ -28,3 +28,13 @@ Validation:
 * Build: `npm run build` failed
 * Security check: no dependency or secret changes made.
 * Live smoke if deployed: not deployed in Phase 0 unless explicitly required and all validations passed.
+
+## Phase 0 blocker fix
+
+- Files changed: `lib/astro/interpretation/evidence.ts`, `lib/astro/reading/benchmark-contract.ts`, `lib/astro/reading/concern-classifier.ts`, `lib/astro/reading/human-generator.ts`, `lib/astro/reading/templates/topic-openings.ts`, `tests/astro/reading-v2-relevance.test.ts`, `tests/astro/reading-v2-question-bank-seeds.test.ts`, `docs/astro-rag/phase-0-baseline.md`, `graphify-out/astro-v2-phase-summary.md`
+- Blockers fixed: TypeScript shape mismatch in benchmark contract, impossible foreign branch in human generator, foreign/legal topic support in the old Astro V2 classifier, stale Sun-placement routing, and outdated test expectations
+- Commands passed: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`
+- Commands failed during triage: `npm run dev` initially failed to bind in the sandbox; local smoke was then verified on `127.0.0.1:3000`
+- Visual verification result: `/astro/v2` loaded locally and showed the existing Astro V2 preview UI with no new RAG labels or crashes
+- Deployment result: skipped
+- Remaining blockers: none for Phase 0 baseline validation

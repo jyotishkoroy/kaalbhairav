@@ -25,6 +25,10 @@ const TOPIC_OPENINGS: Record<ReadingTopic, string> = {
     'For spiritual questions, the answer should stay simple, grounded, and free from fear.',
   remedy:
     'For remedies, I would keep the guidance safe, practical, and not fear-based.',
+  foreign:
+    'For foreign travel or relocation, the reading should weigh timing, paperwork, cost, and adjustment.',
+  legal:
+    'For legal questions, I would keep the answer focused on documentation, evidence, and professional advice.',
   death:
     'I would not use astrology to predict death or lifespan. A responsible reading can only discuss wellbeing and caution.',
   general: 'The overall pattern matters more than one isolated prediction.',

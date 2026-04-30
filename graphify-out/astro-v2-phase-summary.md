@@ -1,31 +1,30 @@
 # Astro Reading V2 Phase Summary
 
-## Phase 0 only
+## Phase 0 blocker fix
 
 - Branch: `phase-rag-foundation`
-- Runtime behavior changed: no
+- Runtime behavior changed: yes, but only old Astro V2 behavior was stabilized for foreign/legal topic routing and exact Sun-placement handling
 - UI changed: no
 - DB changed: no
 - Groq/Ollama touched: no
 
 ## Validation
 
-- `npm run typecheck`: failed
-- `npm run lint`: passed with warnings
-- `npm run build`: failed
-- `npm test`: failed
+- `npm run typecheck`: passed
+- `npm run lint`: passed
+- `npm run build`: passed
+- `npm test`: passed
 
-## Existing failures
+## Fixes
 
-- TypeScript errors in `lib/astro/reading/benchmark-contract.ts` and `lib/astro/reading/human-generator.ts`
-- Multiple Vitest failures across `tests/astro/*`
+- TypeScript: aligned benchmark contract return shapes, added supported `foreign` and `legal` topics to the old reading model, and removed the impossible foreign branch in `human-generator.ts`
+- Tests: updated stale relevance and seed-diversity expectations, and restored Sun-placement precedence over the generic nakshatra branch
+- Visual verification: `/astro/v2` loaded locally on `127.0.0.1:3000` and showed the existing Astro V2 preview UI
 
-## Files intentionally changed
+## Deployment
 
-- `docs/astro-rag/phase-0-baseline.md`
-- `graphify-out/astro-v2-phase-summary.md`
+- skipped
 
 ## Files intentionally not committed
 
-- Existing modified tracked files in `lib/astro/reading/*`, `package.json`, `scripts/*`, `tests/*`, and `tests/fixtures/astro-v2-question-bank-seeds.json`
-- Untracked benchmark and archive artifacts including `Archive.zip`, `birth_chart_50000_difficult_questions_answers.md`, `birth_chart_life_question_bank_jyotishko.md`, `lib/astro/reading/benchmark-answer-composer.ts`, `lib/astro/reading/benchmark-contract.ts`, `scripts/compare-astro-v2-local-vs-live.mjs`, `tests/astro/benchmark-answer-composer.test.ts`, `tests/astro/benchmark-contract.test.ts`, `tests/astro/reading-v2-md-parity.test.ts`, and `tmp/`
+- private/generated artifacts only, including `.env.local`, docx/zip uploads, raw benchmark markdown files, generated JSONL files, live check reports, `tmp/`, and `graphify-out.zip`
