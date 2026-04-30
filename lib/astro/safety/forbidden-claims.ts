@@ -38,7 +38,7 @@ export function removeForbiddenClaims(text: string): string {
 
   for (const claim of claims) {
     const pattern = new RegExp(`\\b${escapeRegExp(claim)}\\b`, 'gi')
-    cleaned = cleaned.replace(pattern, 'unsafe claim')
+    cleaned = cleaned.replace(pattern, 'unsupported claim')
   }
 
   return cleaned
