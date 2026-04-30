@@ -36,7 +36,7 @@ describe('Astro safety response filter', () => {
     })
 
     expect(result.replaced).toBe(true)
-    expect(result.answer).toContain('I would not predict death')
+    expect(result.answer).toContain('I would not predict death, lifespan, or death timing.')
     expect(result.answer).not.toContain('death date is shown')
   })
 
@@ -63,6 +63,8 @@ describe('Astro safety response filter', () => {
 
     expect(result.forbiddenClaimsRemoved).toBe(true)
     expect(result.answer).not.toContain('You will never marry')
+    expect(result.answer).not.toContain('[removed unsafe claim]')
+    expect(result.answer).not.toContain('unsafe claim]')
   })
 
   it('detects forbidden claim text', () => {

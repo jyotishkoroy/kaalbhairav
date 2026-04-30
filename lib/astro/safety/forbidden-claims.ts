@@ -34,12 +34,17 @@ export function containsForbiddenClaim(text: string): boolean {
 export function removeForbiddenClaims(text: string): string {
   let cleaned = text
 
-  for (const claim of forbiddenClaims) {
-    const pattern = new RegExp(escapeRegExp(claim), 'gi')
-    cleaned = cleaned.replace(pattern, '[removed unsafe claim]')
+  const claims = [...forbiddenClaims].sort((a, b) => b.length - a.length)
+
+  for (const claim of claims) {
+    const pattern = new RegExp(`\\b${escapeRegExp(claim)}\\b`, 'gi')
+    cleaned = cleaned.replace(pattern, 'unsafe claim')
   }
 
   return cleaned
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim()
 }
 
 function escapeRegExp(value: string): string {

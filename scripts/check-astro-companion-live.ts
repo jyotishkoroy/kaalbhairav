@@ -10,6 +10,7 @@ import {
   compareCompanionResults,
   classifyFetchFailure,
   getCompanionSmokePrompts,
+  isPageHtmlNotAnswer,
   normalizeBaseUrl,
   normalizeFallbackBaseUrls,
   parseCompanionEndpointResponse,
@@ -66,11 +67,6 @@ async function fetchWithFallback(baseUrls: string[], pathName: string, timeoutMs
   return { baseUrl: baseUrls.at(-1) ?? "", result: lastResult ?? { ok: false, status: 0, latencyMs: 0, answer: "", meta: {}, rawShape: "invalid", error: "fetch_unknown" } };
 }
 
-function isHtmlPageResponse(result: CompanionEndpointResult): boolean {
-  const text = result.answer.trim();
-  return result.error === "page_html_not_answer" || /^(<!doctype html|<html\b|<head\b|<body\b)/i.test(text);
-}
-
 function classifyActionableFailure(result: CompanionPromptEvaluation): boolean {
   return Boolean(result.failures.length && !result.failures.every((failure) => failure === "route_unreachable"));
 }
@@ -87,7 +83,7 @@ async function run() {
   results.push({
     id: "lagna_exact",
     passed: pageResult.status > 0 && pageResult.status < 500,
-    failures: pageResult.status === 404 ? ["route_missing:/astro/v2"] : pageResult.status === 0 ? [`route_unreachable:${pageResult.error ?? "unknown"}`] : isHtmlPageResponse(pageResult) ? ["page_available"] : [],
+    failures: pageResult.status === 404 ? ["route_missing:/astro/v2"] : pageResult.status === 0 ? [`route_unreachable:${pageResult.error ?? "unknown"}`] : isPageHtmlNotAnswer(pageResult) ? ["page_available"] : [],
     warnings: [],
     live: pageResult,
   });
@@ -120,6 +116,9 @@ async function run() {
     if (live.status === 404) {
       promptEval.failures.push("route_missing");
       promptEval.passed = false;
+    }
+    if (live.status === 405) {
+      promptEval.failures.push("route_exists_wrong_method");
     }
     if (live.status === 0) {
       promptEval.failures.push(`route_unreachable:${live.error ?? "unknown"}`);

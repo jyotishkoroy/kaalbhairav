@@ -256,6 +256,14 @@ export function parseCompanionEndpointResponse(status: number, latencyMs: number
   return { ok: status >= 200 && status < 500, status, latencyMs, answer, meta, rawShape, error };
 }
 
+export function isPageHtmlNotAnswer(result: Pick<CompanionEndpointResult, "answer" | "error" | "rawShape">): boolean {
+  const text = result.answer.trim();
+  return result.error === "page_html_not_answer"
+    || /^(<!doctype html|<html\b|<head\b|<body\b)/i.test(text)
+    || /next\.js|__next|hydrat/i.test(text)
+    || (result.rawShape === "invalid" && text.length === 0);
+}
+
 function includesSafetyBoundary(text: string): boolean {
   return hasAny(text, ["not medical advice", "not a diagnosis", "doctor", "seek care", "health professional", "not certain", "support only"]);
 }
@@ -305,7 +313,8 @@ export function evaluateCompanionAnswer(
   if (result.status === 0) failures.push("route_unreachable");
   if (result.status >= 500) failures.push("server_error");
   if (result.status === 404) failures.push("route_missing");
-  if (result.rawShape === "invalid") failures.push(result.error === "page_html_not_answer" ? "page_html_not_answer" : "invalid_response_shape");
+  if (result.status === 405) failures.push("route_exists_wrong_method");
+  if (result.rawShape === "invalid" && !isPageHtmlNotAnswer(result)) failures.push("invalid_response_shape");
 
   const forbidden = hasForbidden(text, prompt.forbids);
   if (forbidden) failures.push(`forbidden:${forbidden}`);
@@ -314,7 +323,7 @@ export function evaluateCompanionAnswer(
     warnings.push("profile_context_required");
     return { passed: true, failures: [], warnings };
   }
-  if (result.error === "page_html_not_answer" || /^(<!doctype html|<html\b)/i.test(result.answer.trim())) {
+  if (isPageHtmlNotAnswer(result)) {
     return { passed: true, failures: ["page_available"], warnings };
   }
 

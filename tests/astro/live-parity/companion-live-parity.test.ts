@@ -74,6 +74,10 @@ describe("companion live parity", () => {
     const result = endpoint(200, "No active birth profile was found for your account, so chat is disabled until one is available.");
     expect(evaluateCompanionAnswer(prompts[0], result).warnings).toContain("profile_context_required");
   });
+  it("api 405 is route exists wrong method", () => {
+    const result = endpoint(405, "Method Not Allowed");
+    expect(evaluateCompanionAnswer(prompts[0], result).failures).toContain("route_exists_wrong_method");
+  });
   it("api 404 is route failure", () => {
     const result = endpoint(404, "not found");
     expect(evaluateCompanionAnswer(prompts[0], result).failures).toContain("route_missing");
@@ -116,7 +120,7 @@ describe("companion live parity", () => {
   it("compare route shape mismatch fails", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok", {}, "json"), endpoint(200, "ok", {}, "text"))?.shapeAligned).toBe(false));
   it("compare status class mismatch fails", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(404, "not found"))?.statusAligned).toBe(false));
   it("compare fallback explainable passes with warning", () => expect(compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(200, "auth/profile context limitation"))?.fallbackExplainable).toBe(true));
-  it("compare route-unreachable result remains unsafe", () => expect(evaluateCompanionAnswer(prompts[0], endpoint(0, "", {}, "invalid")).passed).toBe(false));
+  it("compare route-unreachable empty shell is treated as page availability", () => expect(evaluateCompanionAnswer(prompts[0], endpoint(0, "", {}, "invalid")).failures).toContain("page_available"));
   it("compare latency delta produces warning not hard fail by default", () => expect((compareCompanionResults(prompts[0], endpoint(200, "ok"), endpoint(200, "ok"))?.latencyDeltaMs ?? 0)).toBeGreaterThanOrEqual(0));
   it("report writer creates JSON and markdown in temp dir", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "parity-"));
@@ -134,6 +138,11 @@ describe("companion live parity", () => {
   it("env checker helper behavior can be imported or script tested via child process", () => expect(typeof execFileSync).toBe("function"));
   it("check live script has default tarayai.com but can override base URL", () => expect(fs.readFileSync(path.join(process.cwd(), "scripts/check-astro-companion-live.ts"), "utf8")).toContain("tarayai.com"));
   it("compare script has local/live override support", () => expect(fs.readFileSync(path.join(process.cwd(), "scripts/compare-astro-companion-local-live.ts"), "utf8")).toContain("--local-url"));
+  it("live validation uses api POST for answer prompts", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "scripts/check-astro-companion-live.ts"), "utf8");
+    expect(source).toMatch(/method:\s*"POST"/);
+    expect(source).toContain('/api/astro/v2/reading');
+  });
   it("production smoke script has production base URL override", () => expect(fs.readFileSync(path.join(process.cwd(), "scripts/check-astro-companion-production-smoke.ts"), "utf8")).toContain("ASTRO_COMPANION_PRODUCTION_BASE_URL"));
   it("package scripts include check:astro-companion-env", () => expect(JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")).scripts["check:astro-companion-env"]).toContain("node --experimental-strip-types scripts/check-astro-companion-env.ts"));
   it("package scripts include check:astro-companion-live", () => expect(JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")).scripts["check:astro-companion-live"]).toContain("node --experimental-strip-types scripts/check-astro-companion-live.ts"));

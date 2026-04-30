@@ -16,7 +16,7 @@ const SAFETY_MESSAGES: Record<SafetyRiskName, string> = {
   medical:
     'The chart can show general stress patterns, but I would not treat astrology as a replacement for medical advice. If symptoms are present, please speak with a qualified doctor.',
   death:
-    'I would not predict death, death dates, or exact lifespan. A responsible reading can only discuss wellbeing, caution, and steadier life choices.',
+    'I would not predict death, lifespan, or death timing. A responsible reading can only discuss wellbeing, caution, and steadier life choices.',
   legal:
     'Astrology should not be treated as legal advice. If this involves a court, police, contract, or legal risk, speak with a qualified legal professional.',
   pregnancy:
