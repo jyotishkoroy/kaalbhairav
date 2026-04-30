@@ -1,0 +1,23 @@
+# Phase 5 - Supabase Companion Memory
+
+- Goal: add safe, same-user companion memory that preserves continuity without storing sensitive or invasive content.
+- Position in pipeline: retrieval and extraction are isolated library modules; live route and orchestrator behavior remain unchanged by default.
+- Files added: `lib/astro/memory/companion-memory-types.ts`, `lib/astro/memory/companion-memory-redactor.ts`, `lib/astro/memory/companion-memory-policy.ts`, `lib/astro/memory/supabase-companion-memory-store.ts`, `lib/astro/memory/companion-memory-retriever.ts`, `lib/astro/memory/companion-memory-extractor.ts`, `lib/astro/memory/index.ts`.
+- Migration added: `supabase/migrations/20260430101000_astro_companion_memory.sql`.
+- Feature flags: memory is disabled by default; retrieve/write require explicit flags; `ASTRO_COMPANION_PIPELINE_ENABLED=false` remains the default; `ASTRO_RAG_ENABLED` alone does not enable memory; `ASTRO_READING_PLAN_ENABLED` alone does not enable memory.
+- Memory table: `public.astro_companion_memory` stores same-user topic memories with confidence, timestamps, and archive support.
+- Feedback table: `public.astro_reading_feedback` stores optional same-user feedback without changing the UI in Phase 5.
+- RLS policies: same-user read/insert/update policies are enabled with `auth.uid() = user_id`.
+- Retrieval policy: same-topic and related-topic filtering, low-confidence exclusion by default, archived exclusion, and short non-creepy summaries.
+- Extraction policy: deterministic rule-based extraction only, capped to a small number of safe drafts per answer.
+- Redaction policy: strip markdown, emails, phones, tokens, URLs, and raw birth-data-like text before any store operation.
+- Clear/archive behavior: store supports per-memory archive and user/topic archive operations; no UI clear button is added in Phase 5.
+- Supabase CLI deployment status: pending until CLI/auth/link are verified in the local environment.
+- Safety behavior: memory failure does not break readings; retrieval and storage fail soft.
+- What memory may store: safe preferences, recurring concerns, broad context, and practical guidance.
+- What memory must not store: sensitive medical/legal/self-harm/death/private-third-party/raw-birth details, secrets, or raw uploaded file content.
+- Tests run: memory policy, redactor, retriever, extractor, store, migration static tests, feature-flag tests, and existing companion regression suites.
+- Runtime behavior changed: no production behavior change by default.
+- UI changed: no.
+- DB changed: yes, forward-only migration added.
+- Rollback: disable `ASTRO_COMPANION_MEMORY_ENABLED=false`, `ASTRO_COMPANION_MEMORY_WRITE_ENABLED=false`, `ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED=false`, and `ASTRO_COMPANION_PIPELINE_ENABLED=false`; continue without companion memory; prefer forward-fix database migrations and avoid dropping production memory without backup.

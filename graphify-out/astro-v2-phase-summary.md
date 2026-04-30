@@ -1,39 +1,47 @@
-Phase: Companion Phase 4 Ollama Critic
+Phase: Companion Phase 5 Supabase Companion Memory
 Branch: phase-rag-foundation
-Starting commit: 4fbf8f9
-Runtime behavior changed: no production behavior change by default; critic disabled unless ASTRO_OLLAMA_CRITIC_ENABLED=true and ASTRO_COMPANION_PIPELINE_ENABLED=true
+Starting commit: 751e3f8
+Runtime behavior changed: no production behavior change by default; memory disabled unless `ASTRO_COMPANION_MEMORY_ENABLED=true` and retrieve/write flags enabled
 UI changed: no
-DB changed: no
-Ollama critic:
-- adds ReadingCriticResult type
-- adds critic prompt/policy/runner
-- uses qwen2.5:3b via local model router
-- uses injected client only in tests
-- invalid JSON/timeout/error falls back
-- critic does not write final answer
-- rewrite policy allows at most one rewrite instruction set
+DB changed: yes, migration added for astro_companion_memory and astro_reading_feedback
+Memory:
+- adds memory types/policy/redactor/store/retriever/extractor
+- same-user RLS migration
+- safe deterministic extraction
+- topic-specific retrieval
+- failure-safe fallback
+- clear/archive support
 Safety:
-- deterministic safety remains final authority
-- critic flags genericness, fear, missing acknowledgement, missing chart anchor, unsupported timing/remedies, invented facts, unsafe guarantees, internal metadata
+- no raw medical/legal/self-harm/death/private third-party/raw birth data stored
+- sensitive content filtered before retrieve/write
+Supabase:
+- CLI version: pending
+- migration list: pending
+- db push: pending
 Validation:
-- reading critic tests: passed
-- critic policy tests: passed
-- synthesis tests: passed
-- reading plan tests: passed
-- listening tests: passed
-- local model router/local critic tests: passed
+- memory policy tests: passed
+- memory redactor tests: passed
+- memory retriever tests: passed
+- memory extractor tests: passed
+- memory store tests: passed
+- migration static tests: passed
+- companion critic/synthesis/reading plan/listening tests: passed
 - feature flag tests: passed
-- answer/safety/fact/timing/remedy/genericness validator tests: passed
-- rag API route tests: passed
-- rag UI tests: passed
-- smoke script tests: passed
-- rollout validation tests: passed
-- typecheck: passed
-- lint: passed with pre-existing warnings only
-- build: passed
-- full tests: failed only on known unrelated seed-quality assertion
+- safety/fact/timing/remedy/genericness validator tests: pending
+- rag API route tests: pending
+- rag UI tests: pending
+- smoke script tests: pending
+- rollout validation tests: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
 Manual:
 - local smoke: not run
-Deployment: skipped
-Remaining blockers: unrelated npm test question-bank seed failure if still present, or none
-Next: Phase 5 Supabase Companion Memory
+Deployment:
+- Supabase migration deployed/pending with exact reason: pending CLI/auth verification
+- Vercel skipped
+Remaining blockers:
+- unrelated npm test question-bank seed failure if still present, or none
+Next:
+- Phase 6 UI Feedback and Companion Cards

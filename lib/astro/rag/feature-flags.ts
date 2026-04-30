@@ -37,9 +37,11 @@ export type AstroRagFlags = {
   companionPipelineEnabled?: boolean;
   companionCompassionateSynthesisEnabled?: boolean;
   companionMemoryEnabled?: boolean;
-  companionMemoryStoreEnabled?: boolean;
+  companionMemoryWriteEnabled?: boolean;
   companionMemoryRetrieveEnabled?: boolean;
+  companionMemoryStoreEnabled?: boolean;
   companionMemoryMaxChars?: number;
+  companionMemoryMaxItems?: number;
 };
 
 function readBool(value: string | undefined, defaultValue: boolean): boolean {
@@ -64,6 +66,12 @@ function readMemoryMaxChars(value: string | undefined, defaultValue: number): nu
   const parsed = readInt(value, defaultValue);
   if (parsed < 200 || parsed > 3000) return defaultValue;
   return parsed;
+}
+
+function readMemoryMaxItems(value: string | undefined, defaultValue: number): number {
+  const parsed = readInt(value, defaultValue);
+  if (parsed < 1) return defaultValue;
+  return Math.min(parsed, 12);
 }
 
 export function getAstroRagFlags(env: Record<string, string | undefined> = process.env): AstroRagFlags {
@@ -103,8 +111,10 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
     companionPipelineEnabled: readBool(env.ASTRO_COMPANION_PIPELINE_ENABLED, false),
     companionCompassionateSynthesisEnabled: readBool(env.ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED, false),
     companionMemoryEnabled: readBool(env.ASTRO_COMPANION_MEMORY_ENABLED, false),
-    companionMemoryStoreEnabled: readBool(env.ASTRO_COMPANION_MEMORY_STORE_ENABLED, false),
+    companionMemoryWriteEnabled: readBool(env.ASTRO_COMPANION_MEMORY_WRITE_ENABLED, false),
     companionMemoryRetrieveEnabled: readBool(env.ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED, false),
+    companionMemoryStoreEnabled: readBool(env.ASTRO_COMPANION_MEMORY_STORE_ENABLED, false),
     companionMemoryMaxChars: readMemoryMaxChars(env.ASTRO_COMPANION_MEMORY_MAX_CHARS, 1200),
+    companionMemoryMaxItems: readMemoryMaxItems(env.ASTRO_COMPANION_MEMORY_MAX_ITEMS, 8),
   };
 }
