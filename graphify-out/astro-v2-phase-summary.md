@@ -236,3 +236,33 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+
+Phase: Rollout execution after Phase 25
+Branch: phase-rag-foundation
+Starting commit: 7d8dbf6
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Validation:
+- npm test: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- verify astro preview: passed
+- focused RAG suites: passed
+- rollout stage validation: blocked in Codex shell because `npx tsx` tried to fetch `tsx` and failed with `ENOTFOUND registry.npmjs.org`
+- local smoke: blocked in Codex shell because `npm run dev:local` failed with `EPERM` on `127.0.0.1:3000`
+- local ollama health: started but not completed in this shell; same `npx tsx` registry access limitation applies
+- live smoke: not run
+Deployment:
+- skipped
+Production flags:
+- ASTRO_RAG_ENABLED: unchanged
+- ASTRO_LLM_ANSWER_ENGINE_ENABLED: unchanged
+- ASTRO_LOCAL_ANALYZER_ENABLED: unchanged
+- ASTRO_LOCAL_CRITIC_ENABLED: unchanged
+- ASTRO_COMPANION_MEMORY_ENABLED: unchanged
+Rollback:
+- disable ASTRO_RAG_ENABLED=false
+Remaining blockers:
+- no repo blocker; rollout-stage CLI needs local `tsx` availability without registry lookup, and local dev socket bind is blocked by the Codex sandbox
