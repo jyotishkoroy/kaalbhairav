@@ -48,3 +48,28 @@ Deployment:
 - skipped
 Remaining blockers:
 - none
+
+Phase: 2 Supabase RAG schema foundation
+Branch: phase-rag-foundation
+Runtime behavior changed: no
+UI changed: no
+DB changed: migration added but not runtime-applied by app code
+Groq/Ollama touched: no
+Tables added:
+- astro_chart_facts
+- astro_reasoning_rules
+- astro_benchmark_examples
+- astro_reasoning_paths
+- astro_answer_contracts
+- astro_validation_results
+- astro_timing_windows
+Validation:
+- schema test: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
+Deployment:
+- skipped
+Remaining blockers:
+- none
