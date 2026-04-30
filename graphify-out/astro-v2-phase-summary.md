@@ -73,3 +73,32 @@ Deployment:
 - skipped
 Remaining blockers:
 - none
+
+Phase: 3 Chart fact extractor and repository
+Branch: phase-rag-foundation
+Runtime behavior changed: no
+UI changed: no
+DB changed: no new migration; writes supported only by manual repository/backfill
+Groq/Ollama touched: no
+Extractor:
+- deterministic
+- no external calls
+- supports birth/lagna/rasi/nakshatra/planet placements/houses/lords/dasha/varshaphal/SAV/explicit aspects
+Repository:
+- maps facts to astro_chart_facts
+- upsert helper with caller-provided Supabase client
+Backfill:
+- manual dry-run-first script
+Validation:
+- extractor test: pending
+- repository test: pending
+- schema test: pending
+- feature flag test: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
+Deployment:
+- skipped
+Remaining blockers:
+- none
