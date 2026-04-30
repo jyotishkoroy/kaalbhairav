@@ -1,0 +1,26 @@
+# Phase 2 - ReadingPlan Builder
+- Goal: build a structured ReadingPlan before any human-language synthesis.
+- Position in pipeline: standalone synthesis layer, not wired into live runtime by default.
+- Files added: `lib/astro/synthesis/reading-plan-types.ts`, `lib/astro/synthesis/reading-plan-policy.ts`, `lib/astro/synthesis/reading-plan-builder.ts`, `lib/astro/synthesis/reading-plan-renderer.ts`, `lib/astro/synthesis/index.ts`, `tests/astro/synthesis/reading-plan-builder.test.ts`, `tests/astro/synthesis/reading-plan-policy.test.ts`, `tests/astro/synthesis/reading-plan-renderer.test.ts`.
+- Feature flags: `ASTRO_READING_PLAN_ENABLED=false` by default; `ASTRO_COMPANION_PIPELINE_ENABLED=false` remains default.
+- ReadingPlan shape: preserves question, topic, mode, acknowledgement, chartTruth, livedExperience, lessonPattern, practicalGuidance, remedies, safetyBoundaries, reassurance, followUp, and memoryUse.
+- Inputs used: question, concern, ListeningAnalysis, evidence, chartAnchors, missingChartFacts, birthContext, timingContext, remedyContext, memorySummary, and safetyRestrictions.
+- Policy rules: preserve chart truth, prohibit timing without source, keep remedies safe and conditional, add boundaries for safety risks, and prefer follow-up for vague questions.
+- Deterministic renderer: `renderReadingPlanFallback` turns the plan into a fixed fallback answer without Groq or Ollama.
+- Safety behavior: no chart facts invented, no timing invented, no fear language, no deterministic guarantees, no unsafe remedies, and no death prediction.
+- What the plan may do: acknowledge the user, summarize chart evidence, describe grounded lived experience, offer practical guidance, include safe remedies when requested, and ask a clarifying follow-up.
+- What the plan must not do: invent placements, invent timing, pressure expensive rituals, provide medical or legal certainty, or expose debug metadata.
+- Tests run: builder, policy, renderer, listening regression, feature flag regression, and existing RAG safety/timing/remedy/exact-fact suites.
+- Runtime behavior changed: no production behavior change by default; ReadingPlan remains disabled unless `ASTRO_READING_PLAN_ENABLED=true`.
+- UI changed: no.
+- DB changed: no.
+- Rollback: disable `ASTRO_READING_PLAN_ENABLED=false` and `ASTRO_COMPANION_PIPELINE_ENABLED=false`, then use the existing human-generator path. No database rollback required.
+- ReadingPlan preserves chart truth.
+- ReadingPlan does not invent chart facts.
+- ReadingPlan does not invent timing.
+- ReadingPlan does not add unsafe remedies.
+- ReadingPlan renderer is deterministic.
+- Groq synthesis is not added in Phase 2.
+- Disabled by default.
+- No DB changes.
+- No UI changes.

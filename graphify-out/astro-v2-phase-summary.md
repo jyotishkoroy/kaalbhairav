@@ -1,29 +1,30 @@
-Phase: Companion Phase 1 Ollama Listening Analyzer
-Branch: phase-rag-foundation
-Starting commit: 1f2b0f1
-Runtime behavior changed: no production behavior change by default; listener disabled unless ASTRO_LISTENING_ANALYZER_ENABLED=true
+Phase: Companion Phase 2 ReadingPlan Builder
+Branch: phase-rag-foundation or active companion branch
+Starting commit: 7c2156c
+Runtime behavior changed: no production behavior change by default; ReadingPlan disabled unless ASTRO_READING_PLAN_ENABLED=true
 UI changed: no
 DB changed: no
-Listening analyzer:
-- adds ListeningAnalysis type
-- deterministic fallback first
-- optional Ollama path via Phase 27 local model router
-- qwen2.5:3b remains default
-- invalid JSON/timeout/error falls back
-- maps emotional context, missing context, safety risks, humanization hints
+ReadingPlan:
+- adds ReadingPlan type
+- adds builder/policy/renderer
+- uses ListeningAnalysis when provided
+- preserves chart evidence and anchors
+- adds limitations for missing data
+- prohibits timing without timing source
+- keeps remedies safe and conditional
+- deterministic renderer fallback added
 Safety:
 - no chart facts invented
-- no timing predictions
-- no remedies
-- death/medical/legal/financial/self-harm risks detected
+- no timing predictions without source
+- no fear-based remedies
+- safety risks map to boundaries
 Validation:
-- listening analyzer tests:
-- listening fallback tests:
-- listening policy tests:
-- local model router tests:
-- local analyzer tests:
-- safety gate/validator tests:
+- reading plan builder tests:
+- reading plan policy tests:
+- reading plan renderer tests:
+- listening tests:
 - feature flag tests:
+- safety/timing/remedy/exact tests:
 - rag API route tests:
 - rag UI tests:
 - smoke script tests:
@@ -39,4 +40,4 @@ Deployment:
 Remaining blockers:
 - none
 Next:
-- Phase 2 ReadingPlan Builder
+- Phase 3 Groq Compassionate Synthesis from Plan

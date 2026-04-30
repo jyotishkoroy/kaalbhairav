@@ -6,6 +6,7 @@
 
 export type AstroRagFlags = {
   ragEnabled: boolean;
+  readingPlanEnabled?: boolean;
   reasoningGraphEnabled: boolean;
   listeningAnalyzerEnabled?: boolean;
   askFollowupWhenInsufficient: boolean;
@@ -66,6 +67,7 @@ function readMemoryMaxChars(value: string | undefined, defaultValue: number): nu
 export function getAstroRagFlags(env: Record<string, string | undefined> = process.env): AstroRagFlags {
   return {
     ragEnabled: readBool(env.ASTRO_RAG_ENABLED, false),
+    readingPlanEnabled: readBool(env.ASTRO_READING_PLAN_ENABLED, false),
     reasoningGraphEnabled: readBool(env.ASTRO_REASONING_GRAPH_ENABLED, false),
     listeningAnalyzerEnabled: readBool(env.ASTRO_LISTENING_ANALYZER_ENABLED, false),
     askFollowupWhenInsufficient: readBool(env.ASTRO_ASK_FOLLOWUP_WHEN_INSUFFICIENT, true),
