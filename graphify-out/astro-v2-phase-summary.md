@@ -54,3 +54,52 @@ Deployment:
 - skipped
 Remaining blockers:
 - none
+Phase: 16 Ollama critic client
+Branch: phase-rag-foundation
+Runtime behavior changed: no route/app integration
+UI changed: no
+DB changed: no new migration
+Groq runtime call added: no
+Groq integration tests/contracts: existing provider tests + Groq writer tests checked
+Ollama critic client added: yes
+Ollama live call in tests: no; critic tests use mocked fetch
+Ollama/proxy/analyzer integration contracts: checked through existing proxy/local-analyzer tests
+Supabase live call added: no
+Supabase schema/retrieval contracts: checked through existing tests
+Critic:
+- lib/astro/rag/critic-schema.ts
+- lib/astro/rag/local-critic.ts
+- calls Phase 6 proxy /critic only when enabled/configured
+- advisory only
+- never overrides deterministic safety/exact facts/validator fallback
+- merges retry/fallback advice conservatively
+- failure is non-fatal unless ASTRO_LOCAL_CRITIC_REQUIRED=true
+Validation:
+- critic schema test:
+- local critic test:
+- answer validator tests:
+- groq answer prompt/writer tests:
+- answer contract tests:
+- sufficiency checker test:
+- python timing adapter test:
+- timing engine test:
+- reasoning graph tests:
+- retrieval service/repository tests:
+- required data tests:
+- analyzer schema/local analyzer tests:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor test:
+- repository test:
+- schema test:
+- feature flag test:
+- existing groq/provider tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped
+Remaining blockers:
+- none
