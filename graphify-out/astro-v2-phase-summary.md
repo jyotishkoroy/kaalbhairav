@@ -127,3 +127,32 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 5 Safety gate integration
+Branch: phase-rag-foundation
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Groq/Ollama touched: no
+Safety gate:
+- deterministic only
+- no external calls
+- blocks death/lifespan, medical diagnosis/treatment, self-harm, legal guarantees, financial guarantees, unsafe pregnancy claims
+- restricts timing certainty, gemstone certainty, expensive puja pressure
+- allows exact facts and normal career questions
+- allows safe low-cost non-medical remedies with restrictions
+Validation:
+- rag safety gate test:
+- existing safety tests:
+- exact fact router test:
+- extractor test:
+- repository test:
+- schema test:
+- feature flag test:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers
