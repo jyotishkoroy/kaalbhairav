@@ -1,0 +1,19 @@
+# Phase 7 - Human-Feel Validation Bank
+- Goal: add a CI-safe human-feel validation bank that checks astrology answers for compassion, specificity, practicality, grounding, safety, and non-generic tone without changing runtime behavior.
+- Position in pipeline: companion validation only, downstream of the existing reading, critic, and safety layers.
+- Files added: `lib/astro/validation/human-feel-bank.ts`, `scripts/check-astro-human-feel-bank.ts`, `tests/astro/human-feel-bank.test.ts`, `tests/astro/fixtures/human-feel-reading-bank.json`.
+- Fixture categories: marriage delay, relationship confusion, career stagnation, money anxiety, sleep/remedy request, family pressure, education confusion, foreign settlement, vague life direction, health-adjacent safety, death/lifespan safety, gemstone/remedy pressure, legal/financial guarantee safety, spiritual distress, repeat-user memory continuity.
+- Scoring dimensions: feelsHeard, specificity, safety, practical, grounded, nonGeneric.
+- Deterministic evaluator behavior: validates fixture shape, scores sample answers with pattern checks, and fails cold generic answers, fear-based answers, unsupported timing, unsafe remedies, guarantees, death/lifespan claims, and medical/legal/financial overreach.
+- Optional local AI behavior: only attempts local critic mode when `ASTRO_USE_LOCAL_CRITIC_FOR_TESTS=true`, and it fails soft if the local Ollama proxy or routing is unavailable.
+- CI-safe behavior: the default mode does not require Groq, Ollama, or Supabase, and it does not make live route calls.
+- Report output: writes generated artifacts to `artifacts/astro-human-feel-bank-report.json` and `artifacts/astro-human-feel-bank-summary.md`.
+- What this bank catches: generic answers, fear language, unsupported timing, unsafe remedies, certainty claims, and creepy memory phrasing.
+- What this bank does not do: change `/api/astro/v2/reading`, change the UI, change the DB schema, or deploy anything.
+- Tests run: fixture validation, evaluator behavior, report writing, script wiring, and optional local-AI gating.
+- Runtime behavior changed: no.
+- UI changed: no.
+- DB changed: no.
+- Deployment status: not deployed.
+- Rollback: no runtime rollback required; remove the script from any future CI gate if it blocks unexpectedly, and keep the fixture for manual regression review if useful.
+- Required statements: Human-feel bank does not change production runtime. CI-safe mode does not require Groq/Ollama/Supabase. Optional local AI mode is explicitly opt-in. Reports are generated artifacts and should not be committed. The bank should fail cold generic answers. The bank should fail fear-based answers. The bank should fail unsupported timing. The bank should fail unsafe remedies. The bank should pass grounded compassionate answers. No DB changes. No UI changes.

@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy. -->
 Phase: Companion Phase 5 Supabase Companion Memory
 Branch: phase-rag-foundation
 Starting commit: 751e3f8
@@ -93,3 +96,43 @@ Remaining blockers:
 - Supabase migration deployment pending if still unauthenticated
 Next:
 - Phase 7 Human-Feel Validation Bank
+Phase: Companion Phase 7 Human-Feel Validation Bank
+Branch: phase-rag-foundation
+Starting commit: 505275c
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Validation bank:
+- adds at least 150 human-feel cases
+- covers 15 categories
+- adds deterministic evaluator
+- adds CI-safe check script
+- adds optional local AI mode behind ASTRO_USE_LOCAL_CRITIC_FOR_TESTS=true
+- writes generated reports to artifacts
+Safety:
+- fails generic/cold answers
+- fails fear-based answers
+- fails unsupported timing
+- fails unsupported remedies
+- fails guarantees/death/legal/financial/medical overreach
+Validation:
+- human-feel script: passed
+- human-feel tests: passed
+- companion UI tests: passed
+- memory tests: passed
+- critic/synthesis/reading plan/listening tests: passed
+- feature flag tests: passed
+- safety/fact/timing/remedy/genericness validator tests: passed
+- typecheck: passed
+- lint: passed with pre-existing warnings only
+- build: passed
+- full tests: failed only on unrelated seed-quality failure
+Manual:
+- local AI optional check: not run
+Deployment:
+- Vercel skipped
+Remaining blockers:
+- unrelated npm test question-bank seed failure if still present
+- Supabase migration deployment pending if still unauthenticated
+Next:
+- Phase 8 Live Parity Validation
