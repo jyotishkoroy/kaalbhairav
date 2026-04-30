@@ -1,0 +1,22 @@
+# Phase 4 - Ollama Critic
+- Goal: add a companion-reading Ollama critic layer that evaluates the final candidate answer against the supplied ReadingPlan and ListeningAnalysis.
+- Position in pipeline: the critic sits after Groq compassionate synthesis, but Phase 4 does not wire it into the live route/orchestrator by default.
+- Files added: `lib/astro/critic/reading-critic-types.ts`, `lib/astro/critic/reading-critic.ts`, `lib/astro/critic/critic-prompts.ts`, `lib/astro/critic/critic-policy.ts`, `lib/astro/critic/index.ts`, `tests/astro/critic/reading-critic.test.ts`, `tests/astro/critic/critic-policy.test.ts`.
+- Feature flags: `ASTRO_OLLAMA_CRITIC_ENABLED=false` by default; `ASTRO_COMPANION_PIPELINE_ENABLED=false` remains the default; `ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED` alone does not enable the critic; `ASTRO_RAG_ENABLED` alone does not enable the critic; `ASTRO_LOCAL_CRITIC_ENABLED` alone does not enable the companion critic.
+- Critic input: question, ListeningAnalysis, ReadingPlan, candidate answer, safety boundaries, and environment context for policy checks.
+- Critic output: `ReadingCriticResult` with safety, grounding, specificity, compassion, score fields, missing element markers, unsafe/invented/timing/remedy findings, rewrite instructions, and source.
+- Prompt rules: the critic must return JSON only, must not write the final answer, must not add astrology facts, and must not leak internal metadata, secrets, or local URLs.
+- Deterministic critic checks: the policy adds findings for generic language, fear-based language, missing emotional acknowledgement, missing chart anchor, missing lived experience, missing practical guidance, missing reassurance, missing follow-up in follow-up mode, missing safety boundary, unsupported timing, unsupported remedies, invented chart facts, death/lifespan certainty, guarantee claims, and internal metadata exposure.
+- Rewrite policy: at most one rewrite instruction set is allowed, and only for mild quality issues. Unsafe claims, invented facts, unsupported timing, unsupported remedies, or high fear scores block rewrite.
+- Fallback behavior: invalid JSON, timeout, client failure, or invalid shape falls back safely. The critic never throws for normal model failure.
+- Local model/router behavior: the critic uses Phase 27 local model routing for task `critic`, with `qwen2.5:3b` as the default path and `qwen2.5:7b` not used as the default.
+- Safety behavior: deterministic safety remains final authority. The critic cannot make an unsafe answer safe and cannot override deterministic safety findings.
+- What critic may do: flag generic/fearful/ungrounded answers, suggest one rewrite direction for mild quality issues, and confirm when an answer feels heard and grounded.
+- What critic must not do: write the final answer, invent chart facts, invent timing, invent remedies, expose raw model payloads, or expose raw debug metadata to UI/API.
+- Tests run: critic policy tests, critic runner tests, synthesis regression tests, reading plan regression tests, listening regression tests, feature flag regression tests, local model router tests, and existing validator suites.
+- Runtime behavior changed: no production behavior change by default; critic remains disabled unless both `ASTRO_OLLAMA_CRITIC_ENABLED=true` and `ASTRO_COMPANION_PIPELINE_ENABLED=true`.
+- UI changed: no.
+- DB changed: no.
+- Actual rewrite generation is not implemented in Phase 4.
+- No real Ollama calls in tests.
+- Rollback: set `ASTRO_OLLAMA_CRITIC_ENABLED=false`, `ASTRO_COMPANION_PIPELINE_ENABLED=false`, and `ASTRO_LOCAL_CRITIC_REQUIRED=false`; keep deterministic safety and synthesis acceptance checks active. No database rollback is required.

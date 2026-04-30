@@ -160,6 +160,9 @@ function getTaskEnabled(task: LocalAiTask, env: LocalModelRouterEnv): boolean {
     if (env.ASTRO_LISTENING_ANALYZER_ENABLED === "false") return false;
     return listening && localAnalyzerEnabled;
   }
+  if (task === "critic") {
+    return parseLocalBoolean(env.ASTRO_OLLAMA_CRITIC_ENABLED, false) || parseLocalBoolean(env.ASTRO_LOCAL_CRITIC_ENABLED, false);
+  }
   return parseLocalBoolean(readFirstValue(env, keys), false);
 }
 

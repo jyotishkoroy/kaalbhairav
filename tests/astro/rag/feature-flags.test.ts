@@ -18,6 +18,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.listeningAnalyzerEnabled).toBe(false);
     expect(flags.localAnalyzerEnabled).toBe(false);
     expect(flags.localCriticEnabled).toBe(false);
+    expect(flags.localOllamaCriticEnabled).toBe(false);
     expect(flags.llmAnswerEngineEnabled).toBe(false);
     expect(flags.timingEngineEnabled).toBe(false);
     expect(flags.exactFactsDeterministic).toBe(true);
@@ -38,6 +39,7 @@ describe("getAstroRagFlags", () => {
       ASTRO_LISTENING_ANALYZER_ENABLED: "true",
       ASTRO_LOCAL_ANALYZER_ENABLED: "true",
       ASTRO_LOCAL_CRITIC_ENABLED: "true",
+      ASTRO_OLLAMA_CRITIC_ENABLED: "true",
       ASTRO_LLM_ANSWER_ENGINE_ENABLED: "true",
       ASTRO_TIMING_ENGINE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_ENABLED: "true",
@@ -54,6 +56,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.listeningAnalyzerEnabled).toBe(true);
     expect(flags.localAnalyzerEnabled).toBe(true);
     expect(flags.localCriticEnabled).toBe(true);
+    expect(flags.localOllamaCriticEnabled).toBe(true);
     expect(flags.llmAnswerEngineEnabled).toBe(true);
     expect(flags.timingEngineEnabled).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(true);

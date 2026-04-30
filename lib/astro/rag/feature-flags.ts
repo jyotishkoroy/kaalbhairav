@@ -20,6 +20,7 @@ export type AstroRagFlags = {
   localAnalyzerMaxInputChars: number;
   localAnalyzerConcurrency: number;
   localCriticEnabled: boolean;
+  localOllamaCriticEnabled?: boolean;
   localCriticRequired: boolean;
   localCriticTimeoutMs: number;
   llmAnswerEngineEnabled: boolean;
@@ -82,6 +83,7 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
     localAnalyzerMaxInputChars: readInt(env.ASTRO_LOCAL_ANALYZER_MAX_INPUT_CHARS, 12000),
     localAnalyzerConcurrency: readInt(env.ASTRO_LOCAL_ANALYZER_CONCURRENCY, 1),
     localCriticEnabled: readBool(env.ASTRO_LOCAL_CRITIC_ENABLED, false),
+    localOllamaCriticEnabled: readBool(env.ASTRO_OLLAMA_CRITIC_ENABLED, false),
     localCriticRequired: readBool(env.ASTRO_LOCAL_CRITIC_REQUIRED, false),
     localCriticTimeoutMs: readInt(env.ASTRO_LOCAL_CRITIC_TIMEOUT_MS, 15000),
     llmAnswerEngineEnabled: readBool(env.ASTRO_LLM_ANSWER_ENGINE_ENABLED, false),

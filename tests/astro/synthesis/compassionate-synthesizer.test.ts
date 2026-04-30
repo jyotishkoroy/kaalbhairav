@@ -9,6 +9,10 @@ import { buildReadingPlan, renderReadingPlanFallback, synthesizeCompassionatelyS
 import type { ListeningAnalysis } from "../../../lib/astro/listening";
 import type { CompassionateSynthesisClient } from "../../../lib/astro/synthesis";
 
+function firstSynthCall<T>(client: { synthesize: { mock: { calls: Array<unknown[]> } } }): T {
+  return client.synthesize.mock.calls[0]?.[0] as T;
+}
+
 const listening = {
   topic: "career",
   emotionalTone: "anxious",
@@ -130,63 +134,63 @@ describe("synthesizeCompassionatelySafely", () => {
   it("prompt includes ReadingPlan evidence", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].prompt.user).toContain("ReadingPlan");
+    expect(firstSynthCall<{ prompt: { user: string } }>(client).prompt.user).toContain("ReadingPlan");
   });
   it("prompt includes safety boundaries", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: ["boundary"], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].prompt.user).toContain("boundary");
+    expect(firstSynthCall<{ prompt: { user: string } }>(client).prompt.user).toContain("boundary");
   });
   it("prompt includes memory summary when provided", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), memorySummary: "Memory", safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].prompt.user).toContain("Memory");
+    expect(firstSynthCall<{ prompt: { user: string } }>(client).prompt.user).toContain("Memory");
   });
   it("prompt does not include env secrets", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: { ...baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), GROQ_API_KEY: "secret" }, client });
-    const body = (client.synthesize.mock.calls[0] as any)[0].prompt.user;
+    const body = firstSynthCall<{ prompt: { user: string } }>(client).prompt.user;
     expect(body).not.toContain("secret");
   });
   it("model default is openai/gpt-oss-120b", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].model).toBe("openai/gpt-oss-120b");
+    expect(firstSynthCall<{ model: string }>(client).model).toBe("openai/gpt-oss-120b");
   });
   it("timeout default is 8000", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].timeoutMs).toBe(8000);
+    expect(firstSynthCall<{ timeoutMs: number }>(client).timeoutMs).toBe(8000);
   });
   it("max tokens default is 1100", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].maxTokens).toBe(1100);
+    expect(firstSynthCall<{ maxTokens: number }>(client).maxTokens).toBe(1100);
   });
   it("temperature default is 0.35", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].temperature).toBe(0.35);
+    expect(firstSynthCall<{ temperature: number }>(client).temperature).toBe(0.35);
   });
   it("env overrides model", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true", ASTRO_COMPASSIONATE_SYNTHESIS_MODEL: "test-model" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].model).toBe("test-model");
+    expect(firstSynthCall<{ model: string }>(client).model).toBe("test-model");
   });
   it("env overrides timeout safely", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true", ASTRO_COMPASSIONATE_SYNTHESIS_TIMEOUT_MS: "5000" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].timeoutMs).toBe(5000);
+    expect(firstSynthCall<{ timeoutMs: number }>(client).timeoutMs).toBe(5000);
   });
   it("env overrides max tokens safely", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true", ASTRO_COMPASSIONATE_SYNTHESIS_MAX_TOKENS: "700" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].maxTokens).toBe(700);
+    expect(firstSynthCall<{ maxTokens: number }>(client).maxTokens).toBe(700);
   });
   it("env overrides temperature safely", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
     await synthesizeCompassionatelySafely({ question: "Q", listening, plan: plan(), safetyBoundaries: [], fallbackAnswer: "fallback", env: baseEnv({ ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true", ASTRO_COMPANION_PIPELINE_ENABLED: "true", ASTRO_COMPASSIONATE_SYNTHESIS_TEMPERATURE: "0.1" }), client });
-    expect((client.synthesize.mock.calls[0] as any)[0].temperature).toBe(0.1);
+    expect(firstSynthCall<{ temperature: number }>(client).temperature).toBe(0.1);
   });
   it("source groq only when accepted", async () => {
     const client = { synthesize: vi.fn(async () => "I hear how hard this feels. Saturn points to delay, so keep showing your work and taking one concrete step each week. Timing is uncertain, and I will stay with the grounded pattern. You are not blocked forever.") };
