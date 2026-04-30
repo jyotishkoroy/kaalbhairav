@@ -28,3 +28,23 @@
 ## Files intentionally not committed
 
 - private/generated artifacts only, including `.env.local`, docx/zip uploads, raw benchmark markdown files, generated JSONL files, live check reports, `tmp/`, and `graphify-out.zip`
+Phase: 1 feature flag and module skeleton
+Branch: phase-rag-foundation
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Groq/Ollama touched: no external calls; only disabled skeleton files added
+Validation:
+- feature flag test: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
+Files changed:
+- lib/astro/rag/*
+- tests/astro/rag/feature-flags.test.ts
+- docs/astro-rag/phase-1-feature-flags.md
+Deployment:
+- skipped
+Remaining blockers:
+- none

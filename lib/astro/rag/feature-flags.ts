@@ -1,0 +1,80 @@
+export type AstroRagFlags = {
+  ragEnabled: boolean;
+  reasoningGraphEnabled: boolean;
+  askFollowupWhenInsufficient: boolean;
+  ragFallbackDeterministic: boolean;
+  exactFactsDeterministic: boolean;
+  localAnalyzerEnabled: boolean;
+  localAnalyzerProvider: "ollama";
+  localAnalyzerModel: string;
+  localAnalyzerBaseUrl: string;
+  localAnalyzerTimeoutMs: number;
+  localAnalyzerMaxInputChars: number;
+  localAnalyzerConcurrency: number;
+  localCriticEnabled: boolean;
+  localCriticRequired: boolean;
+  localCriticTimeoutMs: number;
+  llmAnswerEngineEnabled: boolean;
+  llmProvider: "groq";
+  llmAnswerModel: string;
+  llmMaxTokens: number;
+  llmTemperature: number;
+  llmRetryOnValidationFail: boolean;
+  timingEngineEnabled: boolean;
+  timingSource: "report_only" | "stored" | "python_oracle";
+  oracleVmTimingEnabled: boolean;
+  validateLlmOutput: boolean;
+  storeValidationResults: boolean;
+};
+
+function readBool(value: string | undefined, defaultValue: boolean): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return defaultValue;
+}
+
+function readInt(value: string | undefined, defaultValue: number): number {
+  if (!value) return defaultValue;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
+function readFloat(value: string | undefined, defaultValue: number): number {
+  if (!value) return defaultValue;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+export function getAstroRagFlags(env: Record<string, string | undefined> = process.env): AstroRagFlags {
+  return {
+    ragEnabled: readBool(env.ASTRO_RAG_ENABLED, false),
+    reasoningGraphEnabled: readBool(env.ASTRO_REASONING_GRAPH_ENABLED, false),
+    askFollowupWhenInsufficient: readBool(env.ASTRO_ASK_FOLLOWUP_WHEN_INSUFFICIENT, true),
+    ragFallbackDeterministic: readBool(env.ASTRO_RAG_FALLBACK_DETERMINISTIC, true),
+    exactFactsDeterministic: readBool(env.ASTRO_EXACT_FACTS_DETERMINISTIC, true),
+    localAnalyzerEnabled: readBool(env.ASTRO_LOCAL_ANALYZER_ENABLED, false),
+    localAnalyzerProvider: "ollama",
+    localAnalyzerModel: env.ASTRO_LOCAL_ANALYZER_MODEL || "qwen2.5:3b",
+    localAnalyzerBaseUrl: env.ASTRO_LOCAL_ANALYZER_BASE_URL || "http://127.0.0.1:8787",
+    localAnalyzerTimeoutMs: readInt(env.ASTRO_LOCAL_ANALYZER_TIMEOUT_MS, 15000),
+    localAnalyzerMaxInputChars: readInt(env.ASTRO_LOCAL_ANALYZER_MAX_INPUT_CHARS, 12000),
+    localAnalyzerConcurrency: readInt(env.ASTRO_LOCAL_ANALYZER_CONCURRENCY, 1),
+    localCriticEnabled: readBool(env.ASTRO_LOCAL_CRITIC_ENABLED, false),
+    localCriticRequired: readBool(env.ASTRO_LOCAL_CRITIC_REQUIRED, false),
+    localCriticTimeoutMs: readInt(env.ASTRO_LOCAL_CRITIC_TIMEOUT_MS, 15000),
+    llmAnswerEngineEnabled: readBool(env.ASTRO_LLM_ANSWER_ENGINE_ENABLED, false),
+    llmProvider: "groq",
+    llmAnswerModel: env.ASTRO_LLM_ANSWER_MODEL || "openai/gpt-oss-120b",
+    llmMaxTokens: readInt(env.ASTRO_LLM_MAX_TOKENS, 900),
+    llmTemperature: readFloat(env.ASTRO_LLM_TEMPERATURE, 0.2),
+    llmRetryOnValidationFail: readBool(env.ASTRO_LLM_RETRY_ON_VALIDATION_FAIL, true),
+    timingEngineEnabled: readBool(env.ASTRO_TIMING_ENGINE_ENABLED, false),
+    timingSource:
+      env.ASTRO_TIMING_SOURCE === "stored" || env.ASTRO_TIMING_SOURCE === "python_oracle"
+        ? env.ASTRO_TIMING_SOURCE
+        : "report_only",
+    oracleVmTimingEnabled: readBool(env.ASTRO_ORACLE_VM_TIMING_ENABLED, false),
+    validateLlmOutput: readBool(env.ASTRO_VALIDATE_LLM_OUTPUT, true),
+    storeValidationResults: readBool(env.ASTRO_STORE_VALIDATION_RESULTS, true),
+  };
+}
