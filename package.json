@@ -27,6 +27,7 @@
     "check:astro-rag-live": "npx tsx scripts/check-astro-rag-live.ts",
     "compare:astro-rag-local-live": "npx tsx scripts/compare-astro-rag-local-vs-live.ts",
     "check:local-ollama-health": "npx tsx scripts/check-local-ollama-health.ts",
+    "validate:astro-rag-rollout": "npx tsx scripts/validate-astro-rag-rollout.ts",
     "parse:astro-benchmarks": "npx tsx scripts/parse-astro-benchmark-md.ts",
     "ingest:astro-benchmarks": "npx tsx scripts/ingest-astro-benchmark-examples.ts",
     "start": "next start",

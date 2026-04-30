@@ -198,3 +198,41 @@ Deployment:
 - skipped
 Remaining blockers:
 - none in repo code; local smoke scripts need installed `tsx` or a shell path to run without network lookup
+Phase: 25 Staged rollout
+Branch: phase-rag-foundation
+Runtime behavior changed: no code runtime behavior change unless validation helper only
+UI changed: no
+DB changed: no
+Rollout:
+- Stage A local deterministic RAG documented
+- Stage B preview deterministic RAG documented
+- Stage C preview Groq writer documented
+- Stage D production RAG without laptop documented
+- Stage E production optional laptop documented
+- production laptop remains optional
+- no production flags enabled in code
+Validation helper:
+- scripts/validate-astro-rag-rollout.ts
+- validates safe rollout flag combinations
+- rejects unsafe production laptop/validator settings
+Validation:
+- rollout validation tests:
+- feature flag tests:
+- smoke script tests:
+- rag API route tests:
+- rag UI tests:
+- orchestrator tests:
+- companion memory tests:
+- fallback/retry tests:
+- groq writer tests:
+- analyzer/critic/proxy tests:
+- validator/safety/timing/remedy tests:
+- schema tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers
