@@ -167,4 +167,7 @@ describe("groq answer prompt", () => {
   it("compact contract keeps canUseGroq", () => expect(compactContractForPrompt(base.contract).canUseGroq).toBe(true));
   it("compact timing respects allowed flag", () => expect(compactTimingForPrompt(base.timing).allowed).toBe(true));
   it("system prompt references JSON keys exactly", () => expect(buildGroqAnswerMessages(base).system).toContain("answer, sections, usedAnchors, limitations, suggestedFollowUp, confidence"));
+  it("retry system prompt includes correction directive", () => expect(buildGroqAnswerMessages({ ...base, correctionInstruction: "fix grounding" }).system).toContain("This is a retry. Correct the prior issues exactly. Do not introduce new facts."));
+  it("retry user prompt includes correctionInstruction", () => expect(buildGroqAnswerMessages({ ...base, correctionInstruction: "fix grounding" }).user).toContain('"correctionInstruction"'));
+  it("retry prompt does not leak secrets", () => expect(buildGroqAnswerMessages({ ...base, correctionInstruction: "fix TARAYAI_LOCAL_SECRET" }).user).not.toContain("TARAYAI_LOCAL_SECRET"));
 });

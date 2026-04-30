@@ -7,6 +7,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "next dev -H 127.0.0.1",
+    "verify:astro-local": "next dev -H 127.0.0.1 -p 3001",
     "build": "next build",
     "generate:astro-v2-question-bank": "node scripts/generate-astro-v2-question-bank.mjs",
     "parse:astro-v2-generic-qa-bank": "node scripts/parse-astro-v2-generic-qa-bank.mjs",
@@ -20,6 +22,7 @@
     "check:astro-v2-live": "node scripts/check-astro-v2-live.mjs",
     "check:astro-v2-live-banks": "node scripts/check-astro-v2-live-banks.mjs",
     "check:astro-v2-live-banks:full": "ASTRO_V2_LIVE_FULL=1 node scripts/check-astro-v2-live-banks.mjs",
+    "compare:astro-v2-local-live": "node scripts/compare-astro-v2-local-vs-live.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

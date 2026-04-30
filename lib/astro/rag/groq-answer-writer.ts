@@ -25,6 +25,7 @@ export type GroqAnswerWriterInput = {
   context: RetrievalContext;
   reasoningPath: ReasoningPath;
   timing: TimingContext;
+  correctionInstruction?: string;
   env?: Record<string, string | undefined>;
   flags?: AstroRagFlags;
   fetchImpl?: FetchLike;
@@ -272,6 +273,7 @@ export async function writeGroqRagAnswer(input?: Partial<GroqAnswerWriterInput>)
     context: input.context,
     reasoningPath: input.reasoningPath,
     timing: input.timing,
+    correctionInstruction: input.correctionInstruction,
   });
   const promptBytes = new TextEncoder().encode(`${prompt.system}\n\n${prompt.user}`).byteLength;
   const timeoutMs = readTimeoutMs(input.env);

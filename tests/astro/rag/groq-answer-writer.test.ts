@@ -202,6 +202,20 @@ describe("groq answer writer", () => {
       const result = await writeGroqRagAnswer({ ...pipeline, env: { GROQ_API_KEY: "k" }, flags: { ...defaultFlags(), llmAnswerEngineEnabled: true }, fetchImpl });
       expect(result.metadata.promptBytes).toBeGreaterThan(0);
     });
+    it("retry correctionInstruction flows into prompt", async () => {
+      const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: JSON.stringify(validAnswer()) } }] }));
+      await writeGroqRagAnswer({ ...pipeline, correctionInstruction: "Fix grounding", env: { GROQ_API_KEY: "k" }, flags: { ...defaultFlags(), llmAnswerEngineEnabled: true }, fetchImpl });
+      const body = JSON.parse(String(firstCall(fetchImpl)[1].body)) as { messages: Array<{ role: string; content: string }> };
+      expect(body.messages[0].content).toContain("This is a retry. Correct the prior issues exactly. Do not introduce new facts.");
+      expect(body.messages[1].content).toContain('"correctionInstruction"');
+    });
+    it("retry prompt does not include secrets", async () => {
+      const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: JSON.stringify(validAnswer()) } }] }));
+      await writeGroqRagAnswer({ ...pipeline, correctionInstruction: "TARAYAI_LOCAL_SECRET", env: { GROQ_API_KEY: "k" }, flags: { ...defaultFlags(), llmAnswerEngineEnabled: true }, fetchImpl });
+      const body = JSON.parse(String(firstCall(fetchImpl)[1].body)) as { messages: Array<{ role: string; content: string }> };
+      expect(body.messages[0].content).not.toContain("TARAYAI_LOCAL_SECRET");
+      expect(body.messages[1].content).not.toContain("TARAYAI_LOCAL_SECRET");
+    });
   });
 
   describe("success", () => {

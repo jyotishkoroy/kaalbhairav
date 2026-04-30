@@ -13,6 +13,7 @@ export type GroqPromptInput = {
   context: RetrievalContext;
   reasoningPath: ReasoningPath;
   timing: TimingContext;
+  correctionInstruction?: string;
 };
 
 export type GroqPromptMessages = {
@@ -23,6 +24,12 @@ export type GroqPromptMessages = {
 function trimText(value: unknown, max = 300): string {
   const text = typeof value === "string" ? value.trim() : "";
   return text.length > max ? text.slice(0, max) : text;
+}
+
+function sanitizeRetryInstruction(value: unknown): string {
+  return trimText(value, 2000)
+    .replace(/TARAYAI_LOCAL_SECRET/gi, "[redacted]")
+    .replace(/GROQ_API_KEY/gi, "[redacted]");
 }
 
 function compactList(values: unknown, max = 30): string[] {
@@ -260,13 +267,15 @@ export function buildGroqAnswerMessages(input: GroqPromptInput): GroqPromptMessa
     "Do not predict death/lifespan/fatal events.",
     "Do not claim gemstones/puja guarantee outcomes.",
     "Keep tone human, clear, calm, companion-like, not robotic.",
+    input.correctionInstruction ? "This is a retry. Correct the prior issues exactly. Do not introduce new facts." : "",
     "Must output valid JSON only.",
     "JSON keys exactly: answer, sections, usedAnchors, limitations, suggestedFollowUp, confidence",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 
   const user = JSON.stringify(
     {
       question: trimText(input.question, 1000),
+      correctionInstruction: sanitizeRetryInstruction(input.correctionInstruction),
       contract: compactContractForPrompt(input.contract),
       retrievedFacts: compactContextForPrompt(input.context),
       reasoningPath: compactReasoningPathForPrompt(input.reasoningPath),
@@ -280,6 +289,7 @@ export function buildGroqAnswerMessages(input: GroqPromptInput): GroqPromptMessa
         };
       }),
       writerInstructions: compactList(input.contract.writerInstructions, 20),
+      retryDirective: input.correctionInstruction ? "This is a retry. Correct the prior issues exactly. Do not introduce new facts." : "",
     },
     null,
     2,
