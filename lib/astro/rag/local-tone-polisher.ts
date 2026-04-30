@@ -147,7 +147,10 @@ export function buildTonePolisherPrompt(input: TonePolisherInput): { system: str
 }
 
 function validationInputFromTone(input: TonePolisherInput, answer: string): AnswerValidationInput | null {
-  if (!input.allowedFacts?.length && !input.requiredBoundaries?.length && !input.forbiddenClaims?.length) return null;
+  const allowedFacts = input.allowedFacts ?? [];
+  const requiredBoundaries = input.requiredBoundaries ?? [];
+  const forbiddenClaims = input.forbiddenClaims ?? [];
+  if (!allowedFacts.length && !requiredBoundaries.length && !forbiddenClaims.length) return null;
   return {
     question: input.question,
     answer,
@@ -159,8 +162,8 @@ function validationInputFromTone(input: TonePolisherInput, answer: string): Answ
       mustNotInclude: [],
       requiredSections: [],
       optionalSections: [],
-      anchors: input.allowedFacts.map((fact) => ({ key: fact, label: fact, required: false, source: "chart_fact", factKeys: [fact], ruleKeys: [], description: fact })),
-      forbiddenClaims: input.forbiddenClaims.map((claim) => ({ key: claim, description: claim, severity: "block" })),
+      anchors: allowedFacts.map((fact) => ({ key: fact, label: fact, required: false, source: "chart_fact", factKeys: [fact], ruleKeys: [], description: fact })),
+      forbiddenClaims: forbiddenClaims.map((claim) => ({ key: claim, description: claim, severity: "block" })),
       timingAllowed: input.mode !== "timing",
       timingRequired: false,
       remedyAllowed: input.mode === "remedy",
@@ -173,7 +176,7 @@ function validationInputFromTone(input: TonePolisherInput, answer: string): Answ
       validatorRules: [],
       writerInstructions: [],
       metadata: {
-        requiredFactKeys: input.allowedFacts ?? [],
+        requiredFactKeys: allowedFacts,
         missingFacts: [],
         selectedRuleKeys: [],
         timingWindowCount: 0,

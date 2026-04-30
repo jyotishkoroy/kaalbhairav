@@ -105,7 +105,12 @@ function okResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-type CriticExpectation = (critic: LocalCriticResult | null) => void;
+type CriticExpectation = (critic: LocalCriticResult) => void;
+
+function assertCritic(critic: LocalCriticResult | null): LocalCriticResult {
+  expect(critic).not.toBeNull();
+  return critic as LocalCriticResult;
+}
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -186,7 +191,7 @@ describe("local critic quality detection", () => {
   ];
   it.each(cases)("%s", async (_name, answer, criticOverrides, expected) => {
     const result = await goodCritic(criticOverrides, answer);
-    expected(result.critic);
+    expected(assertCritic(result.critic));
   });
 });
 
@@ -209,7 +214,7 @@ describe("local critic safety detection", () => {
   ];
   it.each(cases)("%s", async (_name, answer, criticOverrides, expected) => {
     const result = await goodCritic(criticOverrides, answer);
-    expected(result.critic);
+    expected(assertCritic(result.critic));
   });
 });
 
@@ -228,7 +233,7 @@ describe("local critic grounding and leakage", () => {
   ];
   it.each(cases)("%s", async (_name, answer, criticOverrides, expected) => {
     const result = await goodCritic(criticOverrides, answer);
-    expected(result.critic);
+    expected(assertCritic(result.critic));
   });
 });
 
