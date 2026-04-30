@@ -1,0 +1,144 @@
+import type { ChartFact } from "./chart-fact-extractor";
+import type { RequiredDataPlan } from "./required-data-planner";
+
+export type SupabaseQueryResult<T> = {
+  data: T[] | null;
+  error: { message?: string; code?: string; details?: string } | null;
+};
+
+export type SupabaseQueryLike<T = unknown> = {
+  select: (columns?: string) => SupabaseQueryLike<T>;
+  eq: (column: string, value: unknown) => SupabaseQueryLike<T>;
+  in: (column: string, values: unknown[]) => SupabaseQueryLike<T>;
+  contains: (column: string, value: unknown) => SupabaseQueryLike<T>;
+  overlaps: (column: string, value: unknown) => SupabaseQueryLike<T>;
+  or: (filters: string) => SupabaseQueryLike<T>;
+  order: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => SupabaseQueryLike<T>;
+  limit: (count: number) => PromiseLike<SupabaseQueryResult<T>> | SupabaseQueryLike<T>;
+  then?: unknown;
+};
+
+export type SupabaseLikeClient = {
+  from: <T = unknown>(table: string) => SupabaseQueryLike<T>;
+};
+
+export type ReasoningRule = {
+  id: string;
+  ruleKey: string;
+  domain: string;
+  title: string;
+  description: string;
+  requiredFactTypes: string[];
+  requiredTags: string[];
+  reasoningTemplate: string;
+  weight: number;
+  safetyNotes: string[];
+  enabled: boolean;
+  metadata: Record<string, unknown>;
+};
+
+export type BenchmarkExample = {
+  id: string;
+  exampleKey: string;
+  domain: string;
+  question: string;
+  answer: string;
+  reasoning: string | null;
+  accuracyClass: string | null;
+  readingStyle: string | null;
+  followUpQuestion: string | null;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  enabled: boolean;
+};
+
+export type TimingWindow = {
+  id: string;
+  userId: string;
+  profileId: string | null;
+  domain: string;
+  label: string;
+  startsOn: string | null;
+  endsOn: string | null;
+  interpretation: string;
+  source: "dasha" | "varshaphal" | "python_transit" | "stored" | "user_provided";
+  confidence: "partial" | "strong";
+  tags: string[];
+  metadata: Record<string, unknown>;
+};
+
+export type SafeRemedy = {
+  id: string;
+  domain: string;
+  title: string;
+  description: string;
+  tags: string[];
+  restrictions: string[];
+  source: "rule" | "benchmark" | "deterministic";
+};
+
+export type RetrievalContext = {
+  chartFacts: ChartFact[];
+  reasoningRules: ReasoningRule[];
+  benchmarkExamples: BenchmarkExample[];
+  timingWindows: TimingWindow[];
+  safeRemedies: SafeRemedy[];
+  memorySummary?: string;
+  metadata: {
+    userId: string;
+    profileId: string | null;
+    domain: RequiredDataPlan["domain"];
+    requestedFactKeys: string[];
+    retrievalTags: string[];
+    errors: string[];
+    partial: boolean;
+  };
+};
+
+export type RetrievalServiceInput = {
+  supabase: SupabaseLikeClient;
+  userId: string;
+  profileId?: string | null;
+  plan: RequiredDataPlan;
+  limit?: number;
+  includeBenchmarks?: boolean;
+  includeTiming?: boolean;
+  includeRemedies?: boolean;
+  memorySummary?: string;
+};
+
+export type RepositoryResult<T> = {
+  ok: boolean;
+  data: T[];
+  error?: string;
+  partial?: boolean;
+};
+
+export function normalizeStringArray(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : value == null ? [] : [value];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of values) {
+    const text = typeof item === "string" ? item.trim() : typeof item === "number" && Number.isFinite(item) ? String(item) : "";
+    if (!text) continue;
+    const normalized = text.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(text);
+  }
+  return out;
+}
+
+export function compactRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return { ...(value as Record<string, unknown>) };
+}
+
+export function snakeToCamelRecord(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    const camel = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    out[camel] = value;
+  }
+  return out;
+}
