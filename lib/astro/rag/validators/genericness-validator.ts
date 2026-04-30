@@ -9,12 +9,24 @@ function sentencePieces(text: string): string[] {
   return text.split(/[.!?]+/).map((item) => item.trim()).filter(Boolean);
 }
 
+function dedupeAdjacentTerms(text: string): string {
+  const words = text.split(/\s+/);
+  const output: string[] = [];
+  for (const word of words) {
+    const prev = output[output.length - 1];
+    if (prev && prev.toLowerCase() === word.toLowerCase()) continue;
+    output.push(word);
+  }
+  return output.join(" ");
+}
+
 export function validateGenericness(input: AnswerValidationInput): {
   issues: ValidationIssue[];
   genericnessScore: number;
 } {
   const answer = input.answer ?? "";
-  const lower = normalizeText(answer);
+  const normalizedAnswer = dedupeAdjacentTerms(answer);
+  const lower = normalizeText(normalizedAnswer);
   const issues: ValidationIssue[] = [];
   let score = 0;
   const mode = input.contract.answerMode;
@@ -33,21 +45,21 @@ export function validateGenericness(input: AnswerValidationInput): {
   }
 
   const genericPhrases = ["work hard", "stay positive", "things will improve", "trust the process", "good things are coming", "be patient"];
-  const genericHits = genericPhrases.filter((phrase) => textIncludesLoose(answer, phrase));
+  const genericHits = genericPhrases.filter((phrase) => textIncludesLoose(normalizedAnswer, phrase));
   if (genericHits.length) {
     score += 0.4;
     issues.push(buildIssue("generic_answer", "warning", "Answer relies on generic advice.", genericHits[0]));
   }
 
-  if (!input.contract.anchors?.some((anchor) => anchor.required && textIncludesLoose(answer, anchor.key))) {
+  if (!input.contract.anchors?.some((anchor) => anchor.required && textIncludesLoose(normalizedAnswer, anchor.key))) {
     score += 0.2;
   }
 
-  if (!/(direct answer|chart basis|reasoning|what to do|safe remedies|limitations|accuracy|follow up|suggested follow up|safety response)/i.test(answer)) {
+  if (!/(direct answer|chart basis|reasoning|what to do|safe remedies|limitations|accuracy|follow up|suggested follow up|safety response)/i.test(normalizedAnswer)) {
     score += 0.1;
   }
 
-  const sentences = sentencePieces(answer);
+  const sentences = sentencePieces(normalizedAnswer);
   if (sentences.length > 1) {
     const dup = sentences.find((sentence, index) => sentences.indexOf(sentence) !== index);
     if (dup) {
@@ -85,7 +97,7 @@ export function validateGenericness(input: AnswerValidationInput): {
     issues.push(buildIssue("does_not_answer_question", "warning", "Answer does not address the expected domain.", domain));
   }
 
-  const remedyLike = /(mantra|breath|breathing|routine|sleep hygiene|remedy|optional)/i.test(answer);
+  const remedyLike = /(mantra|breath|breathing|routine|sleep hygiene|remedy|optional)/i.test(normalizedAnswer);
   if (mode === "interpretive" && score >= 0.55 && !(input.contract.remedyAllowed && remedyLike)) {
     issues.push(buildIssue("generic_answer", "error", "Answer is too generic for an interpretive response.", answer.slice(0, 120)));
   }

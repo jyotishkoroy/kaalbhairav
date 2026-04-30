@@ -25,28 +25,15 @@ export function validateAnswerSafety(input: AnswerValidationInput): {
   const issues: ValidationIssue[] = [];
   const unsafeClaims: string[] = [];
 
-  if (/(cannot|can't|do not|don't|no)\s+(predict|provide|state).*(death|lifespan)/i.test(answer)) {
-    return {
-      issues: [],
-      unsafeClaims: [],
-    };
-  }
-
-  if (/(do not|don't|cannot|can't|please do not)\s+stop\s+(your\s+)?(medication|medicine)/i.test(answer)) {
-    return {
-      issues: [],
-      unsafeClaims: [],
-    };
-  }
-
-  const deathHits = unsafeHit(answer, ["death date", "death dates", "lifespan", "how long will i live", "fatal accident", "when will i die"]);
+  const deathRefusal = /(cannot|can't|do not|don't|no|unable to)\s+(predict|provide|state).*(death|lifespan)/i.test(answer) || /(cannot|can't|do not|don't|no|unable to)\s+(predict|give|say).*(death|lifespan)/i.test(answer);
+  const deathHits = deathRefusal ? [] : unsafeHit(answer, ["death date", "death dates", "lifespan", "life span", "how long will i live", "fatal accident", "when will i die", "will die at age", "death in", "die at age"], ["cannot predict death", "can't predict death", "do not predict death", "not predict death"]);
   if (deathHits.length) {
     unsafeClaims.push(...deathHits);
     issues.push(buildIssue("death_lifespan_claim", "error", "Death or lifespan prediction is not allowed.", deathHits[0]));
     issues.push(buildIssue("unsafe_claim", "error", "Unsafe death/lifespan claim detected.", deathHits[0]));
   }
 
-  const medicalHits = unsafeHit(answer, ["cancer", "diagnosis", "cure diabetes", "stop medication", "stop medicine", "stop your medication", "surgery guarantee"]);
+  const medicalHits = unsafeHit(answer, ["cancer", "diagnosis", "cure diabetes", "stop medication", "stop medicine", "stop your medication", "surgery guarantee", "medical diagnosis", "doctor says"]);
   if (medicalHits.length) {
     unsafeClaims.push(...medicalHits);
     issues.push(buildIssue("medical_claim", "error", "Medical claim is not allowed.", medicalHits[0]));
@@ -60,7 +47,7 @@ export function validateAnswerSafety(input: AnswerValidationInput): {
     issues.push(buildIssue("unsafe_claim", "error", "Unsafe legal claim detected.", legalHits[0]));
   }
 
-  const financialHits = unsafeHit(answer, ["stock", "crypto", "lottery", "investment", "guaranteed profit", "100% return", "definitely get promoted", "definitely promotion", "guaranteed promotion"]);
+  const financialHits = unsafeHit(answer, ["stock", "crypto", "lottery", "investment", "guaranteed profit", "100% return", "definitely get promoted", "definitely promotion", "guaranteed promotion", "win your case", "guaranteed legal", "sure shot profit"]);
   if (financialHits.length) {
     unsafeClaims.push(...financialHits);
     issues.push(buildIssue("financial_claim", "error", "Financial guarantee or instruction is not allowed.", financialHits[0]));
@@ -73,14 +60,14 @@ export function validateAnswerSafety(input: AnswerValidationInput): {
     issues.push(buildIssue("unsafe_claim", "error", "Self-harm content is not allowed.", selfHarmHits[0]));
   }
 
-  const gemstoneHits = unsafeHit(answer, ["blue sapphire", "gemstone guarantee", "gemstone will fix", "stone will surely"]);
+  const gemstoneHits = unsafeHit(answer, ["blue sapphire", "gemstone guarantee", "gemstone will fix", "stone will surely", "will fix all my problems", "fix everything"]);
   if (gemstoneHits.length) {
     unsafeClaims.push(...gemstoneHits);
     issues.push(buildIssue("gemstone_guarantee", "error", "Gemstone guarantee is not allowed.", gemstoneHits[0]));
     issues.push(buildIssue("unsafe_claim", "error", "Unsafe gemstone claim detected.", gemstoneHits[0]));
   }
 
-  const pujaHits = unsafeHit(answer, ["must do puja", "mandatory puja", "expensive puja", "pay 50000", "fear", "otherwise"]);
+  const pujaHits = unsafeHit(answer, ["must do puja", "mandatory puja", "expensive puja", "pay 50000", "fear", "otherwise", "pay rupees", "need a costly puja"]);
   if (pujaHits.length) {
     unsafeClaims.push(...pujaHits);
     issues.push(buildIssue("expensive_puja_pressure", "error", "Expensive or fear-based puja pressure is not allowed.", pujaHits[0]));

@@ -221,7 +221,7 @@ describe('Reading Orchestrator V2', () => {
 
     expect(second.meta?.memoryLayer).toBe('enabled_phase_7')
     expect(second.meta?.memorySummaryUsed).toBe(true)
-    expect(String(second.answer ?? '')).toContain('From the earlier context')
+    expect(String(second.answer ?? '')).toContain('Previous concern')
   })
 
   it('skips memory gracefully when userId is missing', async () => {

@@ -85,4 +85,20 @@ describe("renderReadingPlanFallback", () => {
     const text = renderReadingPlanFallback(plan);
     expect(text).not.toMatch(/guarantee|curse|doomed|death date/i);
   });
+  it("dedupes repeated topic words", () => {
+    const text = renderReadingPlanFallback(buildReadingPlan({ question: "career progress career", concern: { topic: "career" } }));
+    expect(text).not.toMatch(/career progress career/i);
+  });
+  it("dedupes repeated chart basis paragraph", () => {
+    const repeated = renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, evidence: [{ id: "e1", label: "Saturn", explanation: "Delay is visible", confidence: "high", source: "chart" }], chartAnchors: ["house_10", "house_10"] }));
+    expect(repeated.match(/Chart basis:/gi)?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+  it("dedupes repeated key anchors block", () => {
+    const repeated = renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, evidence: [{ id: "e1", label: "Saturn", explanation: "Delay is visible", confidence: "high", source: "chart" }], chartAnchors: ["house_10", "house_10", "house_11"] }));
+    expect(repeated).not.toMatch(/house_10.*house_10/i);
+  });
+  it("career answer remains chart anchored after deduping", () => {
+    const text = renderReadingPlanFallback(plan);
+    expect(text).toMatch(/Saturn|house/i);
+  });
 });

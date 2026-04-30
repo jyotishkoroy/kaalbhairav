@@ -70,14 +70,16 @@ export function buildMemorySummary(memories: CompanionMemoryItem[] | { previousR
   if (!memories) return "";
   if (!Array.isArray(memories)) {
     const last = memories.previousReadings?.at(-1);
-    return last ? `Last time the user asked about ${last.topic}. The guidance was: ${last.summary}.`.slice(0, 260) : "";
+    if (!last) return "";
+    const topic = normalizeMemoryTopic(last.topic);
+    return `Previous concern: ${topic === "general" ? "general guidance" : `${topic} guidance`}. Preference: practical, non-fear-based guidance.`.slice(0, 180);
   }
   const items = memories.slice(0, 3).map((memory) => {
     const topic = normalizeMemoryTopic(memory.topic);
-    const noun = topic === "general" || topic === "unknown" ? "earlier themes" : `${topic} themes`;
-    return `${noun}: ${memory.content}`;
+    const noun = topic === "general" || topic === "unknown" ? "earlier themes" : `${topic} concern`;
+    return `Previous concern: ${noun}.`;
   });
-  return items.join(" | ").slice(0, 260);
+  return [...new Set(items)].join(" ").slice(0, 180);
 }
 
 export function shouldStoreDraft(draft: CompanionMemoryDraft): { allowed: boolean; reason?: string } {

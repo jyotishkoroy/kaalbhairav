@@ -38,8 +38,8 @@ export type HumanReadingInput = {
 
 function renderMemoryBridge(memorySummary?: string): string {
   if (!memorySummary) return ''
-
-  return `From the earlier context, I would keep this in mind: ${memorySummary}`
+  const cleaned = memorySummary.replace(/\s+/g, ' ').trim()
+  return cleaned.length > 160 ? `Previous concern: ${cleaned.slice(0, 157).trimEnd()}...` : `Previous concern: ${cleaned}`
 }
 
 function extractDatePhrase(question: string): string | undefined {
@@ -129,6 +129,25 @@ function buildOpening(concern: UserConcern, question?: string): string {
   }
 
   return `You are asking for guidance on a specific situation${echoQuestionKeyword(question)}, so I will keep the answer focused and practical.`
+}
+
+function dedupeAdjacentWords(text: string): string {
+  return text.split(/\s+/).reduce<string[]>((acc, word) => {
+    const prev = acc[acc.length - 1]
+    if (prev && prev.toLowerCase() === word.toLowerCase()) return acc
+    acc.push(word)
+    return acc
+  }, []).join(' ')
+}
+
+function dedupeRepeatedLines(text: string): string {
+  const lines = text.split('\n\n').map((line) => line.trim()).filter(Boolean)
+  const output: string[] = []
+  for (const line of lines) {
+    if (output.includes(line)) continue
+    output.push(line)
+  }
+  return output.join('\n\n')
 }
 
 function buildChartBasis(concern: UserConcern, question?: string): string {
@@ -313,8 +332,10 @@ export function generateHumanReading(input: HumanReadingInput): string {
     .filter(Boolean)
     .join('\n\n')
 
+  const deduped = dedupeRepeatedLines(dedupeAdjacentWords(raw))
+
   return applyLanguageTone({
-    text: lintHumanStyle(raw),
+    text: lintHumanStyle(deduped),
     language: input.language ?? detectPreferredLanguage(input.question ?? ''),
   })
 }

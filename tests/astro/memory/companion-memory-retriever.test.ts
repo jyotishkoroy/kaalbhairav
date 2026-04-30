@@ -42,6 +42,29 @@ describe("companion memory retriever", () => {
   it("unrelated topic excluded when enough relevant", async () => expect((await retrieveCompanionMemorySafely({ userId: "u1", topic: "career", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "A", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }, { id: "2", user_id: "u1", memory_type: "preference", topic: "family", content: "B", confidence: "high", last_seen_at: "2026-04-02T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env, maxItems: 1 })).memories[0]?.topic).toBe("career"));
   it("summary generated", async () => expect((await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "Practical remedies", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env })).summary).toContain("career"));
   it("summary does not include sensitive content", async () => expect((await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "When will I die", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env })).summary ?? "").not.toMatch(/die/i));
+  it("long prior answer is compressed to short safe summary", async () => {
+    const result = await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "Career recognition and practical guidance only.", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env });
+    expect((result.summary ?? "").length).toBeLessThan(180);
+  });
+  it("previous answer body is not injected", async () => {
+    const result = await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "From the earlier context, please repeat the full answer body.", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env });
+    expect(result.summary ?? "").not.toContain("full answer body");
+  });
+  it("from the earlier context is not emitted for unsafe or overlong memory", async () => {
+    const result = await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "Earlier context should not be replayed.", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env });
+    expect(result.summary ?? "").not.toMatch(/from the earlier context/i);
+  });
+  it("irrelevant memory excluded", async () => {
+    const result = await retrieveCompanionMemorySafely({ userId: "u1", topic: "career", store: makeStore([
+      { id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "Career recognition.", confidence: "high", last_seen_at: "2026-04-02T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" },
+      { id: "2", user_id: "u1", memory_type: "preference", topic: "money", content: "Budget only.", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" },
+    ]), env, maxItems: 1 });
+    expect(result.memories[0]?.topic).toBe("career");
+  });
+  it("memory summary still works for safe preference", async () => {
+    const result = await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([{ id: "1", user_id: "u1", memory_type: "preference", topic: "career", content: "Prefer practical, non-fear-based guidance.", confidence: "high", last_seen_at: "2026-04-01T00:00:00.000Z", created_at: "2026-04-01T00:00:00.000Z", updated_at: "2026-04-01T00:00:00.000Z" }]), env });
+    expect(result.summary ?? "").toContain("career");
+  });
   it("no throw on malformed store data", async () => expect((await retrieveCompanionMemorySafely({ userId: "u1", store: makeStore([null, {}]), env })).used).toBe(false));
   it("missing userId no store call", async () => {
     const store = makeStore([]);

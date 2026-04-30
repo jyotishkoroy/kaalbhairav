@@ -63,5 +63,9 @@ export function validateAnswerTiming(input: AnswerValidationInput): ValidationIs
     issues.push(buildIssue("invented_timing", "error", "Timing appears without a grounded source.", answer.slice(0, 120)));
   }
 
+  if (/death|lifespan|when will i die|how long will i live/i.test(answer) && !hasGroundedLimitation(answer)) {
+    issues.push(buildIssue("invented_timing", "error", "Death/lifespan timing is not allowed.", answer.slice(0, 120)));
+  }
+
   return issues;
 }

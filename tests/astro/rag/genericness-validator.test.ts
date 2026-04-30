@@ -41,4 +41,9 @@ describe("genericness validator", () => {
     const result = validateGenericness(makeInput({ contract: fakeContract({ domain: "general", answerMode: "followup" }), answer: "Could you share your birth time?" }));
     expect(result.issues.some((issue) => issue.code === "too_short")).toBe(false);
   });
+
+  it("dedupes repeated adjacent topic words", () => {
+    const result = validateGenericness(makeInput({ contract: fakeContract({ answerMode: "interpretive" }), answer: "career progress career" }));
+    expect(result.issues.some((issue) => issue.code === "too_repetitive")).toBe(false);
+  });
 });

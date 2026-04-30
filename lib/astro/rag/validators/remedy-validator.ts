@@ -23,7 +23,7 @@ export function validateAnswerRemedies(input: AnswerValidationInput): Validation
 
   if (!remedyTalk) return issues;
 
-  if (/cure|treat|heal|fix/i.test(answer) && !hasNegatedUnsafePhrase(answer, "cure")) {
+  if (/(cure|treat|heal|fix)/i.test(answer) && !hasNegatedUnsafePhrase(answer, "cure")) {
     issues.push(buildIssue("unsafe_remedy", "error", "Medical cure language is not allowed in remedies.", answer.slice(0, 120)));
   }
 
@@ -35,11 +35,11 @@ export function validateAnswerRemedies(input: AnswerValidationInput): Validation
     issues.push(buildIssue("unsafe_remedy", "error", "Guarantee language is not allowed in remedies.", answer.slice(0, 120)));
   }
 
-  if (/blue sapphire|gemstone|stone/i.test(answer) && /guarantee|surely|fix/i.test(answer) && !hasNegatedUnsafePhrase(answer, "gemstone")) {
+  if (/blue sapphire|gemstone|stone/i.test(answer) && /guarantee|surely|fix|all my problems/i.test(answer) && !hasNegatedUnsafePhrase(answer, "gemstone")) {
     issues.push(buildIssue("unsafe_remedy", "error", "Gemstone certainty is not allowed.", answer.slice(0, 120)));
   }
 
-  if (/must do puja|mandatory puja|pay\s*\d+|rupees|fear/i.test(answer) && !/optional|if you choose|if helpful|not required/i.test(answer)) {
+  if (/must do puja|mandatory puja|pay\s*\d+|rupees|fear|expensive puja/i.test(answer) && !/optional|if you choose|if helpful|not required/i.test(answer)) {
     issues.push(buildIssue("unsafe_remedy", "error", "Expensive or coercive puja pressure is not allowed.", answer.slice(0, 120)));
   }
 

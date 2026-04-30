@@ -23,7 +23,7 @@ describe("safety validator", () => {
   });
 
   it("passes a death-date refusal", () => {
-    const result = validateAnswerSafety(makeInput({ answer: "I can't predict death dates." }));
+    const result = validateAnswerSafety(makeInput({ answer: "I understand the concern. I can't predict death dates." }));
     expect(result.issues).toHaveLength(0);
   });
 
