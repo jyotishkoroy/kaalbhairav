@@ -11,6 +11,8 @@ import type { TimingContext } from "./timing-engine";
 import type { AnswerValidationResult } from "./validation-types";
 import type { LocalCriticResult } from "./critic-schema";
 import { normalizeLocalCriticResult } from "./critic-schema";
+import { buildLocalCriticMessages } from "./local-critic-prompt";
+import { routeLocalModelTask } from "./local-model-router";
 
 export type FetchLike = (
   input: string | URL,
@@ -88,10 +90,55 @@ function compactString(value: string, max: number): string {
   return value.length > max ? value.slice(0, max) : value;
 }
 
+function sanitizePathLike(value: string): string {
+  return value.replace(/https?:\/\/[^\s"']+/gi, "[REDACTED_URL]").replace(/\b(?:[A-Za-z]:\\|\/)[^\s"']+/g, "[REDACTED_PATH]");
+}
+
+function sanitizeCriticStringArray(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const cleaned = sanitizePathLike(value).replace(/\b(?:secret|token|key|password|cookie|bearer)\b[^,]*/gi, "[REDACTED]");
+    const text = cleaned.trim();
+    if (!text) continue;
+    const normalized = text.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(text);
+  }
+  return out;
+}
+
+function normalizeRawBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "n", "off"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function normalizeSource(value: unknown): LocalCriticResult["source"] {
+  return value === "ollama" || value === "skipped" || value === "fallback" ? value : "fallback";
+}
+
 function hasCriticKeys(value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const raw = value as Record<string, unknown>;
   return (
+    "ok" in raw ||
+    "safe" in raw ||
+    "grounded" in raw ||
+    "specific" in raw ||
+    "compassionate" in raw ||
+    "feelsHeardScore" in raw ||
+    "genericnessScore" in raw ||
+    "fearBasedScore" in raw ||
+    "groundingScore" in raw ||
+    "specificityScore" in raw ||
+    "practicalValueScore" in raw ||
+    "missingRequiredElements" in raw ||
     "answersQuestion" in raw &&
     "tooGeneric" in raw &&
     "missingAnchors" in raw &&
@@ -163,17 +210,83 @@ function compactFacts(input: LocalCriticClientInput): Record<string, unknown> {
   };
 }
 
+function buildFallbackCriticResult(reason: string, source: LocalCriticResult["source"] = "skipped"): LocalCriticResult {
+  return {
+    ok: false,
+    safe: true,
+    grounded: false,
+    specific: false,
+    compassionate: true,
+    feelsHeardScore: 0,
+    genericnessScore: 1,
+    fearBasedScore: 0,
+    groundingScore: 0,
+    specificityScore: 0,
+    practicalValueScore: 0,
+    missingRequiredElements: [],
+    unsafeClaims: [],
+    inventedFacts: [],
+    unsupportedTimingClaims: [],
+    unsupportedRemedies: [],
+    genericPhrases: [],
+    emotionalGaps: [],
+    rewriteInstructions: [],
+    shouldRewrite: false,
+    shouldFallback: true,
+    source,
+    rejectedReason: reason,
+    warnings: [],
+    answersQuestion: false,
+    tooGeneric: false,
+    missingAnchors: [],
+    missingSections: [],
+    wrongFacts: [],
+    companionToneScore: 0.5,
+    shouldRetry: false,
+    correctionInstruction: "",
+  };
+}
+
+function normalizeCriticResult(value: unknown): LocalCriticResult | null {
+  const normalized = normalizeLocalCriticResult(value);
+  if (!normalized) return null;
+  const raw = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return {
+    ...buildFallbackCriticResult("normalized", normalizeSource((value as Record<string, unknown>)?.source)),
+    ...normalized,
+    unsafeClaims: sanitizeCriticStringArray(normalized.unsafeClaims),
+    inventedFacts: sanitizeCriticStringArray(normalized.inventedFacts),
+    unsupportedTimingClaims: sanitizeCriticStringArray(normalized.unsupportedTimingClaims),
+    unsupportedRemedies: sanitizeCriticStringArray(normalized.unsupportedRemedies),
+    genericPhrases: sanitizeCriticStringArray(normalized.genericPhrases),
+    emotionalGaps: sanitizeCriticStringArray(normalized.emotionalGaps),
+    rewriteInstructions: sanitizeCriticStringArray(normalized.rewriteInstructions),
+    warnings: sanitizeCriticStringArray(normalized.warnings),
+    source: normalizeSource(normalized.source),
+    shouldFallback: normalizeRawBoolean(raw.shouldFallback, normalized.safe === false || normalized.grounded === false),
+    shouldRewrite: normalizeRawBoolean(raw.shouldRewrite, normalized.shouldRetry || normalized.genericnessScore >= 0.65),
+    ok: normalizeRawBoolean(raw.ok, true),
+    safe: normalizeRawBoolean(raw.safe, true),
+    grounded: normalizeRawBoolean(raw.grounded, true),
+    specific: normalizeRawBoolean(raw.specific, true),
+    compassionate: normalizeRawBoolean(raw.compassionate, true),
+  };
+}
+
 export function buildLocalCriticPayload(input: LocalCriticClientInput): Record<string, unknown> {
   return {
     question: compactString(input.question, 6000),
     answer: compactString(input.answer, 6000),
     contract: compactContract(input.contract),
     facts: compactFacts(input),
+    prompt: buildLocalCriticMessages(input),
   };
 }
 
 function shouldSkipCritic(input: LocalCriticClientInput, flags: AstroRagFlags, deterministicValidationOk: boolean | null): { skip: boolean; reason?: string } {
+  const routed = routeLocalModelTask("critic", input.env ?? process.env);
   if (!flags.localCriticEnabled) return { skip: true, reason: "critic_disabled" };
+  if (!routed.useLocal) return { skip: true, reason: routed.fallbackReason ?? "critic_disabled" };
   if (!getSecret(input.env)) return { skip: true, reason: "missing_secret" };
   if (!hasGlobalFetch() && !input.fetchImpl) return { skip: true, reason: "missing_fetch" };
   if (input.contract.answerMode === "safety" || input.contract.answerMode === "exact_fact") {
@@ -255,7 +368,7 @@ export async function critiqueAnswerWithLocalOllama(input?: Partial<LocalCriticC
     return {
       used: false,
       ok: false,
-      critic: null,
+      critic: buildFallbackCriticResult(gating.reason ?? "critic_skipped", "skipped"),
       fallbackRecommended: flags.localCriticRequired && gating.reason !== "critic_disabled" ? true : false,
       retryRecommended: false,
       error: gating.reason,
@@ -286,7 +399,7 @@ export async function critiqueAnswerWithLocalOllama(input?: Partial<LocalCriticC
       return {
         used: true,
         ok: false,
-        critic: null,
+        critic: buildFallbackCriticResult(`status_${response.status}`),
         fallbackRecommended: flags.localCriticRequired,
         retryRecommended: false,
         status: response.status,
@@ -305,7 +418,7 @@ export async function critiqueAnswerWithLocalOllama(input?: Partial<LocalCriticC
       return {
         used: true,
         ok: false,
-        critic: null,
+        critic: buildFallbackCriticResult("critic_error"),
         fallbackRecommended: true,
         retryRecommended: false,
         error: typeof (parsed as { error?: unknown }).error === "string" ? (parsed as { error: string }).error : "critic_error",
@@ -318,12 +431,12 @@ export async function critiqueAnswerWithLocalOllama(input?: Partial<LocalCriticC
       };
     }
 
-    const critic = hasCriticKeys(parsed) ? normalizeLocalCriticResult(parsed) : null;
+    const critic = hasCriticKeys(parsed) ? normalizeCriticResult(parsed) : null;
     if (!critic) {
       return {
         used: true,
         ok: false,
-        critic: null,
+        critic: buildFallbackCriticResult("invalid_critic_json"),
         fallbackRecommended: flags.localCriticRequired,
         retryRecommended: false,
         error: "invalid_critic_json",
@@ -354,7 +467,7 @@ export async function critiqueAnswerWithLocalOllama(input?: Partial<LocalCriticC
     return {
       used: true,
       ok: false,
-      critic: null,
+      critic: buildFallbackCriticResult(timeoutHit ? "critic_timeout" : error instanceof Error ? error.message : "critic_fetch_failed"),
       fallbackRecommended: flags.localCriticRequired,
       retryRecommended: false,
       error: timeoutHit ? "critic_timeout" : error instanceof Error ? error.message : "critic_fetch_failed",
@@ -396,7 +509,7 @@ export function mergeCriticWithValidation(input: {
     };
   }
 
-  if (critic.unsafeClaims.length || critic.wrongFacts.length) {
+  if (critic.unsafeClaims.length || critic.wrongFacts.length || critic.shouldFallback) {
     return {
       retryRecommended,
       fallbackRecommended: true,
@@ -405,7 +518,7 @@ export function mergeCriticWithValidation(input: {
     };
   }
 
-  if ((critic.shouldRetry || critic.tooGeneric || critic.companionToneScore < 0.55) && !fallbackRecommended) {
+  if ((critic.shouldRetry || critic.shouldRewrite || critic.tooGeneric || critic.genericnessScore >= 0.65 || critic.companionToneScore < 0.55) && !fallbackRecommended) {
     retryRecommended = true;
   }
 

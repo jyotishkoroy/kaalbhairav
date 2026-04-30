@@ -3,11 +3,34 @@
 // repository or any part of it without prior written permission from Jyotishko Roy.
 
 export type LocalCriticResult = {
+  ok: boolean;
+  safe: boolean;
+  grounded: boolean;
+  specific: boolean;
+  compassionate: boolean;
+  feelsHeardScore: number;
+  genericnessScore: number;
+  fearBasedScore: number;
+  groundingScore: number;
+  specificityScore: number;
+  practicalValueScore: number;
+  missingRequiredElements: string[];
+  unsafeClaims: string[];
+  inventedFacts: string[];
+  unsupportedTimingClaims: string[];
+  unsupportedRemedies: string[];
+  genericPhrases: string[];
+  emotionalGaps: string[];
+  rewriteInstructions: string[];
+  shouldRewrite: boolean;
+  shouldFallback: boolean;
+  source: "ollama" | "skipped" | "fallback";
+  rejectedReason?: string;
+  warnings: string[];
   answersQuestion: boolean;
   tooGeneric: boolean;
   missingAnchors: string[];
   missingSections: string[];
-  unsafeClaims: string[];
   wrongFacts: string[];
   companionToneScore: number;
   shouldRetry: boolean;
@@ -47,11 +70,33 @@ function normalizeString(value: unknown, max = 1200): string {
 
 export function buildDefaultCriticResult(overrides: Partial<LocalCriticResult> = {}): LocalCriticResult {
   return {
+    ok: true,
+    safe: true,
+    grounded: true,
+    specific: true,
+    compassionate: true,
+    feelsHeardScore: 0.5,
+    genericnessScore: 0.5,
+    fearBasedScore: 0,
+    groundingScore: 0.5,
+    specificityScore: 0.5,
+    practicalValueScore: 0.5,
+    missingRequiredElements: [],
+    unsafeClaims: [],
+    inventedFacts: [],
+    unsupportedTimingClaims: [],
+    unsupportedRemedies: [],
+    genericPhrases: [],
+    emotionalGaps: [],
+    rewriteInstructions: [],
+    shouldRewrite: false,
+    shouldFallback: false,
+    source: "fallback",
+    warnings: [],
     answersQuestion: false,
     tooGeneric: false,
     missingAnchors: [],
     missingSections: [],
-    unsafeClaims: [],
     wrongFacts: [],
     companionToneScore: 0.5,
     shouldRetry: false,
@@ -63,14 +108,38 @@ export function buildDefaultCriticResult(overrides: Partial<LocalCriticResult> =
 export function validateLocalCriticResult(value: unknown): LocalCriticValidationResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false, error: "invalid_critic_object" };
   const raw = value as Record<string, unknown>;
+  const source = raw.source === "ollama" || raw.source === "skipped" || raw.source === "fallback" ? raw.source : "fallback";
   return {
     ok: true,
     value: {
+      ok: typeof raw.ok === "boolean" ? raw.ok : true,
+      safe: typeof raw.safe === "boolean" ? raw.safe : true,
+      grounded: typeof raw.grounded === "boolean" ? raw.grounded : true,
+      specific: typeof raw.specific === "boolean" ? raw.specific : true,
+      compassionate: typeof raw.compassionate === "boolean" ? raw.compassionate : true,
+      feelsHeardScore: clamp01(raw.feelsHeardScore),
+      genericnessScore: clamp01(raw.genericnessScore ?? raw.genericness),
+      fearBasedScore: clamp01(raw.fearBasedScore),
+      groundingScore: clamp01(raw.groundingScore),
+      specificityScore: clamp01(raw.specificityScore),
+      practicalValueScore: clamp01(raw.practicalValueScore),
+      missingRequiredElements: normalizeStringArray(raw.missingRequiredElements),
+      unsafeClaims: normalizeStringArray(raw.unsafeClaims),
+      inventedFacts: normalizeStringArray(raw.inventedFacts),
+      unsupportedTimingClaims: normalizeStringArray(raw.unsupportedTimingClaims),
+      unsupportedRemedies: normalizeStringArray(raw.unsupportedRemedies),
+      genericPhrases: normalizeStringArray(raw.genericPhrases),
+      emotionalGaps: normalizeStringArray(raw.emotionalGaps),
+      rewriteInstructions: normalizeStringArray(raw.rewriteInstructions),
+      shouldRewrite: typeof raw.shouldRewrite === "boolean" ? raw.shouldRewrite : Boolean(raw.shouldRetry),
+      shouldFallback: typeof raw.shouldFallback === "boolean" ? raw.shouldFallback : false,
+      source,
+      rejectedReason: normalizeString(raw.rejectedReason, 300) || undefined,
+      warnings: normalizeStringArray(raw.warnings),
       answersQuestion: typeof raw.answersQuestion === "boolean" ? raw.answersQuestion : false,
       tooGeneric: typeof raw.tooGeneric === "boolean" ? raw.tooGeneric : false,
       missingAnchors: normalizeStringArray(raw.missingAnchors),
       missingSections: normalizeStringArray(raw.missingSections),
-      unsafeClaims: normalizeStringArray(raw.unsafeClaims),
       wrongFacts: normalizeStringArray(raw.wrongFacts),
       companionToneScore: clamp01(raw.companionToneScore),
       shouldRetry: typeof raw.shouldRetry === "boolean" ? raw.shouldRetry : false,

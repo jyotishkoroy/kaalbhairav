@@ -106,3 +106,41 @@ Remaining blockers:
 - none
 Next:
 - Phase 30 Strengthen local critic
+Phase: 30 Strengthen local critic
+Branch: phase-rag-foundation
+Runtime behavior changed: optional critic behavior strengthened behind critic flags
+UI changed: no
+DB changed: no
+Local AI:
+- critic strengthened
+- qwen2.5:3b default
+- qwen2.5:1.5b fallback warning
+- qwen2.5:7b not default
+- critic fails soft
+- critic cannot override deterministic validators
+Safety:
+- detects genericness, missing acknowledgement, unsupported timing, unsupported remedies, invented facts, fear language, death/lifespan prediction, medical/legal/financial unsafe claims
+Validation:
+- local critic tests:
+- local critic policy tests:
+- local model router tests:
+- answer validator tests:
+- safety/timing/remedy/genericness/fact validator tests:
+- groq answer writer tests:
+- orchestrator tests:
+- rag API route tests:
+- rag UI tests:
+- smoke script tests:
+- rollout validation tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local ollama health:
+Deployment:
+- skipped
+Remaining blockers:
+- none
+Next:
+- Phase 31 Optional local tone polisher

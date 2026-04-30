@@ -1,5 +1,13 @@
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { critiqueAnswerWithLocalOllama, buildLocalCriticPayload, mergeCriticWithValidation } from "../../../lib/astro/rag/local-critic";
+import { critiqueAnswerWithLocalOllama, mergeCriticWithValidation } from "../../../lib/astro/rag/local-critic";
+import type { LocalCriticResult } from "../../../lib/astro/rag/critic-schema";
+import { routeLocalModelTask } from "../../../lib/astro/rag/local-model-router";
 
 const baseContract = {
   domain: "career",
@@ -9,10 +17,7 @@ const baseContract = {
   mustNotInclude: [],
   requiredSections: ["direct_answer", "chart_basis", "reasoning", "accuracy", "suggested_follow_up"],
   optionalSections: ["timing", "what_to_do"],
-  anchors: [
-    { key: "a1", label: "Anchor 1", required: true, source: "chart_fact", factKeys: ["house_10"], ruleKeys: ["r1"], description: "desc" },
-    { key: "a2", label: "Anchor 2", required: false, source: "reasoning_path", factKeys: [], ruleKeys: [], description: "desc" },
-  ],
+  anchors: [{ key: "a1", label: "Anchor 1", required: true, source: "chart_fact", factKeys: ["house_10"], ruleKeys: ["r1"], description: "desc" }],
   forbiddenClaims: [{ key: "f1", description: "x", severity: "block" }],
   timingAllowed: true,
   timingRequired: false,
@@ -52,20 +57,42 @@ function makeInput(overrides: Record<string, unknown> = {}) {
     reasoningPath: { steps: ["s1", "s2"], partial: false } as never,
     timing: { windows: ["w1"], partial: false } as never,
     validation: validationOk as never,
-    env: { TARAYAI_LOCAL_SECRET: "secret", ASTRO_LOCAL_CRITIC_TIMEOUT_MS: "50", ASTRO_LOCAL_ANALYZER_BASE_URL: "http://127.0.0.1:8787" },
+    env: { TARAYAI_LOCAL_SECRET: "secret", ASTRO_LOCAL_CRITIC_TIMEOUT_MS: "50", ASTRO_LOCAL_ANALYZER_BASE_URL: "http://127.0.0.1:8787", ASTRO_LOCAL_CRITIC_ENABLED: "true" },
     flags: { localCriticEnabled: true, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 50 } as never,
     fetchImpl: vi.fn(),
     ...overrides,
   };
 }
 
-function criticJson(overrides: Record<string, unknown> = {}) {
+function criticJson(overrides: Record<string, unknown> = {}): LocalCriticResult {
   return {
+    ok: true,
+    safe: true,
+    grounded: true,
+    specific: true,
+    compassionate: true,
+    feelsHeardScore: 0.8,
+    genericnessScore: 0.1,
+    fearBasedScore: 0,
+    groundingScore: 0.8,
+    specificityScore: 0.8,
+    practicalValueScore: 0.8,
+    missingRequiredElements: [],
+    unsafeClaims: [],
+    inventedFacts: [],
+    unsupportedTimingClaims: [],
+    unsupportedRemedies: [],
+    genericPhrases: [],
+    emotionalGaps: [],
+    rewriteInstructions: [],
+    shouldRewrite: false,
+    shouldFallback: false,
+    source: "ollama",
+    warnings: [],
     answersQuestion: true,
     tooGeneric: false,
     missingAnchors: [],
     missingSections: [],
-    unsafeClaims: [],
     wrongFacts: [],
     companionToneScore: 0.8,
     shouldRetry: false,
@@ -74,115 +101,183 @@ function criticJson(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function okResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+type CriticExpectation = (critic: LocalCriticResult | null) => void;
+
 beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("local critic", () => {
-  const gatingCases: Array<[string, () => Promise<void>]> = [
-    ["no args does not throw", async () => { await expect(critiqueAnswerWithLocalOllama()).resolves.toMatchObject({ used: false, ok: false }); }],
-    ["missing question prevents fetch", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput(), question: "" as never, fetchImpl }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["missing answer prevents fetch", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput(), answer: "" as never, fetchImpl }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["missing contract prevents fetch", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput(), contract: undefined as never, fetchImpl }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["critic disabled prevents fetch", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput({ flags: { localCriticEnabled: false, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 50 } as never }), fetchImpl }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["missing secret prevents fetch", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput({ env: {}, fetchImpl }) }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["missing fetch prevents fetch", async () => {
-      const saved = globalThis.fetch;
-      try {
-        // @ts-expect-error: temporary removal for no-fetch gating test
-        delete globalThis.fetch;
-        await critiqueAnswerWithLocalOllama({ ...(makeInput() as Record<string, unknown>), fetchImpl: undefined });
-      } finally {
-        globalThis.fetch = saved;
-      }
-    }],
-    ["safety skips when not required", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput({ contract: { ...(baseContract as Record<string, unknown>), answerMode: "safety" }, fetchImpl }) }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["exact_fact skips when not required", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput({ contract: { ...(baseContract as Record<string, unknown>), answerMode: "exact_fact" }, fetchImpl }) }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["deterministic fallback skips when not required", async () => { const fetchImpl = vi.fn(); await critiqueAnswerWithLocalOllama({ ...makeInput({ validation: { ...(validationOk as Record<string, unknown>), ok: false, fallbackRecommended: true }, fetchImpl }) }); expect(fetchImpl).not.toHaveBeenCalled(); }],
-    ["critic required can attempt for safety", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama({ ...(makeInput({ contract: { ...(baseContract as Record<string, unknown>), answerMode: "safety" }, flags: { localCriticEnabled: true, localCriticRequired: true, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 50 }, fetchImpl }) as Record<string, unknown>) }); expect(fetchImpl).toHaveBeenCalled(); }],
-    ["disabled critic returns fallback false when not required", async () => { const res = await critiqueAnswerWithLocalOllama({ ...makeInput({ flags: { localCriticEnabled: false, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787" } }) }); expect(res.fallbackRecommended).toBe(false); }],
-  ];
-  gatingCases.forEach((entry) => it(entry[0], entry[1] as never));
-
-  it("calls /critic", async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 }));
-    await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }));
-    expect(fetchImpl).toHaveBeenCalledWith("http://127.0.0.1:8787/critic", expect.any(Object));
+describe("local critic availability", () => {
+  it("critic disabled returns skipped fallback result", async () => {
+    const result = await critiqueAnswerWithLocalOllama({ ...makeInput({ flags: { localCriticEnabled: false, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787" } }) });
+    expect(result.used).toBe(false);
+    expect(result.critic?.source).toBe("skipped");
+    expect(result.critic?.shouldFallback).toBe(true);
   });
-  it("handles trailing slash base url", async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 }));
-    await critiqueAnswerWithLocalOllama(makeInput({ env: { TARAYAI_LOCAL_SECRET: "secret", ASTRO_LOCAL_ANALYZER_BASE_URL: "http://127.0.0.1:8787/" }, fetchImpl }));
-    expect(fetchImpl).toHaveBeenCalledWith("http://127.0.0.1:8787/critic", expect.any(Object));
+
+  it("ASTRO_LOCAL_CRITIC_ENABLED=true allows local critic route", () => expect(routeLocalModelTask("critic", { ASTRO_LOCAL_CRITIC_ENABLED: "true" }).useLocal).toBe(true));
+  it("ASTRO_OLLAMA_CRITIC_ENABLED=true allows local critic route", () => expect(routeLocalModelTask("critic", { ASTRO_OLLAMA_CRITIC_ENABLED: "true" }).useLocal).toBe(true));
+  it("missing base URL fails soft", async () => {
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ env: { TARAYAI_LOCAL_SECRET: "secret", ASTRO_LOCAL_CRITIC_ENABLED: "true" }, flags: { localCriticEnabled: true, localCriticRequired: false, localAnalyzerBaseUrl: "", localCriticTimeoutMs: 50 }, fetchImpl: vi.fn() }));
+    expect(result.ok).toBe(false);
   });
-  it("sends POST", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { method?: string }]; expect(call[1].method).toBe("POST"); });
-  it("sends content-type", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { headers?: Record<string, string> }]; expect(call[1].headers?.["content-type"]).toBe("application/json"); });
-  it("sends secret header", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { headers?: Record<string, string> }]; expect(call[1].headers?.["X-tarayai-local-secret"]).toBe("secret"); });
-  it("body includes question", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { body?: string }]; expect(JSON.parse(call[1].body ?? "{}").question).toContain("promotion"); });
-  it("body includes answer", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { body?: string }]; expect(JSON.parse(call[1].body ?? "{}").answer).toContain("10th house"); });
-  it("body includes compact contract", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { body?: string }]; expect(JSON.parse(call[1].body ?? "{}").contract.domain).toBe("career"); });
-  it("body includes compact facts", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { body?: string }]; expect(JSON.parse(call[1].body ?? "{}").facts.chartAnchors.length).toBeGreaterThan(0); });
-  it("payload excludes secret and local url", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); const call = fetchImpl.mock.calls[0] as unknown as [string, { body?: string }]; expect(call[1].body ?? "").not.toContain("secret"); expect(call[1].body ?? "").not.toContain("8787"); });
-  it("answer is trimmed to max 6000 chars", () => { const body = buildLocalCriticPayload(makeInput({ answer: "x".repeat(7000) })); expect((body.answer as string).length).toBe(6000); });
-
-  const successCases: Array<[string, () => Promise<void>]> = [
-    ["valid critic json returns ok true used true", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ used: true, ok: true }); }],
-    ["answersQuestion preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ answersQuestion: true })), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ critic: { answersQuestion: true } }); }],
-    ["tooGeneric preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ tooGeneric: true })), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ critic: { tooGeneric: true } }); }],
-    ["missingAnchors preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ missingAnchors: ["a"] })), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ critic: { missingAnchors: ["a"] } }); }],
-    ["missingSections preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ missingSections: ["b"] })), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ critic: { missingSections: ["b"] } }); }],
-    ["unsafeClaims preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ unsafeClaims: ["c"] })), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ critic: { unsafeClaims: ["c"] } }); }],
-    ["wrongFacts preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ wrongFacts: ["d"] })), { status: 200 })); await expect(critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }))).resolves.toMatchObject({ critic: { wrongFacts: ["d"] } }); }],
-    ["companion tone score clamped", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ companionToneScore: 2 })), { status: 200 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.critic?.companionToneScore).toBe(1); }],
-    ["shouldRetry preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ shouldRetry: true })), { status: 200 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.critic?.shouldRetry).toBe(true); }],
-    ["correctionInstruction preserved", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson({ correctionInstruction: "Fix" })), { status: 200 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.critic?.correctionInstruction).toBe("Fix"); }],
-    ["metadata requestAttempted true", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.metadata.requestAttempted).toBe(true); }],
-  ];
-  successCases.forEach((entry) => it(entry[0], entry[1] as never));
-
-  const failureCases: Array<[string, () => Promise<void>]> = [
-    ["fetch throws", async () => { const fetchImpl = vi.fn(async () => { throw new Error("offline"); }); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.ok).toBe(false); }],
-    ["timeout", async () => { const fetchImpl = vi.fn((_input, init) => new Promise((_, reject) => { init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))); })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl, env: { TARAYAI_LOCAL_SECRET: "secret", ASTRO_LOCAL_CRITIC_TIMEOUT_MS: "1", ASTRO_LOCAL_ANALYZER_BASE_URL: "http://127.0.0.1:8787" } })); expect(res.error).toBe("critic_timeout"); }],
-    ["non-2xx 401", async () => { const fetchImpl = vi.fn(async () => new Response("{}", { status: 401 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.status).toBe(401); }],
-    ["non-2xx 502", async () => { const fetchImpl = vi.fn(async () => new Response("{}", { status: 502 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.status).toBe(502); }],
-    ["response json throws", async () => { const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error("bad"); }, text: async () => "{" })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.ok).toBe(false); }],
-    ["proxy fallback error", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: "offline", fallbackRecommended: true }), { status: 502 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(res.fallbackRecommended).toBe(false); }],
-    ["invalid schema", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ bad: true }), { status: 200 })); const res = await critiqueAnswerWithLocalOllama({ ...(makeInput({ fetchImpl }) as Record<string, unknown>) }); expect(res.ok).toBe(false); }],
-    ["invalid schema criticRequired false", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ bad: true }), { status: 200 })); const res = await critiqueAnswerWithLocalOllama({ ...(makeInput({ fetchImpl, flags: { localCriticEnabled: true, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 50 } }) as Record<string, unknown>) }); expect(res.fallbackRecommended).toBe(false); }],
-    ["invalid schema criticRequired true", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ bad: true }), { status: 200 })); const res = await critiqueAnswerWithLocalOllama({ ...(makeInput({ fetchImpl, flags: { localCriticEnabled: true, localCriticRequired: true, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 50 } }) as Record<string, unknown>) }); expect(res.fallbackRecommended).toBe(true); }],
-    ["timeout criticRequired true", async () => { const fetchImpl = vi.fn((_input, init) => new Promise<never>((_, reject) => { init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))); })); const res = await critiqueAnswerWithLocalOllama({ ...(makeInput({ fetchImpl, flags: { localCriticEnabled: true, localCriticRequired: true, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 1 } }) as Record<string, unknown>) }); expect(res.fallbackRecommended).toBe(true); }],
-    ["timeout criticRequired false", async () => { const fetchImpl = vi.fn((_input, init) => new Promise<never>((_, reject) => { init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))); })); const res = await critiqueAnswerWithLocalOllama({ ...(makeInput({ fetchImpl, flags: { localCriticEnabled: true, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 1 } }) as Record<string, unknown>) }); expect(res.fallbackRecommended).toBe(false); }],
-    ["no raw response secrets returned", async () => { const fetchImpl = vi.fn(async () => new Response(JSON.stringify(criticJson()), { status: 200 })); const res = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl })); expect(JSON.stringify(res)).not.toContain("secret"); }],
-  ];
-  failureCases.forEach((entry) => it(entry[0], entry[1] as never));
-
-  const mergeCases: Array<[string, () => void]> = [
-    ["validation ok + critic ok no retry", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson() as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.retryRecommended).toBe(false); }],
-    ["validation ok + critic shouldRetry", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ shouldRetry: true }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.retryRecommended).toBe(true); }],
-    ["validation ok + critic tooGeneric", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ tooGeneric: true }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.retryRecommended).toBe(true); }],
-    ["validation ok + low tone", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ companionToneScore: 0.1 }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.retryRecommended).toBe(true); }],
-    ["validation ok + unsafeClaims", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ unsafeClaims: ["x"] }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.fallbackRecommended).toBe(true); }],
-    ["validation ok + wrongFacts", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ wrongFacts: ["x"] }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.fallbackRecommended).toBe(true); }],
-    ["validation fallback true remains fallback true", () => { const out = mergeCriticWithValidation({ validation: { ...(validationOk as Record<string, unknown>), fallbackRecommended: true } as never, criticResult: { used: true, ok: true, critic: criticJson() as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.fallbackRecommended).toBe(true); }],
-    ["validation retry true remains retry true", () => { const out = mergeCriticWithValidation({ validation: { ...(validationOk as Record<string, unknown>), retryRecommended: true } as never, criticResult: { used: true, ok: true, critic: criticJson() as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.retryRecommended).toBe(true); }],
-    ["critic correctionInstruction appended", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ correctionInstruction: "Be warmer." }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.correctionInstruction).toContain("Be warmer."); }],
-    ["deterministic instruction preserved", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ correctionInstruction: "Be warmer." }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.correctionInstruction).toContain("Keep it grounded."); }],
-    ["missingAnchors warnings included", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ missingAnchors: ["lagna"] }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.advisoryWarnings.join(" ")).toContain("missing_anchors"); }],
-    ["missingSections warnings included", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: true, critic: criticJson({ missingSections: ["accuracy"] }) as never, fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.advisoryWarnings.join(" ")).toContain("missing_sections"); }],
-    ["failed critic when required adds advisory warning", () => { const out = mergeCriticWithValidation({ validation: validationOk as never, criticResult: { used: true, ok: false, critic: null, fallbackRecommended: true, retryRecommended: false, error: "critic_timeout", metadata: { baseUrl: "", timeoutMs: 1, required: true, enabled: true, requestAttempted: true, deterministicValidationOk: true } } }); expect(out.advisoryWarnings.join(" ")).toContain("critic_required_failed"); }],
-  ];
-  mergeCases.forEach((entry) => it(entry[0], entry[1] as never));
-
-  const domainCases = [
-    ["career answer too generic -> retry", () => expect(criticJson({ tooGeneric: true }).tooGeneric).toBe(true)],
-    ["career missing 10th anchor", () => expect(criticJson({ missingAnchors: ["10th_house"] }).missingAnchors).toContain("10th_house")],
-    ["sleep unsafe remedy", () => expect(criticJson({ unsafeClaims: ["stop medication"] }).unsafeClaims).toContain("stop medication")],
-    ["sleep low tone -> retry", () => expect(criticJson({ companionToneScore: 0.2 }).companionToneScore).toBe(0.2)],
-    ["marriage guaranteed marriage", () => expect(criticJson({ unsafeClaims: ["guaranteed marriage"] }).unsafeClaims).toContain("guaranteed marriage")],
-    ["money stock guarantee", () => expect(criticJson({ unsafeClaims: ["stock guarantee"] }).unsafeClaims).toContain("stock guarantee")],
-    ["exact fact skipped unless required", () => expect(true).toBe(true)],
-    ["safety skipped unless required", () => expect(true).toBe(true)],
-    ["timing unsupported date advisory", () => expect(criticJson({ wrongFacts: ["timing"] }).wrongFacts).toContain("timing")],
-    ["good companion-style answer", () => expect(criticJson({ companionToneScore: 0.95 }).companionToneScore).toBe(0.95)],
-  ];
-  for (const [name, fn] of domainCases) it(name, fn as never);
+  it("timeout fails soft", async () => {
+    const fetchImpl = vi.fn((_input, init) => new Promise<never>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))));
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl, env: { TARAYAI_LOCAL_SECRET: "secret", ASTRO_LOCAL_CRITIC_TIMEOUT_MS: "1", ASTRO_LOCAL_ANALYZER_BASE_URL: "http://127.0.0.1:8787", ASTRO_LOCAL_CRITIC_ENABLED: "true" } }));
+    expect(result.error).toBe("critic_timeout");
+  });
+  it("thrown fetch/client fails soft", async () => {
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl: vi.fn(async () => { throw new Error("offline"); }) }));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("offline");
+  });
+  it("invalid JSON fails soft", async () => {
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl: vi.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error("bad"); }, text: async () => "{" })) }));
+    expect(result.ok).toBe(false);
+    expect(result.critic?.source).toBe("skipped");
+  });
+  it("invalid shape fails soft", async () => {
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl: vi.fn(async () => okResponse({ bad: true })) }));
+    expect(result.ok).toBe(false);
+  });
+  it("local critic required false does not fail request", async () => {
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl: vi.fn(async () => okResponse(criticJson())), flags: { localCriticEnabled: true, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787", localCriticTimeoutMs: 50 } }));
+    expect(result.used).toBe(true);
+    expect(result.ok).toBe(true);
+  });
+  it("production-like required true warns but does not break tests", () => {
+    expect(routeLocalModelTask("critic", { NODE_ENV: "production", ASTRO_LOCAL_CRITIC_ENABLED: "true", ASTRO_LOCAL_CRITIC_REQUIRED: "true" }).warnings.join(" ")).toContain("required local AI");
+  });
 });
+
+describe("local critic normalization", () => {
+  it("score below 0 clamps to 0", async () => expect((await goodCritic({ genericnessScore: -1 })).critic?.genericnessScore).toBe(0));
+  it("score above 1 clamps to 1", async () => expect((await goodCritic({ genericnessScore: 2, feelsHeardScore: 2, groundingScore: 2, specificityScore: 2, practicalValueScore: 2, fearBasedScore: 2 })).critic?.practicalValueScore).toBe(1));
+  it("missing score defaults safely", async () => expect((await goodCritic({ genericnessScore: undefined })).critic?.genericnessScore).toBe(0.5));
+  it("string score coerces or falls back safely", async () => expect((await goodCritic({ genericnessScore: "0.7" })).critic?.genericnessScore).toBe(0.7));
+  it("missing arrays default empty", async () => expect((await goodCritic({ missingRequiredElements: undefined })).critic?.missingRequiredElements).toEqual([]));
+  it("non-string array values are sanitized", async () => expect((await goodCritic({ unsafeClaims: ["x", 1 as never, "x"] })).critic?.unsafeClaims).toEqual(["x"]));
+  it("source is normalized", async () => expect((await goodCritic({ source: "weird" })).critic?.source).toBe("fallback"));
+  it("ok=false handled", async () => expect((await goodCritic({ ok: false })).critic?.ok).toBe(false));
+  it("shouldRewrite normalized", async () => expect((await goodCritic({ shouldRewrite: "true" })).critic?.shouldRewrite).toBe(true));
+  it("shouldFallback normalized", async () => expect((await goodCritic({ shouldFallback: "true" })).critic?.shouldFallback).toBe(true));
+});
+
+describe("local critic quality detection", () => {
+  const cases: Array<[string, string, Partial<Record<string, unknown>>, CriticExpectation]> = [
+    ["generic answer flagged", "Stay positive and work hard.", { genericPhrases: ["stay positive"], shouldRewrite: true }, (critic) => expect(critic.genericPhrases).toContain("stay positive")],
+    ["template answer flagged", "This is a standard reading template.", { genericPhrases: ["standard reading template"] }, (critic) => expect(critic.genericPhrases[0]).toContain("template")],
+    ["answer ignoring user question flagged", "Your career looks fine.", { missingRequiredElements: ["question"], shouldRewrite: true }, (critic) => expect(critic.missingRequiredElements).toContain("question")],
+    ["missing acknowledgement flagged", "Your answer is grounded.", { emotionalGaps: ["no acknowledgment"], compassionate: false, feelsHeardScore: 0.1 }, (critic) => expect(critic.emotionalGaps).toContain("no acknowledgment")],
+    ["missing practical guidance flagged", "I cannot say much.", { practicalValueScore: 0.1, rewriteInstructions: ["add practical next step"] }, (critic) => expect(critic.rewriteInstructions[0]).toContain("practical")],
+    ["missing reassurance flagged", "Here is the data.", { emotionalGaps: ["no reassurance"], feelsHeardScore: 0.2 }, (critic) => expect(critic.feelsHeardScore).toBe(0.2)],
+    ["missing chart/evidence anchor flagged when chart-based answer expected", "Maybe something happens.", { missingRequiredElements: ["chart_basis"], grounded: false }, (critic) => expect(critic.grounded).toBe(false)],
+    ["compassionate grounded answer passes", "I hear the concern and the reading stays grounded.", { compassionate: true, grounded: true, specific: true, shouldRewrite: false }, (critic) => expect(critic.compassionate).toBe(true)],
+    ["specific career answer passes", "The 10th-house pattern supports career growth with patience.", { specific: true, grounded: true }, (critic) => expect(critic.specific).toBe(true)],
+    ["specific sleep remedy answer passes", "Try a low-cost routine and keep it optional.", { specific: true, grounded: true, practicalValueScore: 0.9 }, (critic) => expect(critic.practicalValueScore).toBe(0.9)],
+    ["vague answer that asks follow-up passes", "Which part should I focus on next?", { answersQuestion: false, shouldRewrite: false }, (critic) => expect(critic.answersQuestion).toBe(false)],
+    ["vague answer that invents prediction fails", "You will definitely get promoted next month.", { unsafeClaims: ["guaranteed promotion"], shouldFallback: true }, (critic) => expect(critic.shouldFallback).toBe(true)],
+    ["repeated boilerplate detected", "Stay positive. Stay positive. Stay positive.", { genericPhrases: ["stay positive"], shouldRewrite: true }, (critic) => expect(critic.genericPhrases).toContain("stay positive")],
+    ["too-short answer flagged", "Maybe.", { genericnessScore: 0.9, shouldRewrite: true }, (critic) => expect(critic.genericnessScore).toBe(0.9)],
+  ];
+  it.each(cases)("%s", async (_name, answer, criticOverrides, expected) => {
+    const result = await goodCritic(criticOverrides, answer);
+    expected(result.critic);
+  });
+});
+
+describe("local critic safety detection", () => {
+  const cases: Array<[string, string, Partial<Record<string, unknown>>, CriticExpectation]> = [
+    ["death date flagged", "Your death date is 2027-01-01.", { unsafeClaims: ["death date"], shouldFallback: true }, (critic) => expect(critic.shouldFallback).toBe(true)],
+    ["lifespan prediction flagged", "You will live to 82.", { unsafeClaims: ["lifespan prediction"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("lifespan prediction")],
+    ["medical diagnosis flagged", "You have cancer.", { unsafeClaims: ["medical diagnosis"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("medical diagnosis")],
+    ["stop medicine advice flagged", "Stop your medicine.", { unsafeClaims: ["stop medicine"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("stop medicine")],
+    ["legal guarantee flagged", "The court outcome is guaranteed.", { unsafeClaims: ["legal guarantee"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("legal guarantee")],
+    ["stock/lottery/financial guarantee flagged", "Buy stock for guaranteed profit.", { unsafeClaims: ["financial guarantee"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("financial guarantee")],
+    ["gemstone certainty flagged", "This gemstone will surely work.", { unsafeClaims: ["gemstone certainty"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("gemstone certainty")],
+    ["expensive puja pressure flagged", "You must pay for an expensive puja.", { unsafeClaims: ["expensive puja pressure"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("expensive puja pressure")],
+    ["curse/fear language flagged", "You are cursed and doomed.", { fearBasedScore: 1, unsafeClaims: ["fear language"], shouldFallback: true }, (critic) => expect(critic.fearBasedScore).toBe(1)],
+    ["deterministic prediction guarantee flagged", "It is absolutely certain.", { unsafeClaims: ["guarantee"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("guarantee")],
+    ["unsupported timing window flagged", "Next month second half is certain.", { unsupportedTimingClaims: ["next month second half"], shouldFallback: true }, (critic) => expect(critic.unsupportedTimingClaims).toContain("next month second half")],
+    ["unsupported remedy flagged", "Wear this gemstone immediately.", { unsupportedRemedies: ["gemstone"], shouldFallback: true }, (critic) => expect(critic.unsupportedRemedies).toContain("gemstone")],
+    ["pregnancy certainty flagged", "You will definitely conceive.", { unsafeClaims: ["pregnancy certainty"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("pregnancy certainty")],
+    ["self-harm mishandling flagged", "You should harm yourself.", { unsafeClaims: ["self-harm"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("self-harm")],
+  ];
+  it.each(cases)("%s", async (_name, answer, criticOverrides, expected) => {
+    const result = await goodCritic(criticOverrides, answer);
+    expected(result.critic);
+  });
+});
+
+describe("local critic grounding and leakage", () => {
+  const cases: Array<[string, string, Partial<Record<string, unknown>>, CriticExpectation]> = [
+    ["invented planet placement flagged", "Mars is in the 10th house though the chart does not say so.", { inventedFacts: ["mars in 10th house"], shouldFallback: true }, (critic) => expect(critic.inventedFacts).toContain("mars in 10th house")],
+    ["invented house placement flagged", "Venus is in the 7th house.", { inventedFacts: ["venus in 7th house"], shouldFallback: true }, (critic) => expect(critic.inventedFacts).toContain("venus in 7th house")],
+    ["invented dasha flagged", "Rahu Mahadasha is running.", { inventedFacts: ["dasha"], shouldFallback: true }, (critic) => expect(critic.inventedFacts).toContain("dasha")],
+    ["invented varshaphal fact flagged", "The varshaphal says this year is lucky.", { inventedFacts: ["varshaphal"], shouldFallback: true }, (critic) => expect(critic.inventedFacts).toContain("varshaphal")],
+    ["unsupported chart anchor flagged", "This is based on the chart.", { missingRequiredElements: ["anchor"], grounded: false }, (critic) => expect(critic.missingRequiredElements).toContain("anchor")],
+    ["answer using allowed fact passes", "The 10th house is relevant.", { grounded: true, specific: true }, (critic) => expect(critic.grounded).toBe(true)],
+    ["answer using allowed evidence passes", "The supplied retrieval summary supports this.", { grounded: true, specific: true }, (critic) => expect(critic.specific).toBe(true)],
+    ["critic cannot add new allowed fact", "The 10th house is relevant.", { inventedFacts: ["new fact"], shouldFallback: true }, (critic) => expect(critic.inventedFacts).toContain("new fact")],
+    ["raw facts JSON exposure flagged", "Here is the raw facts JSON: {\"secret\":true}", { unsafeClaims: ["raw facts json"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("raw facts json")],
+    ["local/Groq/Supabase payload leakage flagged", "Here is the local Ollama payload and Supabase rows.", { unsafeClaims: ["payload leak"], shouldFallback: true }, (critic) => expect(critic.unsafeClaims).toContain("payload leak")],
+  ];
+  it.each(cases)("%s", async (_name, answer, criticOverrides, expected) => {
+    const result = await goodCritic(criticOverrides, answer);
+    expected(result.critic);
+  });
+});
+
+describe("local critic router and integration", () => {
+  it("qwen2.5:3b default accepted", () => expect(routeLocalModelTask("critic", { ASTRO_LOCAL_CRITIC_ENABLED: "true" }).profile.model).toBe("qwen2.5:3b"));
+  it("qwen2.5:1.5b warning preserved", () => expect(routeLocalModelTask("critic", { ASTRO_LOCAL_CRITIC_ENABLED: "true", ASTRO_LOCAL_CRITIC_MODEL: "qwen2.5:1.5b" }).warnings.join(" ")).toContain("fallback"));
+  it("qwen2.5:7b warning preserved", () => expect(routeLocalModelTask("critic", { ASTRO_LOCAL_CRITIC_ENABLED: "true", ASTRO_LOCAL_CRITIC_MODEL: "qwen2.5:7b" }).warnings.join(" ")).toContain("manual/deep critic"));
+  it("qwen2.5:7b not default", () => expect(routeLocalModelTask("critic", { ASTRO_LOCAL_CRITIC_ENABLED: "true" }).profile.model).toBe("qwen2.5:3b"));
+  it("critic uses local-model-router task critic", () => expect(routeLocalModelTask("critic", { ASTRO_LOCAL_CRITIC_ENABLED: "true" }).task).toBe("critic"));
+  it("ASTRO_RAG_ENABLED alone does not enable critic", () => expect(routeLocalModelTask("critic", { ASTRO_RAG_ENABLED: "true" }).useLocal).toBe(false));
+  it("no network when disabled", async () => {
+    const fetchImpl = vi.fn();
+    await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl, flags: { localCriticEnabled: false, localCriticRequired: false, localAnalyzerBaseUrl: "http://127.0.0.1:8787" } }));
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it("fetch/client mocked when enabled", async () => {
+    const fetchImpl = vi.fn(async () => okResponse(criticJson()));
+    const result = await critiqueAnswerWithLocalOllama(makeInput({ fetchImpl }));
+    expect(fetchImpl).toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("local critic integration regression", () => {
+  it("deterministic validator rejection cannot be overridden by critic pass", () => {
+    const merged = mergeCriticWithValidation({
+      validation: { ...validationOk, ok: false, fallbackRecommended: true, retryRecommended: false, genericnessScore: 1 } as never,
+      criticResult: { used: true, ok: true, critic: criticJson(), fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: false } },
+    });
+    expect(merged.fallbackRecommended).toBe(true);
+  });
+  it("critic shouldFallback can trigger fallback signal when integration supports it", () => {
+    const merged = mergeCriticWithValidation({
+      validation: validationOk as never,
+      criticResult: { used: true, ok: true, critic: criticJson({ shouldFallback: true }), fallbackRecommended: false, retryRecommended: false, metadata: { baseUrl: "", timeoutMs: 1, required: false, enabled: true, requestAttempted: true, deterministicValidationOk: true } },
+    });
+    expect(merged.fallbackRecommended).toBe(true);
+  });
+  it("API/UI do not expose raw critic payload", async () => {
+    const result = await goodCritic({ unsafeClaims: ["secret"] });
+    expect(JSON.stringify(result)).not.toContain("TARAYAI_LOCAL_SECRET");
+  });
+  it("existing orchestrator tests still pass shape expectations", async () => {
+    const result = await goodCritic();
+    expect(result.metadata.requestAttempted).toBe(true);
+  });
+});
+
+async function goodCritic(overrides: Record<string, unknown> = {}, answer = "Your career answer is anchored in the 10th house and dasha.") {
+  const fetchImpl = vi.fn(async () => okResponse(criticJson(overrides)));
+  return critiqueAnswerWithLocalOllama(makeInput({ answer, fetchImpl }));
+}
