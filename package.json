@@ -23,6 +23,8 @@
     "check:astro-v2-live-banks": "node scripts/check-astro-v2-live-banks.mjs",
     "check:astro-v2-live-banks:full": "ASTRO_V2_LIVE_FULL=1 node scripts/check-astro-v2-live-banks.mjs",
     "compare:astro-v2-local-live": "node scripts/compare-astro-v2-local-vs-live.mjs",
+    "parse:astro-benchmarks": "npx tsx scripts/parse-astro-benchmark-md.ts",
+    "ingest:astro-benchmarks": "npx tsx scripts/ingest-astro-benchmark-examples.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

@@ -27,3 +27,57 @@ Deployment:
 - skipped
 Remaining blockers:
 - none
+Phase: 21 Benchmark ingestion
+Branch: phase-rag-foundation
+Runtime behavior changed: no API/UI runtime change
+UI changed: no
+DB changed: no migration unless schema compatibility required
+Groq live call added: no
+Ollama live call added: no
+Supabase live call in tests: no; ingestion tests use mocked Supabase
+Benchmark ingestion:
+- lib/astro/rag/benchmark-parser.ts
+- scripts/parse-astro-benchmark-md.ts
+- scripts/ingest-astro-benchmark-examples.ts
+- parses Markdown examples locally
+- extracts question, answer, reasoning, accuracy class, reading style, follow-up, tags
+- filters unsafe examples
+- dry-run default
+- write requires explicit --write
+- raw benchmark files not committed
+Validation:
+- benchmark parser test:
+- benchmark ingestion test:
+- retrieval service test:
+- rag API route test:
+- rag UI test:
+- rag reading orchestrator test:
+- fallback/retry tests:
+- groq answer prompt/writer tests:
+- critic tests:
+- validator tests:
+- answer contract tests:
+- sufficiency checker test:
+- timing tests:
+- reasoning graph tests:
+- required data tests:
+- analyzer/local analyzer tests:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor/repository tests:
+- schema test:
+- feature flag test:
+- existing UI tests:
+- existing groq/provider tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual dry-run:
+- parser:
+- ingestion:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers
