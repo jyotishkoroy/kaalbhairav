@@ -102,3 +102,28 @@ Deployment:
 - skipped
 Remaining blockers:
 - none
+Phase: 4 Deterministic exact fact router
+Branch: phase-rag-foundation
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Groq/Ollama touched: no
+Router:
+- deterministic only
+- uses ChartFact[] only
+- supports lagna, planet placement, moon sign, house sign, house lord, dasha, SAV comparison, planets in house, co-presence, nakshatra, sign-to-house, planet-in-house yes/no
+Validation:
+- exact fact router test:
+- exact fact answer test:
+- extractor test:
+- repository test:
+- schema test:
+- feature flag test:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers
