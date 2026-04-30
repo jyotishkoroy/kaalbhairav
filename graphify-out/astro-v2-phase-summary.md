@@ -144,3 +144,45 @@ Remaining blockers:
 - none
 Next:
 - Phase 31 Optional local tone polisher
+# Phase: 31 Optional local tone polisher
+Branch: phase-rag-foundation
+Runtime behavior changed: optional tone polishing only if ASTRO_LOCAL_TONE_POLISHER_ENABLED=true; otherwise unchanged
+UI changed: no
+DB changed: no
+Local AI:
+- tone polisher added
+- qwen2.5:3b default via router
+- disabled by default
+- fails soft
+- exact fact and high-risk safety answers skipped
+- deterministic validation required after polishing
+Safety:
+- no added chart facts
+- no added timing
+- no added remedies
+- no added guarantees
+- no raw local payload exposed
+Validation:
+- local tone polisher tests:
+- local model router tests:
+- local critic tests:
+- answer validator tests:
+- safety/timing/remedy/fact validator tests:
+- groq answer writer tests:
+- orchestrator tests:
+- rag API route tests:
+- rag UI tests:
+- smoke script tests:
+- rollout validation tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local smoke:
+Deployment:
+- skipped
+Remaining blockers:
+- none
+Next:
+- New companion-reading plan phases from nextStep.md, starting with Ollama Listening Analyzer if continuing that plan
