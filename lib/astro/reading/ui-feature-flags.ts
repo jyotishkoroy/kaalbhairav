@@ -7,6 +7,7 @@
 export type AstroReadingUiFeatureFlags = {
   readingV2UiEnabled: boolean;
   voiceEnabled: boolean;
+  companionUiEnabled: boolean;
 };
 
 function readBooleanEnv(value: string | undefined, defaultValue = false): boolean {
@@ -35,6 +36,10 @@ export function getAstroReadingUiFeatureFlags(): AstroReadingUiFeatureFlags {
       process.env.NEXT_PUBLIC_ASTRO_VOICE_ENABLED,
       false,
     ),
+    companionUiEnabled: readBooleanEnv(
+      process.env.NEXT_PUBLIC_ASTRO_COMPANION_UI_ENABLED,
+      false,
+    ),
   };
 }
 
@@ -44,4 +49,8 @@ export function isAstroReadingV2UiEnabled(): boolean {
 
 export function isAstroVoiceUiEnabled(): boolean {
   return getAstroReadingUiFeatureFlags().voiceEnabled;
+}
+
+export function isAstroCompanionUiEnabled(): boolean {
+  return getAstroReadingUiFeatureFlags().companionUiEnabled;
 }

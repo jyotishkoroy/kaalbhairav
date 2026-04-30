@@ -8,6 +8,7 @@
 
 import { useMemo, useState } from "react";
 import { AstroReadingV2Panel } from "@/components/astro/AstroReadingV2Panel";
+import { CompanionAnswerShell } from "@/components/astro/CompanionAnswerShell";
 import {
   RagReadingPanel,
   getDisplayableRagSections,
@@ -18,6 +19,7 @@ import {
 import { ReadAloudButton } from "@/components/astro/ReadAloudButton";
 import { VoiceInputButton } from "@/components/astro/VoiceInputButton";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
+import { isAstroCompanionUiEnabled } from "@/lib/astro/reading/ui-feature-flags";
 import {
   buildAstroV2ChatRequest,
   emptyBirthDetails,
@@ -146,6 +148,7 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
   const [sections, setSections] = useState<RagReadingSections | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
+  const companionUiEnabled = isAstroCompanionUiEnabled();
   const [sessionId] = useState(() => {
     if (typeof window === "undefined") return "astro-v2-page-server";
     const existing = window.localStorage.getItem("astro-v2-session-id");
@@ -190,6 +193,18 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
     setQuestion((current) => {
       const trimmed = current.trim();
       return trimmed ? `${trimmed} ${text}` : text;
+    });
+  }
+
+  async function submitFeedback(feedback: import("@/components/astro/ReadingFeedbackBar").ReadingFeedbackInput) {
+    await fetch("/api/astro/v2/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        messageId: typeof meta.messageId === "string" ? meta.messageId : undefined,
+        ...feedback,
+      }),
     });
   }
 
@@ -479,7 +494,28 @@ export function AstroV2ChatClient({ profileId }: AstroV2ChatClientProps) {
       ) : null}
 
       {answer ? (
-        renderStructuredPanel ? (
+        companionUiEnabled ? (
+          <CompanionAnswerShell
+            answer={answer}
+            topic={typeof meta.topic === "string" ? meta.topic : null}
+            acknowledgement={typeof meta.acknowledgement === "string" ? meta.acknowledgement : null}
+            emotionalTone={typeof meta.emotionalTone === "string" ? meta.emotionalTone : null}
+            limitations={sections?.limitations ? [sections.limitations] : undefined}
+            safetyBoundaries={sections?.safety_response ? [sections.safety_response] : undefined}
+            confidence={typeof meta.confidence === "string" ? meta.confidence : null}
+            followUpQuestion={followUpQuestion ?? null}
+            followUpReason={typeof meta.followUpReason === "string" ? meta.followUpReason : null}
+            memoryUsed={Boolean(meta.memorySummaryUsed)}
+            memorySaved={Boolean(meta.memorySaved)}
+            memorySummary={typeof meta.memorySummary === "string" ? meta.memorySummary : null}
+            messageId={typeof meta.messageId === "string" ? meta.messageId : null}
+            sessionId={sessionId}
+            showCompanionUi={companionUiEnabled}
+            onFollowUp={handleFollowUp}
+            onFeedbackSubmit={submitFeedback}
+            onClearMemory={() => setMeta((current) => ({ ...current, memorySaved: false }))}
+          />
+        ) : renderStructuredPanel ? (
           <RagReadingPanel
             answer={answer}
             sections={sections}

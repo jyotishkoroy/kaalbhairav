@@ -45,3 +45,51 @@ Remaining blockers:
 - unrelated npm test question-bank seed failure if still present, or none
 Next:
 - Phase 6 UI Feedback and Companion Cards
+Phase: Companion Phase 6 UI Feedback and Companion Cards
+Branch: phase-rag-foundation or active companion branch
+Starting commit: 1603461
+Runtime behavior changed: no production behavior change by default; companion UI disabled unless ASTRO_COMPANION_UI_ENABLED=true
+UI changed: yes, companion components added and optionally integrated behind flag
+DB changed: no new DB migration unless feedback API required it; Phase 5 feedback table reused
+Companion UI:
+- adds ListeningReflectionCard
+- adds GentleFollowUpCard
+- adds ReadingConfidenceNote
+- adds CompanionMemoryNotice
+- adds ReadingFeedbackBar
+- adds CompanionAnswerShell
+- old UI fallback preserved
+Feedback:
+- captures helpful/somewhat/too generic/too fearful/not relevant
+- optional comment
+- fail-soft API if added
+Safety:
+- no raw metadata exposed
+- no ReadingPlan/ListeningAnalysis/Groq/Ollama/Supabase payload exposed
+- memory notice only when memoryUsed/memorySaved
+Validation:
+- listening reflection card tests:
+- gentle follow-up card tests:
+- reading confidence note tests:
+- companion memory notice tests:
+- reading feedback bar tests:
+- companion answer shell tests:
+- feedback API tests:
+- rag UI/API tests:
+- memory tests:
+- critic/synthesis/reading plan/listening tests:
+- feature flag tests:
+- safety/fact/timing/remedy validator tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local visual /astro/v2:
+Deployment:
+- Vercel skipped
+Remaining blockers:
+- unrelated npm test question-bank seed failure if still present
+- Supabase migration deployment pending if still unauthenticated
+Next:
+- Phase 7 Human-Feel Validation Bank

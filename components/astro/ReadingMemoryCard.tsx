@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 export type ReadingMemoryCardProps = {
@@ -17,6 +17,9 @@ export function ReadingMemoryCard({
   summary,
   previousTopic,
 }: ReadingMemoryCardProps) {
+  const safeSummary = typeof summary === "string" && summary.trim() ? summary.trim().slice(0, 160) : "";
+  const safeTopic = typeof previousTopic === "string" && previousTopic.trim() ? previousTopic.trim().slice(0, 80) : "";
+
   return (
     <section
       aria-label="Reading memory"
@@ -28,10 +31,10 @@ export function ReadingMemoryCard({
           ? "Memory is enabled for Reading V2."
           : "Memory is off by default and only activates when enabled."}
       </div>
-      {previousTopic ? (
-        <div className="mt-2 text-xs opacity-75">Previous topic: {previousTopic}</div>
+      {safeTopic ? (
+        <div className="mt-2 text-xs opacity-75">Previous topic: {safeTopic}</div>
       ) : null}
-      {summary ? <p className="mt-2 text-sm opacity-90">{summary}</p> : null}
+      {safeSummary ? <p className="mt-2 text-sm opacity-90">{safeSummary}</p> : null}
     </section>
   );
 }

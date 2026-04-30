@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { getAstroRagFlags } from "../../../lib/astro/rag/feature-flags";
+import { getAstroReadingUiFeatureFlags } from "../../../lib/astro/reading/ui-feature-flags";
 import { ragReadingOrchestrator } from "../../../lib/astro/rag/rag-reading-orchestrator";
 
 describe("getAstroRagFlags", () => {
@@ -24,6 +25,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.exactFactsDeterministic).toBe(true);
     expect(flags.validateLlmOutput).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(false);
+    expect((flags as { companionUiEnabled?: boolean }).companionUiEnabled ?? false).toBe(false);
     expect(flags.companionPipelineEnabled).toBe(false);
     expect(flags.companionCompassionateSynthesisEnabled).toBe(false);
     expect(flags.companionMemoryWriteEnabled).toBe(false);
@@ -46,6 +48,7 @@ describe("getAstroRagFlags", () => {
       ASTRO_TIMING_ENGINE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_ENABLED: "true",
       ASTRO_COMPANION_PIPELINE_ENABLED: "true",
+      NEXT_PUBLIC_ASTRO_COMPANION_UI_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_WRITE_ENABLED: "true",
       ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED: "true",
@@ -63,6 +66,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.llmAnswerEngineEnabled).toBe(true);
     expect(flags.timingEngineEnabled).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(true);
+    expect((flags as { companionUiEnabled?: boolean }).companionUiEnabled ?? false).toBe(false);
     expect(flags.companionPipelineEnabled).toBe(true);
     expect(flags.companionCompassionateSynthesisEnabled).toBe(true);
     expect(flags.companionMemoryWriteEnabled).toBe(true);
@@ -70,6 +74,11 @@ describe("getAstroRagFlags", () => {
     expect(flags.companionMemoryRetrieveEnabled).toBe(true);
     expect(flags.companionMemoryMaxChars).toBe(2400);
     expect(flags.companionMemoryMaxItems).toBe(12);
+  });
+
+  it("companion ui stays off unless explicit UI flag is enabled", () => {
+    const flags = getAstroReadingUiFeatureFlags();
+    expect(flags.companionUiEnabled).toBe(false);
   });
 
   it("overrides default-true values with false", () => {
