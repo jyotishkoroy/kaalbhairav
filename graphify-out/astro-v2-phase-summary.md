@@ -33,3 +33,40 @@ Remaining blockers:
 - none
 Next:
 - Phase 28 Local query expander
+Phase: 28 Local query expander
+Branch: phase-rag-foundation
+Runtime behavior changed: no production behavior change; not wired into retrieval yet
+UI changed: no
+DB changed: no
+Local AI:
+- query expander module added
+- deterministic fallback first
+- optional local model path via Phase 27 router
+- qwen2.5:3b remains default
+- no live Ollama calls in tests
+Safety:
+- no invented chart facts
+- no invented timing
+- no unsafe remedy/medical/legal/death expansion
+Validation:
+- local query expander tests:
+- local model router tests:
+- feature flag tests:
+- retrieval service tests:
+- exact fact tests:
+- safety gate/validator tests:
+- smoke script tests:
+- rollout validation tests:
+- rag API route tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local smoke:
+Deployment:
+- skipped
+Remaining blockers:
+- none
+Next:
+- Phase 29 Wire query expansion into retrieval
