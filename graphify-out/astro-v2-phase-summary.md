@@ -136,3 +136,51 @@ Remaining blockers:
 - Supabase migration deployment pending if still unauthenticated
 Next:
 - Phase 8 Live Parity Validation
+Phase: Companion Phase 8 Live Parity Validation
+Branch: phase-rag-foundation or active companion branch
+Starting commit: 520b37e
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Live parity:
+- adds env checker
+- adds live smoke checker
+- adds local-vs-live comparator
+- adds production smoke checker
+- uses 8 required smoke prompts
+- compares behavior, shape, safety, exact facts, follow-up behavior, fallback explainability, latency
+- writes generated reports to artifacts
+Safety:
+- exact facts must stay deterministic
+- death/lifespan must be bounded
+- vague prompt must ask follow-up
+- remedy prompt must avoid medical overreach/coercion
+- no unsupported timing/remedies/guarantees
+Validation:
+- env script:
+- live script:
+- compare script:
+- production smoke script:
+- live parity tests:
+- human-feel bank:
+- companion UI tests:
+- memory tests:
+- critic/synthesis/reading plan/listening tests:
+- feature flag tests:
+- safety/fact/timing/remedy/genericness validator tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- local-vs-live check:
+- production smoke:
+Deployment:
+- Vercel skipped unless explicitly run after validation
+Remaining blockers:
+- unrelated npm test question-bank seed failure if still present
+- Supabase migration deployment pending if still unauthenticated
+Generated artifacts:
+- not committed
+Next:
+- final rollout decision / enablement plan
