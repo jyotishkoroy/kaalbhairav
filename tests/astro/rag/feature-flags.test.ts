@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import { describe, expect, it } from "vitest";
 import { getAstroRagFlags } from "../../../lib/astro/rag/feature-flags";
 import { ragReadingOrchestrator } from "../../../lib/astro/rag/rag-reading-orchestrator";
@@ -14,6 +20,10 @@ describe("getAstroRagFlags", () => {
     expect(flags.timingEngineEnabled).toBe(false);
     expect(flags.exactFactsDeterministic).toBe(true);
     expect(flags.validateLlmOutput).toBe(true);
+    expect(flags.companionMemoryEnabled).toBe(false);
+    expect(flags.companionMemoryStoreEnabled).toBe(false);
+    expect(flags.companionMemoryRetrieveEnabled).toBe(false);
+    expect(flags.companionMemoryMaxChars).toBe(1200);
   });
 
   it("enables selected safe values explicitly", () => {
@@ -24,6 +34,10 @@ describe("getAstroRagFlags", () => {
       ASTRO_LOCAL_CRITIC_ENABLED: "true",
       ASTRO_LLM_ANSWER_ENGINE_ENABLED: "true",
       ASTRO_TIMING_ENGINE_ENABLED: "true",
+      ASTRO_COMPANION_MEMORY_ENABLED: "true",
+      ASTRO_COMPANION_MEMORY_STORE_ENABLED: "true",
+      ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED: "true",
+      ASTRO_COMPANION_MEMORY_MAX_CHARS: "2400",
     });
 
     expect(flags.ragEnabled).toBe(true);
@@ -32,6 +46,10 @@ describe("getAstroRagFlags", () => {
     expect(flags.localCriticEnabled).toBe(true);
     expect(flags.llmAnswerEngineEnabled).toBe(true);
     expect(flags.timingEngineEnabled).toBe(true);
+    expect(flags.companionMemoryEnabled).toBe(true);
+    expect(flags.companionMemoryStoreEnabled).toBe(true);
+    expect(flags.companionMemoryRetrieveEnabled).toBe(true);
+    expect(flags.companionMemoryMaxChars).toBe(2400);
   });
 
   it("overrides default-true values with false", () => {
@@ -76,6 +94,7 @@ describe("getAstroRagFlags", () => {
       ASTRO_LOCAL_CRITIC_TIMEOUT_MS: "NaN",
       ASTRO_LLM_MAX_TOKENS: "none",
       ASTRO_LLM_TEMPERATURE: "bad",
+      ASTRO_COMPANION_MEMORY_MAX_CHARS: "bad",
     });
 
     expect(flags.localAnalyzerTimeoutMs).toBe(15000);
@@ -84,6 +103,14 @@ describe("getAstroRagFlags", () => {
     expect(flags.localCriticTimeoutMs).toBe(15000);
     expect(flags.llmMaxTokens).toBe(900);
     expect(flags.llmTemperature).toBe(0.2);
+    expect(flags.companionMemoryMaxChars).toBe(1200);
+  });
+
+  it("clamps companion memory max chars safely", () => {
+    expect(getAstroRagFlags({ ASTRO_COMPANION_MEMORY_MAX_CHARS: "199" }).companionMemoryMaxChars).toBe(1200);
+    expect(getAstroRagFlags({ ASTRO_COMPANION_MEMORY_MAX_CHARS: "3001" }).companionMemoryMaxChars).toBe(1200);
+    expect(getAstroRagFlags({ ASTRO_COMPANION_MEMORY_MAX_CHARS: "3000" }).companionMemoryMaxChars).toBe(3000);
+    expect(getAstroRagFlags({ ASTRO_COMPANION_MEMORY_MAX_CHARS: "200" }).companionMemoryMaxChars).toBe(200);
   });
 
   it("uses model and base URL defaults", () => {

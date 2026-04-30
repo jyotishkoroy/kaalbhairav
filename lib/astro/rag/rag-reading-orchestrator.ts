@@ -22,6 +22,14 @@ import type { AnswerValidationResult } from "./validation-types";
 import { critiqueAnswerWithLocalOllama, type LocalCriticClientResult } from "./local-critic";
 import { runRetryAndFallbackController, type RetryControllerResult } from "./retry-controller";
 import { buildFallbackAnswer, type FallbackAnswerResult } from "./fallback-answer";
+import {
+  createSupabaseCompanionMemoryRepository,
+  mergeCompanionMemory,
+  summarizeCompanionMemory,
+  type CompanionMemoryContext,
+  type CompanionMemoryRepository,
+  type CompanionMemorySummary,
+} from "./companion-memory";
 
 export type RagReadingOrchestratorInput = {
   question: string;
@@ -32,6 +40,7 @@ export type RagReadingOrchestratorInput = {
   env?: Record<string, string | undefined>;
   flags?: AstroRagFlags;
   memorySummary?: string;
+  companionMemoryRepository?: CompanionMemoryRepository;
   explicitUserDates?: Array<{
     label?: string;
     startsOn?: string;
@@ -56,6 +65,7 @@ export type RagReadingOrchestratorDependencies = {
   validateAnswer: typeof validateRagAnswer;
   critiqueAnswer: typeof critiqueAnswerWithLocalOllama;
   retryAndFallback: typeof runRetryAndFallbackController;
+  companionMemoryRepository: CompanionMemoryRepository;
 };
 
 export type RagReadingMetadata = {
@@ -78,6 +88,7 @@ export type RagReadingMetadata = {
   fallbackUsed: boolean;
   followupAsked: boolean;
   timingsAvailable: boolean;
+  companionMemoryUsed?: boolean;
   error?: string;
   pipelineSteps: Array<{
     name: string;
@@ -107,6 +118,7 @@ export type RagReadingOrchestratorResult = {
     critic?: LocalCriticClientResult;
     retry?: RetryControllerResult;
     fallback?: FallbackAnswerResult;
+    companionMemory?: CompanionMemoryContext;
   };
 };
 
@@ -131,6 +143,7 @@ function makeEmptyMeta(reason: string, ragEnabled: boolean): RagReadingMetadata 
     fallbackUsed: true,
     followupAsked: false,
     timingsAvailable: false,
+    companionMemoryUsed: false,
     error: reason,
     pipelineSteps: [
       { name: "feature_flags", ok: true },
@@ -150,7 +163,7 @@ function safeFallbackResult(reason: string, input?: Partial<RagReadingOrchestrat
     followUpAnswer: fallback.followupQuestion,
     status: "fallback",
     meta: makeEmptyMeta(reason, ragEnabled),
-    artifacts: { fallback },
+    artifacts: { fallback, companionMemory: undefined },
   };
 }
 
@@ -178,6 +191,62 @@ function chooseEngineFromOutcome(outcome: { groqUsed: boolean; fallbackUsed: boo
   if (!outcome.ragEnabled) return "fallback";
   if (outcome.groqUsed) return "rag_llm";
   return "rag_deterministic";
+}
+
+function shouldUseCompanionMemory(flags: AstroRagFlags): boolean {
+  return Boolean(flags.companionMemoryEnabled);
+}
+
+async function resolveCompanionMemoryContext(
+  input: Partial<RagReadingOrchestratorInput>,
+  flags: AstroRagFlags,
+  domain?: string,
+): Promise<CompanionMemoryContext | undefined> {
+  if (!shouldUseCompanionMemory(flags) || !flags.companionMemoryRetrieveEnabled) return undefined;
+  if (!input.userId) return undefined;
+  const repository =
+    input.companionMemoryRepository ??
+    input.dependencies?.companionMemoryRepository ??
+    (input.supabase ? createSupabaseCompanionMemoryRepository({ supabase: input.supabase }) : undefined);
+  if (!repository) return undefined;
+  const result = await repository.retrieve({ userId: input.userId, profileId: input.profileId ?? null, domain });
+  return result.ok ? result.context : undefined;
+}
+
+async function maybeStoreCompanionMemory(
+  input: Partial<RagReadingOrchestratorInput>,
+  flags: AstroRagFlags,
+  memoryContext: CompanionMemoryContext | undefined,
+  result: { answer: string; followUpQuestion: string | null; status?: RagReadingOrchestratorResult["status"]; meta: RagReadingMetadata },
+  domain?: string,
+): Promise<CompanionMemorySummary | undefined> {
+  if (!shouldUseCompanionMemory(flags) || !flags.companionMemoryStoreEnabled) return undefined;
+  if (!input.userId) return undefined;
+  const repository =
+    input.companionMemoryRepository ??
+    input.dependencies?.companionMemoryRepository ??
+    (input.supabase ? createSupabaseCompanionMemoryRepository({ supabase: input.supabase }) : undefined);
+  if (!repository) return undefined;
+  if (result.meta.safetyBlocked || result.meta.exactFactAnswered || result.status === "fallback") return undefined;
+  const summary = summarizeCompanionMemory({
+    userId: input.userId,
+    profileId: input.profileId ?? null,
+    question: input.question ?? "",
+    answer: result.answer,
+    domain,
+    followUpQuestion: result.followUpQuestion,
+    language: memoryContext?.languagePreference ?? undefined,
+    tone: memoryContext?.tonePreference ?? undefined,
+    existingSummary: memoryContext?.memorySummary ?? null,
+  });
+  if (!summary.shouldStore) return undefined;
+  const merged = mergeCompanionMemory({
+    existingSummary: memoryContext?.memorySummary ?? null,
+    next: summary,
+    maxChars: flags.companionMemoryMaxChars,
+  });
+  await repository.store({ userId: input.userId, profileId: input.profileId ?? null, memory: merged });
+  return merged;
 }
 
 export async function ragReadingOrchestrator(
@@ -212,6 +281,7 @@ export async function ragReadingOrchestrator(
           fallbackUsed: false,
           followupAsked: false,
           timingsAvailable: false,
+          companionMemoryUsed: false,
           pipelineSteps: [],
         },
         artifacts: {},
@@ -241,6 +311,7 @@ export async function ragReadingOrchestrator(
     fallbackUsed: false,
     followupAsked: false,
     timingsAvailable: false,
+    companionMemoryUsed: false,
     pipelineSteps: [],
   };
   withStep(meta, "feature_flags", true);
@@ -269,7 +340,7 @@ export async function ragReadingOrchestrator(
       followUpAnswer: fallback.followupQuestion,
       status: "fallback",
       meta,
-      artifacts: { fallback },
+      artifacts: { fallback, companionMemory: undefined },
     };
   }
 
@@ -279,7 +350,7 @@ export async function ragReadingOrchestrator(
     meta.error = !question ? "missing_question" : "missing_user_id";
     withStep(meta, "safety_gate", false, { reason: meta.error });
     withStep(meta, "final_answer", true);
-    return { answer: fallback.answer, followUpQuestion: fallback.followupQuestion, followUpAnswer: fallback.followupQuestion, status: "fallback", meta, artifacts: { fallback } };
+    return { answer: fallback.answer, followUpQuestion: fallback.followupQuestion, followUpAnswer: fallback.followupQuestion, status: "fallback", meta, artifacts: { fallback, companionMemory: undefined } };
   }
 
   const safety = (input.dependencies?.safetyGate ?? ragSafetyGate)({ question, answerType: "unknown" });
@@ -310,7 +381,7 @@ export async function ragReadingOrchestrator(
       followUpAnswer: fallback.followupQuestion,
       status: "fallback",
       meta,
-      artifacts: { fallback },
+      artifacts: { fallback, companionMemory: undefined },
     };
   }
 
@@ -340,7 +411,7 @@ export async function ragReadingOrchestrator(
       status: "exact_fact",
       sections: { direct_answer: exactFact.structuredAnswer?.directAnswer ?? exactFact.answer },
       meta,
-      artifacts: { fallback },
+      artifacts: { fallback, companionMemory: undefined },
     };
   }
 
@@ -359,12 +430,17 @@ export async function ragReadingOrchestrator(
   const plan = (input.dependencies?.planRequiredData ?? planRequiredData)({ analyzer, safety: safetyContext, question });
   withStep(meta, "required_data_planner", true);
 
+  const companionMemory = await resolveCompanionMemoryContext(input, flags, plan.domain);
+  if (companionMemory) {
+    meta.companionMemoryUsed = true;
+  }
+
   const context = await (input.dependencies?.retrieveContext ?? retrieveAstroRagContext)({
     supabase: input?.supabase,
     userId: input.userId,
     profileId: input.profileId ?? null,
     plan,
-    memorySummary: input.memorySummary,
+    memorySummary: companionMemory?.memorySummary ?? input.memorySummary,
   } as never);
   meta.supabaseRetrievalUsed = true;
   withStep(meta, "retrieval", true);
@@ -414,7 +490,7 @@ export async function ragReadingOrchestrator(
       followUpAnswer: sufficiency.followupQuestion ?? fallback.followupQuestion,
       status: "ask_followup",
       meta,
-      artifacts: { analyzer, plan, context, reasoningPath, timing, sufficiency, fallback },
+      artifacts: { analyzer, plan, context, reasoningPath, timing, sufficiency, fallback, companionMemory },
     };
   }
 
@@ -434,7 +510,7 @@ export async function ragReadingOrchestrator(
       followUpAnswer: fallback.followupQuestion,
       status: "fallback",
       meta,
-      artifacts: { analyzer, plan, context, reasoningPath, timing, sufficiency, fallback },
+      artifacts: { analyzer, plan, context, reasoningPath, timing, sufficiency, fallback, companionMemory },
     };
   }
 
@@ -520,7 +596,7 @@ export async function ragReadingOrchestrator(
   withStep(meta, "retry_fallback", true);
   withStep(meta, "final_answer", true);
 
-  return {
+  const result: RagReadingOrchestratorResult = {
     answer: retry.finalAnswer,
     followUpQuestion: retry.source === "fallback" && retry.fallback?.followupQuestion ? retry.fallback.followupQuestion : (retry.validation?.retryRecommended ? null : null),
     followUpAnswer: retry.source === "fallback" ? retry.fallback?.followupQuestion ?? null : null,
@@ -540,6 +616,11 @@ export async function ragReadingOrchestrator(
       critic: retry.critic ?? critic,
       retry,
       fallback: retry.fallback,
+      companionMemory,
     },
   };
+
+  await maybeStoreCompanionMemory(input, flags, companionMemory, result, plan.domain);
+
+  return result;
 }

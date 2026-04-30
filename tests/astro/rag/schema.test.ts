@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -17,6 +23,10 @@ function readSeedFile(): string {
   return readFileSync(join(process.cwd(), "supabase", "seed", "astro_reasoning_rules.sql"), "utf8");
 }
 
+function readCompanionMigration(): string {
+  return readFileSync(join(process.cwd(), "supabase", "migrations", "20260430094500_astro_companion_memory.sql"), "utf8");
+}
+
 function normalize(sql: string): string {
   return sql.toLowerCase().replace(/\s+/g, " ");
 }
@@ -24,6 +34,7 @@ function normalize(sql: string): string {
 describe("astro rag schema foundation", () => {
   const migration = normalize(readLatestMigration());
   const seed = normalize(readSeedFile());
+  const companion = normalize(readCompanionMigration());
 
   it("creates all required tables", () => {
     for (const table of [
@@ -127,5 +138,18 @@ describe("astro rag schema foundation", () => {
       expect(migration).not.toContain(forbidden);
       expect(seed).not.toContain(forbidden);
     }
+  });
+
+  it("adds companion memory table safely", () => {
+    expect(companion).toContain("create table if not exists public.astro_companion_memory");
+    expect(companion).toContain("alter table public.astro_companion_memory enable row level security");
+    expect(companion).toContain("unique index if not exists astro_companion_memory_user_profile_key_idx");
+    expect(companion).toContain("astro_companion_memory_user_profile_idx");
+    expect(companion).toContain("astro_companion_memory_domains_idx");
+    expect(companion).toContain("astro_companion_memory_updated_at_idx");
+    expect(companion).toContain("memory_key text not null");
+    expect(companion).toContain("profile_id uuid");
+    expect(companion).not.toContain("raw message");
+    expect(companion).not.toContain("conversation log");
   });
 });

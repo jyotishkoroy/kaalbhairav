@@ -2,6 +2,12 @@
 // commercially use, train models on, scrape, or create derivative works from this
 // repository or any part of it without prior written permission from Jyotishko Roy.
 
+/**
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import { describe, expect, it, vi } from "vitest";
 import { ragReadingOrchestrator, buildEmptyRagReadingResult, shouldUseRagOrchestrator } from "../../../lib/astro/rag/rag-reading-orchestrator";
 import type { AstroRagFlags } from "../../../lib/astro/rag/feature-flags";
@@ -36,6 +42,10 @@ function baseFlags(overrides: Partial<AstroRagFlags> = {}): AstroRagFlags {
     oracleVmTimingEnabled: false,
     validateLlmOutput: true,
     storeValidationResults: true,
+    companionMemoryEnabled: false,
+    companionMemoryStoreEnabled: false,
+    companionMemoryRetrieveEnabled: false,
+    companionMemoryMaxChars: 1200,
     ...overrides,
   };
 }
@@ -66,6 +76,10 @@ function makeDeps(log: CallLog, overrides: Record<string, unknown> = {}): Record
     validateAnswer: vi.fn(() => { log.push("deterministic_validator"); return validation; }),
     critiqueAnswer: vi.fn(() => { log.push("ollama_critic"); return Promise.resolve(critic); }),
     retryAndFallback: vi.fn(() => { log.push("retry_fallback"); return Promise.resolve(retry); }),
+    companionMemoryRepository: {
+      retrieve: vi.fn(async () => ({ ok: true, context: { memorySummary: "Prior career memory.", domains: ["career"], openFollowUp: "Follow up", languagePreference: "English", tonePreference: "concise", source: "supabase" as const } })),
+      store: vi.fn(async () => ({ ok: true, stored: true })),
+    },
     ...overrides,
   };
 }
@@ -294,6 +308,68 @@ describe("ragReadingOrchestrator", () => {
       expect(result.meta.pipelineSteps.map((s) => s.name)).toEqual(["feature_flags", "safety_gate", "exact_fact_router", "analyzer", "required_data_planner", "retrieval", "reasoning_graph", "timing_engine", "sufficiency_checker", "answer_contract", "groq_writer", "deterministic_validator", "ollama_critic", "retry_fallback", "final_answer"]);
     });
   }
+
+  it("flags off means no memory retrieve/store", async () => {
+    const log: CallLog = [];
+    const deps = makeDeps(log);
+    const flags = baseFlags({ companionMemoryEnabled: false, companionMemoryRetrieveEnabled: false, companionMemoryStoreEnabled: false });
+    const result = await ragReadingOrchestrator({ question: "I am working hard and not getting promotion.", userId: "u", flags, dependencies: deps });
+    expect(result.meta.companionMemoryUsed).toBe(false);
+    const memoryRepo = deps.companionMemoryRepository as { retrieve: ReturnType<typeof vi.fn>; store: ReturnType<typeof vi.fn> };
+    expect(memoryRepo.retrieve.mock.calls).toHaveLength(0);
+    expect(memoryRepo.store.mock.calls).toHaveLength(0);
+  });
+
+  it("retrieve flag on adds companion memory to context", async () => {
+    const log: CallLog = [];
+    const deps = makeDeps(log);
+    const flags = baseFlags({ companionMemoryEnabled: true, companionMemoryRetrieveEnabled: true, companionMemoryStoreEnabled: false });
+    const result = await ragReadingOrchestrator({ question: "I am working hard and not getting promotion.", userId: "u", flags, dependencies: deps });
+    const memoryRepo = deps.companionMemoryRepository as { retrieve: ReturnType<typeof vi.fn>; store: ReturnType<typeof vi.fn> };
+    expect(memoryRepo.retrieve.mock.calls.length).toBe(1);
+    expect(result.meta.companionMemoryUsed).toBe(true);
+  });
+
+  it("retrieve failure still answers", async () => {
+    const log: CallLog = [];
+    const deps = makeDeps(log, {
+      companionMemoryRepository: {
+        retrieve: vi.fn(async () => ({ ok: false, context: { memorySummary: null, domains: [], openFollowUp: null, languagePreference: null, tonePreference: null, source: "none" as const }, error: "fail" })),
+        store: vi.fn(async () => ({ ok: true, stored: true })),
+      },
+    });
+    const flags = baseFlags({ companionMemoryEnabled: true, companionMemoryRetrieveEnabled: true });
+    const result = await ragReadingOrchestrator({ question: "I am working hard and not getting promotion.", userId: "u", flags, dependencies: deps });
+    expect(result.answer.length).toBeGreaterThan(0);
+    expect(result.meta.companionMemoryUsed).toBe(false);
+  });
+
+  it("store flag on plus safe career answer stores memory", async () => {
+    const log: CallLog = [];
+    const deps = makeDeps(log);
+    const flags = baseFlags({ companionMemoryEnabled: true, companionMemoryStoreEnabled: true, companionMemoryRetrieveEnabled: false });
+    await ragReadingOrchestrator({ question: "I am working hard and not getting promotion.", userId: "u", flags, dependencies: deps });
+    const memoryRepo = deps.companionMemoryRepository as { retrieve: ReturnType<typeof vi.fn>; store: ReturnType<typeof vi.fn> };
+    expect(memoryRepo.store.mock.calls.length).toBe(1);
+  });
+
+  it("safety blocked death question does not store memory", async () => {
+    const log: CallLog = [];
+    const deps = makeDeps(log);
+    const flags = baseFlags({ companionMemoryEnabled: true, companionMemoryStoreEnabled: true });
+    await ragReadingOrchestrator({ question: "Can my chart tell when I will die?", userId: "u", flags, dependencies: deps });
+    const memoryRepo = deps.companionMemoryRepository as { retrieve: ReturnType<typeof vi.fn>; store: ReturnType<typeof vi.fn> };
+    expect(memoryRepo.store.mock.calls.length).toBe(0);
+  });
+
+  it("exact fact question does not store memory", async () => {
+    const log: CallLog = [];
+    const deps = makeDeps(log);
+    const flags = baseFlags({ companionMemoryEnabled: true, companionMemoryStoreEnabled: true });
+    await ragReadingOrchestrator({ question: "What is my Lagna?", userId: "u", flags, dependencies: deps });
+    const memoryRepo = deps.companionMemoryRepository as { retrieve: ReturnType<typeof vi.fn>; store: ReturnType<typeof vi.fn> };
+    expect(memoryRepo.store.mock.calls.length).toBe(0);
+  });
 
   it("buildEmptyRagReadingResult is safe", () => {
     const result = buildEmptyRagReadingResult("missing");

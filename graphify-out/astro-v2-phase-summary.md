@@ -81,3 +81,50 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 22 Companion memory
+Branch: phase-rag-foundation
+Runtime behavior changed: optional companion memory behind flags only
+UI changed: no
+DB changed: migration added only if needed
+Groq live call added: no
+Ollama live call added: no
+Supabase live call in tests: no; repository tests mocked
+Companion memory:
+- lib/astro/rag/companion-memory.ts
+- safe summary fields only
+- sensitive domains redacted/not stored
+- domain-scoped memory
+- retrieval/store optional via flags
+- no raw messages, raw chart facts, secrets, or artifacts stored
+Validation:
+- companion memory test:
+- orchestrator tests:
+- retrieval service tests:
+- feature flag tests:
+- schema test if migration added:
+- rag API route test:
+- rag UI test:
+- fallback/retry tests:
+- groq answer prompt/writer tests:
+- critic tests:
+- validator tests:
+- answer contract tests:
+- sufficiency checker test:
+- timing tests:
+- reasoning graph tests:
+- required data tests:
+- analyzer/local analyzer tests:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor/repository tests:
+- benchmark parser/ingestion tests:
+- existing groq/provider tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped or completed
+Remaining blockers:
+- none or exact blockers

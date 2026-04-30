@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 export type AstroRagFlags = {
   ragEnabled: boolean;
   reasoningGraphEnabled: boolean;
@@ -25,6 +31,10 @@ export type AstroRagFlags = {
   oracleVmTimingEnabled: boolean;
   validateLlmOutput: boolean;
   storeValidationResults: boolean;
+  companionMemoryEnabled?: boolean;
+  companionMemoryStoreEnabled?: boolean;
+  companionMemoryRetrieveEnabled?: boolean;
+  companionMemoryMaxChars?: number;
 };
 
 function readBool(value: string | undefined, defaultValue: boolean): boolean {
@@ -43,6 +53,12 @@ function readFloat(value: string | undefined, defaultValue: number): number {
   if (!value) return defaultValue;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function readMemoryMaxChars(value: string | undefined, defaultValue: number): number {
+  const parsed = readInt(value, defaultValue);
+  if (parsed < 200 || parsed > 3000) return defaultValue;
+  return parsed;
 }
 
 export function getAstroRagFlags(env: Record<string, string | undefined> = process.env): AstroRagFlags {
@@ -76,5 +92,9 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
     oracleVmTimingEnabled: readBool(env.ASTRO_ORACLE_VM_TIMING_ENABLED, false),
     validateLlmOutput: readBool(env.ASTRO_VALIDATE_LLM_OUTPUT, true),
     storeValidationResults: readBool(env.ASTRO_STORE_VALIDATION_RESULTS, true),
+    companionMemoryEnabled: readBool(env.ASTRO_COMPANION_MEMORY_ENABLED, false),
+    companionMemoryStoreEnabled: readBool(env.ASTRO_COMPANION_MEMORY_STORE_ENABLED, false),
+    companionMemoryRetrieveEnabled: readBool(env.ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED, false),
+    companionMemoryMaxChars: readMemoryMaxChars(env.ASTRO_COMPANION_MEMORY_MAX_CHARS, 1200),
   };
 }
