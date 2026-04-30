@@ -73,7 +73,65 @@ describe("Phase 25 rollout validation", () => {
     expect(resultFor("production-optional-laptop", makeEnv({ ASTRO_LOCAL_ANALYZER_ENABLED: "false" })).ok).toBe(true);
   });
 
-  it("validation output does not include secret values", () => {
+  it("production-groq missing ASTRO_RAG_ENABLED includes suggested env", () => {
+    const result = resultFor("production-groq", makeEnv({ ASTRO_RAG_ENABLED: "false" }));
+    expect(result.issues.some((issue) => issue.code === "prod-rag-required" && issue.suggestedEnv === "ASTRO_RAG_ENABLED=true")).toBe(true);
+  });
+
+  it("production-groq missing ASTRO_REASONING_GRAPH_ENABLED includes suggested env", () => {
+    const result = resultFor("production-groq", makeEnv({ ASTRO_REASONING_GRAPH_ENABLED: "false" }));
+    expect(result.issues.some((issue) => issue.code === "prod-reasoning-required" && issue.suggestedEnv === "ASTRO_REASONING_GRAPH_ENABLED=true")).toBe(true);
+  });
+
+  it("production-groq missing ASTRO_LLM_ANSWER_ENGINE_ENABLED includes suggested env", () => {
+    const result = resultFor("production-groq", makeEnv({ ASTRO_LLM_ANSWER_ENGINE_ENABLED: "false" }));
+    expect(result.issues.some((issue) => issue.code === "prod-llm-required" && issue.suggestedEnv === "ASTRO_LLM_ANSWER_ENGINE_ENABLED=true")).toBe(true);
+  });
+
+  it("production-groq suggested command is copyable", () => {
+    const result = resultFor("production-groq", makeEnv({ ASTRO_RAG_ENABLED: "false" }));
+    expect(result.issues.some((issue) => issue.suggestedCommand?.includes("npm run validate:astro-rag-rollout -- --stage production-groq --json"))).toBe(true);
+  });
+
+  it("local-deterministic suggested command is copyable", () => {
+    const result = resultFor("local-deterministic", makeEnv({ ASTRO_RAG_ENABLED: "false", ASTRO_LLM_ANSWER_ENGINE_ENABLED: "true" }));
+    expect(result.issues.some((issue) => issue.suggestedCommand?.includes("--stage local-deterministic --json"))).toBe(true);
+  });
+
+  it("preview-deterministic suggested command is copyable", () => {
+    const result = resultFor("preview-deterministic", makeEnv({ ASTRO_RAG_ENABLED: "false" }));
+    expect(result.issues.some((issue) => issue.suggestedCommand?.includes("--stage preview-deterministic --json"))).toBe(true);
+  });
+
+  it("preview-groq suggested command is copyable", () => {
+    const result = resultFor("preview-groq", makeEnv({ ASTRO_RAG_ENABLED: "false" }));
+    expect(result.issues.some((issue) => issue.suggestedCommand?.includes("--stage preview-groq --json"))).toBe(true);
+  });
+
+  it("production-optional-laptop qwen2.5:7b warns", () => {
+    const result = resultFor("production-optional-laptop", makeEnv({ ASTRO_LOCAL_ANALYZER_MODEL: "qwen2.5:7b" }));
+    expect(result.issues.some((issue) => issue.code === "slow-model")).toBe(true);
+  });
+
+  it("qwen2.5:3b passes as default", () => {
+    expect(resultFor("production-optional-laptop", makeEnv({ ASTRO_LOCAL_ANALYZER_MODEL: "qwen2.5:3b" })).ok).toBe(true);
+  });
+
+  it("local critic required true fails in production optional laptop", () => {
+    expect(resultFor("production-optional-laptop", makeEnv({ ASTRO_LOCAL_CRITIC_REQUIRED: "true" })).ok).toBe(false);
+  });
+
+  it("validation false with LLM enabled fails", () => {
+    expect(resultFor("preview-groq", makeEnv({ ASTRO_VALIDATE_LLM_OUTPUT: "false" })).ok).toBe(false);
+  });
+
+  it("--json output includes suggestedCommand or suggestedEnv", () => {
+    const result = resultFor("production-groq", makeEnv({ ASTRO_RAG_ENABLED: "false" }));
+    const json = JSON.stringify({ ok: result.ok, issues: result.issues, suggestedEnv: result.issues[0]?.suggestedEnv, suggestedCommand: result.issues[0]?.suggestedCommand });
+    expect(json).toContain("suggested");
+  });
+
+  it("secrets are redacted from output", () => {
     const result = resultFor("production-groq", makeEnv({ GROQ_API_KEY: "secret-value", ASTRO_LLM_ANSWER_ENGINE_ENABLED: "true" }));
     expect(JSON.stringify(result)).not.toContain("secret-value");
   });
@@ -87,10 +145,6 @@ describe("Phase 25 rollout validation", () => {
   it("JSON output helper shape is stable", () => {
     const result = resultFor("preview-groq", makeEnv());
     expect(result).toMatchObject({ ok: true, stage: "preview-groq", issues: expect.any(Array) });
-  });
-
-  it("LLM enabled with validator false fails", () => {
-    expect(resultFor("preview-groq", makeEnv({ ASTRO_VALIDATE_LLM_OUTPUT: "false" })).ok).toBe(false);
   });
 
   it("production-groq with local analyzer true fails", () => {
@@ -205,14 +259,11 @@ describe("Phase 25 rollout validation", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("env-file parser ignores comments", () => {
-    const parsed = parseEnvFile("# hi\nASTRO_RAG_ENABLED=true\n");
-    expect(parsed.ASTRO_RAG_ENABLED).toBe("true");
-  });
-
-  it("env-file parser handles quoted values", () => {
-    const parsed = parseEnvFile("ASTRO_LOCAL_ANALYZER_MODEL=\"qwen2.5:3b\"\n");
-    expect(parsed.ASTRO_LOCAL_ANALYZER_MODEL).toBe("qwen2.5:3b");
+  it("env-file comments and quotes still parse", () => {
+    const parsedComments = parseEnvFile("# hi\nASTRO_RAG_ENABLED=true\n");
+    expect(parsedComments.ASTRO_RAG_ENABLED).toBe("true");
+    const parsedQuotes = parseEnvFile("ASTRO_LOCAL_ANALYZER_MODEL=\"qwen2.5:3b\"\n");
+    expect(parsedQuotes.ASTRO_LOCAL_ANALYZER_MODEL).toBe("qwen2.5:3b");
   });
 
   it("env-file parser redacts secrets in output", () => {
@@ -262,6 +313,10 @@ describe("Phase 25 rollout validation", () => {
   it("strict does not change the stage label", () => {
     const result = resultFor("preview-groq", makeEnv(), true);
     expect(result.stage).toBe("preview-groq");
+  });
+
+  it("validator performs no network calls", () => {
+    expect(resultFor("preview-groq", makeEnv()).ok).toBe(true);
   });
 
   it("warnings remain warnings without strict", () => {

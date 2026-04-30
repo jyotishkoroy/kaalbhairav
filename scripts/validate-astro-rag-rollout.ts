@@ -19,6 +19,8 @@ export type RolloutValidationIssue = {
   severity: "error" | "warning";
   code: string;
   message: string;
+  suggestedEnv?: string;
+  suggestedCommand?: string;
 };
 
 type ParsedEnvFile = {
@@ -65,6 +67,25 @@ export function loadEnvFile(envFilePath: string): ParsedEnvFile {
 
 function issue(severity: "error" | "warning", code: string, message: string): RolloutValidationIssue {
   return { severity, code, message };
+}
+
+function issueWithFix(severity: "error" | "warning", code: string, message: string, suggestedEnv?: string, suggestedCommand?: string): RolloutValidationIssue {
+  return { severity, code, message, suggestedEnv, suggestedCommand };
+}
+
+function suggestCommand(stage: RolloutStage): string {
+  switch (stage) {
+    case "production-groq":
+      return "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage production-groq --json";
+    case "local-deterministic":
+      return "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=false npm run validate:astro-rag-rollout -- --stage local-deterministic --json";
+    case "preview-deterministic":
+      return "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=false npm run validate:astro-rag-rollout -- --stage preview-deterministic --json";
+    case "preview-groq":
+      return "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=false ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage preview-groq --json";
+    case "production-optional-laptop":
+      return "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage production-optional-laptop --json";
+  }
 }
 
 function addIfDefined(issues: RolloutValidationIssue[], condition: boolean, next: RolloutValidationIssue) {
@@ -132,33 +153,33 @@ export function validateAstroRagRolloutEnv(input: {
   }
 
   if (stage === "local-deterministic") {
-    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issue("error", "local-rag-required", "local-deterministic requires ASTRO_RAG_ENABLED=true."));
-    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED === "true") issues.push(issue("error", "local-llm-enabled", "local-deterministic must not enable the Groq writer."));
+    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issueWithFix("error", "local-rag-required", "local-deterministic requires ASTRO_RAG_ENABLED=true.", "ASTRO_RAG_ENABLED=true", suggestCommand(stage)));
+    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED === "true") issues.push(issueWithFix("error", "local-llm-enabled", "local-deterministic must not enable the Groq writer.", "ASTRO_LLM_ANSWER_ENGINE_ENABLED=false", suggestCommand(stage)));
     if (localAnalyzerEnabled === true && !input.env.ASTRO_LOCAL_ANALYZER_BASE_URL) {
       issues.push(issue("warning", "local-base-url-missing", "Local analyzer is enabled but ASTRO_LOCAL_ANALYZER_BASE_URL is missing."));
     }
   }
 
   if (stage === "preview-deterministic") {
-    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issue("error", "preview-rag-required", "preview-deterministic requires ASTRO_RAG_ENABLED=true."));
-    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED === "true") issues.push(issue("error", "preview-llm-enabled", "preview-deterministic must keep the Groq writer disabled."));
+    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issueWithFix("error", "preview-rag-required", "preview-deterministic requires ASTRO_RAG_ENABLED=true.", "ASTRO_RAG_ENABLED=true", suggestCommand(stage)));
+    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED === "true") issues.push(issueWithFix("error", "preview-llm-enabled", "preview-deterministic must keep the Groq writer disabled.", "ASTRO_LLM_ANSWER_ENGINE_ENABLED=false", suggestCommand(stage)));
     if (localAnalyzerEnabled === true) issues.push(issue("error", "preview-local-analyzer", "preview-deterministic must keep the local analyzer disabled."));
     if (localCriticEnabled === true) issues.push(issue("error", "preview-local-critic", "preview-deterministic must keep the local critic disabled."));
   }
 
   if (stage === "preview-groq") {
-    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issue("error", "preview-rag-required", "preview-groq requires ASTRO_RAG_ENABLED=true."));
-    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED !== "true") issues.push(issue("error", "preview-llm-required", "preview-groq requires ASTRO_LLM_ANSWER_ENGINE_ENABLED=true."));
-    if (validateOutput === false) issues.push(issue("error", "preview-validator-disabled", "preview-groq requires ASTRO_VALIDATE_LLM_OUTPUT to stay enabled."));
+    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issueWithFix("error", "preview-rag-required", "preview-groq requires ASTRO_RAG_ENABLED=true.", "ASTRO_RAG_ENABLED=true", suggestCommand(stage)));
+    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED !== "true") issues.push(issueWithFix("error", "preview-llm-required", "preview-groq requires ASTRO_LLM_ANSWER_ENGINE_ENABLED=true.", "ASTRO_LLM_ANSWER_ENGINE_ENABLED=true", suggestCommand(stage)));
+    if (validateOutput === false) issues.push(issueWithFix("error", "preview-validator-disabled", "preview-groq requires ASTRO_VALIDATE_LLM_OUTPUT to stay enabled.", "ASTRO_VALIDATE_LLM_OUTPUT=true", suggestCommand(stage)));
     if (localAnalyzerEnabled === true) issues.push(issue("error", "preview-local-analyzer", "preview-groq must keep the local analyzer disabled."));
     if (localCriticEnabled === true) issues.push(issue("error", "preview-local-critic", "preview-groq must keep the local critic disabled."));
   }
 
   if (stage === "production-groq") {
-    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issue("error", "prod-rag-required", "production-groq requires ASTRO_RAG_ENABLED=true."));
-    if (input.env.ASTRO_REASONING_GRAPH_ENABLED !== "true") issues.push(issue("error", "prod-reasoning-required", "production-groq requires ASTRO_REASONING_GRAPH_ENABLED=true."));
-    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED !== "true") issues.push(issue("error", "prod-llm-required", "production-groq requires ASTRO_LLM_ANSWER_ENGINE_ENABLED=true."));
-    if (validateOutput === false) issues.push(issue("error", "prod-validator-disabled", "production-groq cannot disable ASTRO_VALIDATE_LLM_OUTPUT."));
+    if (input.env.ASTRO_RAG_ENABLED !== "true") issues.push(issueWithFix("error", "prod-rag-required", "production-groq requires ASTRO_RAG_ENABLED=true.", "ASTRO_RAG_ENABLED=true", "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage production-groq --json"));
+    if (input.env.ASTRO_REASONING_GRAPH_ENABLED !== "true") issues.push(issueWithFix("error", "prod-reasoning-required", "production-groq requires ASTRO_REASONING_GRAPH_ENABLED=true.", "ASTRO_REASONING_GRAPH_ENABLED=true", "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage production-groq --json"));
+    if (input.env.ASTRO_LLM_ANSWER_ENGINE_ENABLED !== "true") issues.push(issueWithFix("error", "prod-llm-required", "production-groq requires ASTRO_LLM_ANSWER_ENGINE_ENABLED=true.", "ASTRO_LLM_ANSWER_ENGINE_ENABLED=true", "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage production-groq --json"));
+    if (validateOutput === false) issues.push(issueWithFix("error", "prod-validator-disabled", "production-groq cannot disable ASTRO_VALIDATE_LLM_OUTPUT.", "ASTRO_VALIDATE_LLM_OUTPUT=true", "ASTRO_RAG_ENABLED=true ASTRO_REASONING_GRAPH_ENABLED=true ASTRO_LLM_ANSWER_ENGINE_ENABLED=true ASTRO_VALIDATE_LLM_OUTPUT=true npm run validate:astro-rag-rollout -- --stage production-groq --json"));
     if (localAnalyzerEnabled === true) issues.push(issue("error", "prod-local-analyzer", "production-groq must keep the local analyzer disabled."));
     if (localCriticEnabled === true) issues.push(issue("error", "prod-local-critic", "production-groq must keep the local critic disabled."));
   }
@@ -198,7 +219,8 @@ function redact(value: string): string {
 }
 
 export function formatIssue(issueValue: RolloutValidationIssue): string {
-  return `${issueValue.severity.toUpperCase()} ${issueValue.code}: ${issueValue.message}`;
+  const fix = issueValue.suggestedCommand ? ` Suggested: ${issueValue.suggestedCommand}` : issueValue.suggestedEnv ? ` Suggested env: ${issueValue.suggestedEnv}` : "";
+  return `${issueValue.severity.toUpperCase()} ${issueValue.code}: ${issueValue.message}${fix}`;
 }
 
 export function parseCliArgs(argv: string[]) {
@@ -268,6 +290,8 @@ async function main() {
           ok: result.ok,
           stage: result.stage,
           issues: result.issues,
+          suggestedEnv: result.issues.find((item) => item.suggestedEnv)?.suggestedEnv,
+          suggestedCommand: result.issues.find((item) => item.suggestedCommand)?.suggestedCommand,
         },
         null,
         2,

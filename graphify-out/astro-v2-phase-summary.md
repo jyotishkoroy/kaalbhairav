@@ -266,3 +266,36 @@ Rollback:
 - disable ASTRO_RAG_ENABLED=false
 Remaining blockers:
 - no repo blocker; rollout-stage CLI needs local `tsx` availability without registry lookup, and local dev socket bind is blocked by the Codex sandbox
+Phase: 26A Fix local rollout validation and smoke script
+Branch: phase-rag-foundation
+Runtime behavior changed: no app runtime behavior change
+UI changed: no
+DB changed: no
+Smoke script:
+- route availability preflight added/improved
+- not_found diagnostics include endpoint/method/status/body/likely cause/suggested fix
+- --debug supported
+- profile/chart/user context flags supported where safe
+Rollout validator:
+- missing env diagnostics include copyable commands
+- JSON output includes suggested env/command where safe
+Validation:
+- smoke script tests:
+- rollout validation tests:
+- feature flag tests:
+- rag API route tests:
+- rag UI tests:
+- orchestrator tests:
+- safety/exact/validator/fallback tests:
+- local analyzer/critic/proxy tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- validate rollout production-groq:
+- local smoke debug:
+Deployment:
+- skipped
+Remaining blockers:
+- none or exact blockers

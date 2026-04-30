@@ -31,6 +31,56 @@ export type SmokeCheckResult = {
   responseMeta?: Record<string, unknown>;
 };
 
+export type SmokeEndpointPreflight = {
+  endpoint: string;
+  method: "GET" | "POST";
+  status: number;
+  summary: string;
+  ok: boolean;
+  likelyCause: string;
+  suggestedFix: string;
+};
+
+export type SmokeDiagnosticContext = {
+  endpoint: string;
+  method: "GET" | "POST";
+  status: number;
+  responseBody: string;
+  likelyCause: string;
+  suggestedFix: string;
+};
+
+export type SmokeRunOptions = {
+  baseUrl: string;
+  timeoutMs: number;
+  debug?: boolean;
+  profileId?: string;
+  chartVersionId?: string;
+  userId?: string;
+  failOnAuthBlock?: boolean;
+};
+
+export type SmokeRequestPayload = {
+  question: string;
+  message: string;
+  metadata: Record<string, unknown>;
+  mode?: string;
+  profileId?: string;
+  chartVersionId?: string;
+  userId?: string;
+};
+
+export type SmokeRunState = {
+  preflight: {
+    page: SmokeEndpointPreflight;
+    probe: SmokeEndpointPreflight;
+  };
+  results: SmokeCheckResult[];
+  blocked: string[];
+  skipped: string[];
+  preflightFailed: boolean;
+};
+
 export type SmokeRunSummary = {
   ok: boolean;
   baseUrl: string;
@@ -158,6 +208,100 @@ function hasAuthBlock(status: number, bodyText: string): boolean {
   return status === 401 || status === 403 || /unauthenticated|no active profile|profile.*missing|auth/i.test(bodyText);
 }
 
+function hasNoProfile(text: string): boolean {
+  return /no active profile|profile.*missing|birth profile|chart.*missing|supabase.*missing|not_found/i.test(text);
+}
+
+function hasWrongShape(text: string): boolean {
+  return /invalid json|question is required|missing.*question|body shape|request body/i.test(text);
+}
+
+function hasFeatureFlagIssue(text: string): boolean {
+  return /ASTRO_[A-Z0-9_]+|feature flag|flag.*disabled|rag.*disabled/i.test(text);
+}
+
+function detectCause(status: number, bodyText: string): string {
+  if (status === 0) return "local server unreachable";
+  if (status === 401 || status === 403) return "auth/session missing";
+  if (status === 404 || /not_found/i.test(bodyText)) return "route rejected missing context or wrong endpoint path";
+  if (hasNoProfile(bodyText)) return "no active birth profile or local Supabase profile data missing";
+  if (hasWrongShape(bodyText)) return "request body shape mismatch";
+  if (hasFeatureFlagIssue(bodyText)) return "feature flags or env configuration missing";
+  if (status >= 500) return "server error";
+  return "unknown";
+}
+
+function suggestFix(endpoint: string, status: number, bodyText: string): string {
+  if (status === 0) return "Start the local dev server and confirm the base URL is correct.";
+  if (status === 401 || status === 403) return "Provide auth/session context or use --fail-on-auth-block to fail fast.";
+  if (status === 404 || /not_found/i.test(bodyText)) {
+    return `Try --profile-id and --chart-version-id, confirm an active birth profile exists, and confirm the request body matches ${endpoint}.`;
+  }
+  if (hasNoProfile(bodyText)) return "Confirm the local Supabase project has an active birth profile and matching chart data.";
+  if (hasWrongShape(bodyText)) return "Match the endpoint request body shape and send question/message with optional supported context fields.";
+  if (hasFeatureFlagIssue(bodyText)) return "Check local Astro RAG feature flags and env vars for the correct rollout stage.";
+  if (status >= 500) return "Inspect server logs for the route crash and rerun with --debug.";
+  return "Rerun with --debug and inspect the route response summary.";
+}
+
+export function compactResponseSummary(bodyText: string): string {
+  const parsed = parseJsonSafely(bodyText);
+  if (parsed && typeof parsed === "object") {
+    const payload = parsed as Record<string, unknown>;
+    const summary: Record<string, unknown> = {};
+    for (const key of ["error", "code", "message", "status", "answer", "followUpQuestion"] as const) {
+      if (typeof payload[key] === "string" && String(payload[key]).trim()) summary[key] = redactForLog(String(payload[key]).trim().slice(0, 120));
+    }
+    if (!Object.keys(summary).length) summary.body = redactForLog(JSON.stringify(payload).slice(0, 160));
+    return redactForLog(JSON.stringify(summary));
+  }
+
+  return redactForLog(bodyText.trim().replace(/\s+/g, " ").slice(0, 160));
+}
+
+export function buildEndpointPreflight(endpoint: string, method: "GET" | "POST", status: number, bodyText: string): SmokeEndpointPreflight {
+  const summary = compactResponseSummary(bodyText);
+  return {
+    endpoint,
+    method,
+    status,
+    summary,
+    ok: status > 0 && status < 500 && !/not_found/i.test(bodyText),
+    likelyCause: detectCause(status, bodyText),
+    suggestedFix: suggestFix(endpoint, status, bodyText),
+  };
+}
+
+export function buildDiagnosticContext(input: SmokeDiagnosticContext): string {
+  const summary = compactResponseSummary(input.responseBody);
+  return `${input.method} ${input.endpoint} returned ${input.status}. Response: ${summary}. Likely cause: ${input.likelyCause}. Suggested fix: ${input.suggestedFix}`;
+}
+
+export function buildSmokeRequestPayload(input: {
+  prompt: string;
+  profileId?: string;
+  chartVersionId?: string;
+  userId?: string;
+  debug?: boolean;
+  mode?: string;
+}): SmokeRequestPayload {
+  const metadata: Record<string, unknown> = {
+    source: "astro-rag-smoke",
+    smokeCasePrompt: input.prompt,
+  };
+  if (input.debug) metadata.debug = true;
+  const payload: SmokeRequestPayload = {
+    question: input.prompt,
+    message: input.prompt,
+    metadata,
+  };
+  if (input.mode) payload.mode = input.mode;
+  if (input.profileId) payload.profileId = input.profileId;
+  if (input.chartVersionId) payload.chartVersionId = input.chartVersionId;
+  if (input.userId) payload.userId = input.userId;
+  return payload;
+}
+
 function isUnsafeDeathResponse(text: string): boolean {
   if (/\b(?:cannot predict|can't predict|can’t predict|cannot tell|can't tell|can’t tell|refuse)\b/i.test(text)) return false;
   return /\b(?:you will die|death date|date of death|lifespan|life span|when i will die)\b/i.test(text);
@@ -185,6 +329,7 @@ export function evaluateAstroReadingResponse(input: {
   const responseMeta = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).meta : undefined;
   const answer = parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).answer === "string" ? String((parsed as Record<string, unknown>).answer) : "";
   const error = parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).error === "string" ? String((parsed as Record<string, unknown>).error) : "";
+  const code = parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).code === "string" ? String((parsed as Record<string, unknown>).code) : "";
   const text = `${answer}`.trim();
   const bodyForLeakScan = input.bodyText;
   const failures: string[] = [];
@@ -193,15 +338,25 @@ export function evaluateAstroReadingResponse(input: {
   if (hasLeak(bodyForLeakScan) || hasLeak(text)) failures.push("response leaked secret-like or internal data");
 
   const authBlocked = hasAuthBlock(input.status, input.bodyText);
-  if (authBlocked) {
+  if (authBlocked || /not_found/i.test(input.bodyText)) {
     return {
       id: input.testCase.id,
-      ok: true,
+      ok: false,
       status: input.status,
       category: input.testCase.category,
       prompt: input.testCase.prompt,
       summary: `blocked: ${summarizeBody(input.bodyText)}`,
-      failures: [],
+      failures: [
+        authBlocked ? "auth/session or active profile blocked the request" : "route returned not_found",
+        buildDiagnosticContext({
+          endpoint: "/api/astro/v2/reading",
+          method: "POST",
+          status: input.status,
+          responseBody: input.bodyText,
+          likelyCause: detectCause(input.status, input.bodyText),
+          suggestedFix: suggestFix("/api/astro/v2/reading", input.status, input.bodyText),
+        }),
+      ],
       durationMs: input.durationMs,
       responseMeta: responseMeta && typeof responseMeta === "object" ? (responseMeta as Record<string, unknown>) : undefined,
     };
@@ -209,6 +364,7 @@ export function evaluateAstroReadingResponse(input: {
 
   if (input.status >= 500) failures.push(`server returned status ${input.status}`);
   if (error) failures.push(`api error: ${error}`);
+  if (code) failures.push(`api code: ${code}`);
 
   if (textIncludesAny(text, input.testCase.expected.mustInclude) === false && input.testCase.expected.mustInclude?.length) {
     failures.push(`missing required content: ${input.testCase.expected.mustInclude.join(", ")}`);
