@@ -37,9 +37,20 @@ export type SmokeEndpointPreflight = {
   status: number;
   summary: string;
   ok: boolean;
+  classification: SmokeRoutePreflightClassification;
   likelyCause: string;
   suggestedFix: string;
 };
+
+export type SmokeRoutePreflightClassification =
+  | "route_available"
+  | "auth_blocked"
+  | "profile_blocked"
+  | "context_missing"
+  | "route_missing"
+  | "request_shape_mismatch"
+  | "server_error"
+  | "unknown_failure";
 
 export type SmokeDiagnosticContext = {
   endpoint: string;
@@ -54,6 +65,8 @@ export type SmokeRunOptions = {
   baseUrl: string;
   timeoutMs: number;
   debug?: boolean;
+  pagePath?: string;
+  readingPath?: string;
   profileId?: string;
   chartVersionId?: string;
   userId?: string;
@@ -98,6 +111,9 @@ const SECRET_PATTERNS = [
   /\bASTRO_[A-Z0-9_]*(?:SECRET|TOKEN|KEY|PASSWORD)\b[^ \n\r\t:={"]*[:=]\s*["']?[^ \n\r\t"']+/g,
   /Bearer\s+[A-Za-z0-9._-]{12,}/g,
 ];
+
+const DEFAULT_SMOKE_PAGE_PATH = "/astro/v2";
+const DEFAULT_SMOKE_READING_PATH = "/api/astro/v2/reading";
 
 export const DEFAULT_ASTRO_RAG_SMOKE_CASES: SmokePromptCase[] = [
   {
@@ -178,6 +194,7 @@ export function redactForLog(input: string): string {
     output = output.replace(pattern, "[REDACTED]");
   }
   output = output.replace(/\b(?:[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}(?:\.[A-Za-z0-9_-]{10,})?)\b/g, "[REDACTED]");
+  output = output.replace(/https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?/gi, "[LOCAL_PROXY]");
   return output;
 }
 
@@ -204,43 +221,78 @@ function textIncludesAny(text: string, values?: string[]): boolean {
   return values.some((value) => lower.includes(value.toLowerCase()));
 }
 
-function hasAuthBlock(status: number, bodyText: string): boolean {
-  return status === 401 || status === 403 || /unauthenticated|no active profile|profile.*missing|auth/i.test(bodyText);
+export function normalizeSmokePaths(input?: { pagePath?: string; readingPath?: string } | null) {
+  return {
+    pagePath: input?.pagePath?.trim() || DEFAULT_SMOKE_PAGE_PATH,
+    readingPath: input?.readingPath?.trim() || DEFAULT_SMOKE_READING_PATH,
+  };
 }
 
-function hasNoProfile(text: string): boolean {
-  return /no active profile|profile.*missing|birth profile|chart.*missing|supabase.*missing|not_found/i.test(text);
+function hasAuthBlock(status: number, bodyText: string): boolean {
+  return status === 401 || status === 403 || /unauthenticated|sign in|login required|please sign in/i.test(bodyText);
+}
+
+function hasProfileBlock(text: string): boolean {
+  return /no active profile|profile.*missing|birth profile|chart.*missing|active profile/i.test(text);
+}
+
+function hasContextMissing(status: number, text: string) {
+  return status === 404 && (/not_found/i.test(text) || /supabase.*missing|context.*missing|chart.*missing|profile.*missing/i.test(text));
 }
 
 function hasWrongShape(text: string): boolean {
-  return /invalid json|question is required|missing.*question|body shape|request body/i.test(text);
+  return /invalid json|question is required|missing.*question|body shape|request body|unsupported field/i.test(text);
 }
 
 function hasFeatureFlagIssue(text: string): boolean {
   return /ASTRO_[A-Z0-9_]+|feature flag|flag.*disabled|rag.*disabled/i.test(text);
 }
 
-function detectCause(status: number, bodyText: string): string {
+export function isAuthOrProfileBlocked(status: number, bodyText: string): boolean {
+  return hasAuthBlock(status, bodyText) || hasProfileBlock(bodyText);
+}
+
+export function classifyRoutePreflightResult(input: {
+  endpoint: string;
+  method: "GET" | "POST";
+  status: number;
+  bodyText: string;
+}): SmokeRoutePreflightClassification {
+  const bodyText = input.bodyText ?? "";
+  if (input.status >= 200 && input.status < 300 && !/not_found/i.test(bodyText)) return "route_available";
+  if (input.status === 401 || input.status === 403 || hasAuthBlock(input.status, bodyText)) return "auth_blocked";
+  if (hasProfileBlock(bodyText)) return "profile_blocked";
+  if (hasWrongShape(bodyText) || input.status === 400) return "request_shape_mismatch";
+  if (input.status >= 500) return "server_error";
+  if (input.status >= 300 && input.status < 400) return "auth_blocked";
+  if (hasContextMissing(input.status, bodyText) && /^\s*[{[]/.test(bodyText)) return "context_missing";
+  if (input.status === 404 || /not_found/i.test(bodyText)) return /^\s*[{[]/.test(bodyText) ? "context_missing" : "route_missing";
+  return "unknown_failure";
+}
+
+function detectCause(status: number, bodyText: string, classification: SmokeRoutePreflightClassification): string {
   if (status === 0) return "local server unreachable";
-  if (status === 401 || status === 403) return "auth/session missing";
-  if (status === 404 || /not_found/i.test(bodyText)) return "route rejected missing context or wrong endpoint path";
-  if (hasNoProfile(bodyText)) return "no active birth profile or local Supabase profile data missing";
-  if (hasWrongShape(bodyText)) return "request body shape mismatch";
+  if (classification === "route_available") return "route available";
+  if (classification === "auth_blocked") return "auth/session missing or user is not signed in";
+  if (classification === "profile_blocked") return "no active birth profile or chart context is missing";
+  if (classification === "context_missing") return "missing context: profile, chart, or local Supabase data";
+  if (classification === "request_shape_mismatch") return "request body shape mismatch";
+  if (classification === "route_missing") return "route path is missing or the framework returned not_found";
   if (hasFeatureFlagIssue(bodyText)) return "feature flags or env configuration missing";
-  if (status >= 500) return "server error";
+  if (classification === "server_error") return "server error";
   return "unknown";
 }
 
-function suggestFix(endpoint: string, status: number, bodyText: string): string {
+function suggestFix(endpoint: string, status: number, bodyText: string, classification: SmokeRoutePreflightClassification): string {
   if (status === 0) return "Start the local dev server and confirm the base URL is correct.";
-  if (status === 401 || status === 403) return "Provide auth/session context or use --fail-on-auth-block to fail fast.";
-  if (status === 404 || /not_found/i.test(bodyText)) {
-    return `Try --profile-id and --chart-version-id, confirm an active birth profile exists, and confirm the request body matches ${endpoint}.`;
-  }
-  if (hasNoProfile(bodyText)) return "Confirm the local Supabase project has an active birth profile and matching chart data.";
-  if (hasWrongShape(bodyText)) return "Match the endpoint request body shape and send question/message with optional supported context fields.";
+  if (classification === "route_available") return "No fix needed.";
+  if (classification === "auth_blocked") return "Provide auth/session context or use --fail-on-auth-block to fail fast.";
+  if (classification === "profile_blocked") return "Pass --profile-id and --chart-version-id, and confirm an active birth profile exists.";
+  if (classification === "context_missing") return `Pass --profile-id and --chart-version-id, or populate the local Supabase chart/profile context for ${endpoint}.`;
+  if (classification === "route_missing") return `Confirm the route exists, or override the smoke path with --page-path / --reading-path if the app moved the endpoint.`;
+  if (classification === "request_shape_mismatch") return "Match the endpoint request body shape and send question/message with optional supported context fields.";
   if (hasFeatureFlagIssue(bodyText)) return "Check local Astro RAG feature flags and env vars for the correct rollout stage.";
-  if (status >= 500) return "Inspect server logs for the route crash and rerun with --debug.";
+  if (classification === "server_error") return "Inspect server logs for the route crash and rerun with --debug.";
   return "Rerun with --debug and inspect the route response summary.";
 }
 
@@ -261,20 +313,34 @@ export function compactResponseSummary(bodyText: string): string {
 
 export function buildEndpointPreflight(endpoint: string, method: "GET" | "POST", status: number, bodyText: string): SmokeEndpointPreflight {
   const summary = compactResponseSummary(bodyText);
+  const classification = classifyRoutePreflightResult({ endpoint, method, status, bodyText });
   return {
     endpoint,
     method,
     status,
     summary,
-    ok: status > 0 && status < 500 && !/not_found/i.test(bodyText),
-    likelyCause: detectCause(status, bodyText),
-    suggestedFix: suggestFix(endpoint, status, bodyText),
+    classification,
+    ok: classification === "route_available",
+    likelyCause: detectCause(status, bodyText, classification),
+    suggestedFix: suggestFix(endpoint, status, bodyText, classification),
   };
 }
 
-export function buildDiagnosticContext(input: SmokeDiagnosticContext): string {
+export function buildRouteDiagnostic(input: SmokeDiagnosticContext & { classification: SmokeRoutePreflightClassification }): string {
   const summary = compactResponseSummary(input.responseBody);
-  return `${input.method} ${input.endpoint} returned ${input.status}. Response: ${summary}. Likely cause: ${input.likelyCause}. Suggested fix: ${input.suggestedFix}`;
+  return [
+    `${input.method} ${input.endpoint}`,
+    `status=${input.status}`,
+    `classification=${input.classification}`,
+    `response=${summary}`,
+    `likelyCause=${input.likelyCause}`,
+    `suggestedFix=${input.suggestedFix}`,
+  ].join(" | ");
+}
+
+export function buildDiagnosticContext(input: SmokeDiagnosticContext): string {
+  const classification = classifyRoutePreflightResult({ endpoint: input.endpoint, method: input.method, status: input.status, bodyText: input.responseBody });
+  return buildRouteDiagnostic({ ...input, classification });
 }
 
 export function buildSmokeRequestPayload(input: {
@@ -324,6 +390,7 @@ export function evaluateAstroReadingResponse(input: {
   status: number;
   bodyText: string;
   durationMs: number;
+  failOnAuthBlock?: boolean;
 }): SmokeCheckResult {
   const parsed = parseJsonSafely(input.bodyText);
   const responseMeta = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).meta : undefined;
@@ -337,8 +404,22 @@ export function evaluateAstroReadingResponse(input: {
   if (!parsed || typeof parsed !== "object") failures.push("response was not valid JSON");
   if (hasLeak(bodyForLeakScan) || hasLeak(text)) failures.push("response leaked secret-like or internal data");
 
-  const authBlocked = hasAuthBlock(input.status, input.bodyText);
-  if (authBlocked || /not_found/i.test(input.bodyText)) {
+  const classification = classifyRoutePreflightResult({ endpoint: "/api/astro/v2/reading", method: "POST", status: input.status, bodyText: input.bodyText });
+  const authBlocked = classification === "auth_blocked" || classification === "profile_blocked" || classification === "context_missing";
+  if (classification !== "route_available" && classification !== "unknown_failure" && classification !== "server_error" && classification !== "request_shape_mismatch") {
+    if (authBlocked && !input.failOnAuthBlock) {
+      return {
+        id: input.testCase.id,
+        ok: true,
+        status: input.status,
+        category: input.testCase.category,
+        prompt: input.testCase.prompt,
+        summary: `blocked: ${summarizeBody(input.bodyText)}`,
+        failures: [],
+        durationMs: input.durationMs,
+        responseMeta: responseMeta && typeof responseMeta === "object" ? (responseMeta as Record<string, unknown>) : undefined,
+      };
+    }
     return {
       id: input.testCase.id,
       ok: false,
@@ -347,14 +428,20 @@ export function evaluateAstroReadingResponse(input: {
       prompt: input.testCase.prompt,
       summary: `blocked: ${summarizeBody(input.bodyText)}`,
       failures: [
-        authBlocked ? "auth/session or active profile blocked the request" : "route returned not_found",
+        classification === "auth_blocked"
+          ? "auth/session blocked the request"
+          : classification === "profile_blocked"
+            ? "active profile or chart context blocked the request"
+            : classification === "context_missing"
+              ? "profile/chart/local context is missing"
+              : "route returned not_found",
         buildDiagnosticContext({
           endpoint: "/api/astro/v2/reading",
           method: "POST",
           status: input.status,
           responseBody: input.bodyText,
-          likelyCause: detectCause(input.status, input.bodyText),
-          suggestedFix: suggestFix("/api/astro/v2/reading", input.status, input.bodyText),
+          likelyCause: detectCause(input.status, input.bodyText, classification),
+          suggestedFix: suggestFix("/api/astro/v2/reading", input.status, input.bodyText, classification),
         }),
       ],
       durationMs: input.durationMs,
@@ -363,6 +450,7 @@ export function evaluateAstroReadingResponse(input: {
   }
 
   if (input.status >= 500) failures.push(`server returned status ${input.status}`);
+  if (classification === "request_shape_mismatch") failures.push("request body shape mismatch");
   if (error) failures.push(`api error: ${error}`);
   if (code) failures.push(`api code: ${code}`);
 

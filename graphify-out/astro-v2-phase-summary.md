@@ -218,6 +218,34 @@ Validation helper:
 Validation:
 - rollout validation tests:
 - feature flag tests:
+
+Phase: 26A blocker fix - route-aware smoke diagnostics
+Branch: phase-rag-foundation
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Smoke script:
+- detects real page/API route availability
+- classifies `route_missing`, `auth_blocked`, `profile_blocked`, `context_missing`, `request_shape_mismatch`, `server_error`, and `unknown_failure`
+- supports `--page-path` and `--reading-path` overrides
+- no six unexplained `not_found` semantic failures
+Validation:
+- smoke script tests:
+- rollout validation tests:
+- rag API route tests:
+- rag UI tests:
+- feature flag tests:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Manual:
+- dev local:
+- check astro rag smoke debug:
+Deployment:
+- skipped
+Remaining blockers:
+- none or exact blockers
 - smoke script tests:
 - rag API route tests:
 - rag UI tests:

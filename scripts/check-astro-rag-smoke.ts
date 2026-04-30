@@ -7,7 +7,7 @@ repository or any part of it without prior written permission from Jyotishko Roy
 import { DEFAULT_ASTRO_RAG_SMOKE_CASES, buildDiagnosticContext, buildEndpointPreflight, buildSmokeRequestPayload, evaluateAstroReadingResponse, normalizeBaseUrl, redactForLog, type SmokeCheckResult, type SmokeRunSummary } from "./astro-rag-smoke-utils";
 
 function parseArgs(argv: string[]) {
-  const args = { baseUrl: "http://127.0.0.1:3000", timeoutMs: 30000, includeV1: false, json: false, verbose: false, debug: false, failOnAuthBlock: false, profileId: undefined as string | undefined, chartVersionId: undefined as string | undefined, userId: undefined as string | undefined };
+  const args = { baseUrl: "http://127.0.0.1:3000", timeoutMs: 30000, includeV1: false, json: false, verbose: false, debug: false, failOnAuthBlock: false, pagePath: "/astro/v2", readingPath: "/api/astro/v2/reading", profileId: undefined as string | undefined, chartVersionId: undefined as string | undefined, userId: undefined as string | undefined };
   for (let i = 0; i < argv.length; i += 1) {
     const current = argv[i];
     const next = argv[i + 1];
@@ -22,6 +22,12 @@ function parseArgs(argv: string[]) {
       i += 1;
     } else if (current === "--chart-version-id" && next) {
       args.chartVersionId = next;
+      i += 1;
+    } else if (current === "--page-path" && next) {
+      args.pagePath = next;
+      i += 1;
+    } else if (current === "--reading-path" && next) {
+      args.readingPath = next;
       i += 1;
     } else if (current === "--timeout-ms" && next) {
       args.timeoutMs = Number(next) || args.timeoutMs;
@@ -58,19 +64,21 @@ function summarize(results: SmokeCheckResult[], baseUrl: string, durationMs: num
 async function run() {
   const args = parseArgs(process.argv.slice(2));
   const baseUrl = normalizeBaseUrl(args.baseUrl);
+  const pagePath = args.pagePath.trim() || "/astro/v2";
+  const readingPath = args.readingPath.trim() || "/api/astro/v2/reading";
   const started = Date.now();
   const results: SmokeCheckResult[] = [];
   const blocked: string[] = [];
   const skipped: string[] = [];
 
-  const page = await requestJson(`${baseUrl}/astro/v2`, { method: "GET" }, args.timeoutMs).catch((error) => ({ status: 0, text: String(error?.message ?? error), durationMs: 0 }));
-  const pagePreflight = buildEndpointPreflight("/astro/v2", "GET", page.status, page.text);
-  results.push({ id: "page", ok: pagePreflight.ok, status: page.status, category: "old_route", prompt: "GET /astro/v2", summary: pagePreflight.summary, failures: pagePreflight.ok ? [] : [buildDiagnosticContext({ endpoint: "/astro/v2", method: "GET", status: page.status, responseBody: page.text, likelyCause: pagePreflight.likelyCause, suggestedFix: pagePreflight.suggestedFix })], durationMs: page.durationMs });
+  const page = await requestJson(`${baseUrl}${pagePath}`, { method: "GET" }, args.timeoutMs).catch((error) => ({ status: 0, text: String(error?.message ?? error), durationMs: 0 }));
+  const pagePreflight = buildEndpointPreflight(pagePath, "GET", page.status, page.text);
+  results.push({ id: "page", ok: pagePreflight.ok, status: page.status, category: "old_route", prompt: `GET ${pagePath}`, summary: pagePreflight.summary, failures: pagePreflight.ok ? [] : [buildDiagnosticContext({ endpoint: pagePath, method: "GET", status: page.status, responseBody: page.text, likelyCause: pagePreflight.likelyCause, suggestedFix: pagePreflight.suggestedFix })], durationMs: page.durationMs });
 
   const probePayload = buildSmokeRequestPayload({ prompt: "What is my Lagna?", profileId: args.profileId, chartVersionId: args.chartVersionId, userId: args.userId, debug: args.debug });
-  const probe = await requestJson(`${baseUrl}/api/astro/v2/reading`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(probePayload) }, args.timeoutMs).catch((error) => ({ status: 0, text: String(error?.message ?? error), durationMs: 0 }));
-  const probePreflight = buildEndpointPreflight("/api/astro/v2/reading", "POST", probe.status, probe.text);
-  results.push({ id: "probe", ok: probePreflight.ok, status: probe.status, category: "old_route", prompt: "POST /api/astro/v2/reading", summary: probePreflight.summary, failures: probePreflight.ok ? [] : [buildDiagnosticContext({ endpoint: "/api/astro/v2/reading", method: "POST", status: probe.status, responseBody: probe.text, likelyCause: probePreflight.likelyCause, suggestedFix: probePreflight.suggestedFix })], durationMs: probe.durationMs });
+  const probe = await requestJson(`${baseUrl}${readingPath}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(probePayload) }, args.timeoutMs).catch((error) => ({ status: 0, text: String(error?.message ?? error), durationMs: 0 }));
+  const probePreflight = buildEndpointPreflight(readingPath, "POST", probe.status, probe.text);
+  results.push({ id: "probe", ok: probePreflight.ok, status: probe.status, category: "old_route", prompt: `POST ${readingPath}`, summary: probePreflight.summary, failures: probePreflight.ok ? [] : [buildDiagnosticContext({ endpoint: readingPath, method: "POST", status: probe.status, responseBody: probe.text, likelyCause: probePreflight.likelyCause, suggestedFix: probePreflight.suggestedFix })], durationMs: probe.durationMs });
 
   const preflightFailed = !pagePreflight.ok || !probePreflight.ok;
   if (preflightFailed) {
@@ -83,9 +91,9 @@ async function run() {
       console.log(JSON.stringify({ ...summary, blocked, skipped, preflight: { page: pagePreflight, probe: probePreflight } }, null, 2));
     } else {
       console.log(`baseUrl=${summary.baseUrl} passed=${summary.passed} failed=${summary.failed} blocked=${blocked.length} skipped=${skipped.length} durationMs=${summary.durationMs}`);
-      console.log(buildDiagnosticContext({ endpoint: pagePreflight.ok ? "/api/astro/v2/reading" : "/astro/v2", method: pagePreflight.ok ? "POST" : "GET", status: pagePreflight.ok ? probe.status : page.status, responseBody: pagePreflight.ok ? probe.text : page.text, likelyCause: pagePreflight.ok ? probePreflight.likelyCause : pagePreflight.likelyCause, suggestedFix: pagePreflight.ok ? probePreflight.suggestedFix : pagePreflight.suggestedFix }));
+      console.log(buildDiagnosticContext({ endpoint: pagePreflight.ok ? readingPath : pagePath, method: pagePreflight.ok ? "POST" : "GET", status: pagePreflight.ok ? probe.status : page.status, responseBody: pagePreflight.ok ? probe.text : page.text, likelyCause: pagePreflight.ok ? probePreflight.likelyCause : pagePreflight.likelyCause, suggestedFix: pagePreflight.ok ? probePreflight.suggestedFix : pagePreflight.suggestedFix }));
       if (args.debug) {
-        console.log(JSON.stringify({ preflight: { page: pagePreflight, probe: probePreflight }, payload: probePayload }, null, 2));
+        console.log(JSON.stringify({ preflight: { page: pagePreflight, probe: probePreflight }, payload: probePayload, paths: { pagePath, readingPath } }, null, 2));
       }
     }
     if (!args.failOnAuthBlock && blocked.length > 0) return;
@@ -96,8 +104,8 @@ async function run() {
   for (const testCase of DEFAULT_ASTRO_RAG_SMOKE_CASES) {
     if (testCase.category === "old_route") continue;
     const body = buildSmokeRequestPayload({ prompt: testCase.prompt, profileId: args.profileId, chartVersionId: args.chartVersionId, userId: args.userId, debug: args.debug });
-    const response = await requestJson(`${baseUrl}/api/astro/v2/reading`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, args.timeoutMs).catch((error) => ({ status: 0, text: String(error?.message ?? error), durationMs: 0 }));
-    const result = evaluateAstroReadingResponse({ testCase, status: response.status, bodyText: response.text, durationMs: response.durationMs });
+    const response = await requestJson(`${baseUrl}${readingPath}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, args.timeoutMs).catch((error) => ({ status: 0, text: String(error?.message ?? error), durationMs: 0 }));
+    const result = evaluateAstroReadingResponse({ testCase, status: response.status, bodyText: response.text, durationMs: response.durationMs, failOnAuthBlock: args.failOnAuthBlock });
     if (/auth|profile|not_found/i.test(result.failures.join(" "))) {
       blocked.push(testCase.id);
       if (!args.failOnAuthBlock) {

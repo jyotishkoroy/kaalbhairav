@@ -18,3 +18,12 @@
 - Feature flag rollback: `ASTRO_RAG_ENABLED=false`, `ASTRO_LLM_ANSWER_ENGINE_ENABLED=false`, `ASTRO_LOCAL_ANALYZER_ENABLED=false`, `ASTRO_LOCAL_CRITIC_ENABLED=false`.
 - Production fallback: old V2 path remains available when `ASTRO_RAG_ENABLED=false`.
 - Database rollback: no DB changes.
+
+## Blocker Fix Addendum
+
+- Observed after the first Phase 26A commit: `npm run check:astro-rag-smoke -- --base-url http://127.0.0.1:3000 --debug` still failed preflight with `GET /astro/v2` and `POST /api/astro/v2/reading` returning `404 {"error":"not_found"}`.
+- Root cause found: the app routes exist, but the smoke script classified every `404/not_found` as a stale path mismatch and did not separate framework 404s from app JSON `not_found` responses or auth/profile/context blocks.
+- Route/path/body/auth/profile classification added: the smoke utilities now classify `route_available`, `auth_blocked`, `profile_blocked`, `context_missing`, `route_missing`, `request_shape_mismatch`, `server_error`, and `unknown_failure`.
+- Page-path and reading-path override behavior: `--page-path` and `--reading-path` now override the smoke probe paths, while the default paths remain `/astro/v2` and `/api/astro/v2/reading` for the current app layout.
+- Local debug command: `npm run check:astro-rag-smoke -- --base-url http://127.0.0.1:3000 --debug`.
+- Remaining manual steps if auth/profile context is missing: provide real `--profile-id` and `--chart-version-id`, verify active birth profile data in local Supabase, or rerun with `--fail-on-auth-block` when you want auth/profile blocks to fail instead of skip.

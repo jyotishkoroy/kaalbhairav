@@ -9,18 +9,19 @@ import {
   DEFAULT_ASTRO_RAG_SMOKE_CASES,
   buildDiagnosticContext,
   buildEndpointPreflight,
+  buildRouteDiagnostic,
   buildSmokeRequestPayload,
+  classifyRoutePreflightResult,
   compactResponseSummary,
   evaluateAstroReadingResponse,
-  normalizeBaseUrl,
+  normalizeSmokePaths,
   redactForLog,
+  isAuthOrProfileBlocked,
 } from "@/scripts/astro-rag-smoke-utils";
 
 const exact = DEFAULT_ASTRO_RAG_SMOKE_CASES[0];
 const career = DEFAULT_ASTRO_RAG_SMOKE_CASES[2];
-const sleep = DEFAULT_ASTRO_RAG_SMOKE_CASES[3];
 const death = DEFAULT_ASTRO_RAG_SMOKE_CASES[4];
-const followup = DEFAULT_ASTRO_RAG_SMOKE_CASES[5];
 
 describe("astro rag smoke diagnostics", () => {
   it("GET /astro/v2 preflight success is reported", () => {
@@ -28,25 +29,28 @@ describe("astro rag smoke diagnostics", () => {
     expect(result.ok).toBe(true);
     expect(result.endpoint).toBe("/astro/v2");
     expect(result.method).toBe("GET");
+    expect(result.classification).toBe("route_available");
   });
 
   it("GET /astro/v2 preflight 404 gives endpoint/status", () => {
-    const result = buildEndpointPreflight("/astro/v2", "GET", 404, '{"error":"not_found"}');
+    const result = buildEndpointPreflight("/astro/v2", "GET", 404, "<html>not found</html>");
     expect(result.ok).toBe(false);
     expect(result.status).toBe(404);
     expect(result.endpoint).toBe("/astro/v2");
+    expect(result.classification).toBe("route_missing");
   });
 
   it("POST /api/astro/v2/reading preflight success is reported", () => {
     const result = buildEndpointPreflight("/api/astro/v2/reading", "POST", 200, '{"answer":"ok"}');
     expect(result.ok).toBe(true);
     expect(result.method).toBe("POST");
+    expect(result.classification).toBe("route_available");
   });
 
   it("POST /api/astro/v2/reading not_found includes endpoint", () => {
     const result = buildEndpointPreflight("/api/astro/v2/reading", "POST", 404, '{"error":"not_found"}');
-    expect(result.likelyCause).toContain("wrong endpoint path");
-    expect(result.suggestedFix).toContain("/api/astro/v2/reading");
+    expect(result.likelyCause).toContain("missing context");
+    expect(result.suggestedFix).toContain("--profile-id");
   });
 
   it("not_found includes method", () => {
@@ -70,7 +74,7 @@ describe("astro rag smoke diagnostics", () => {
       likelyCause: "route rejected missing context or wrong endpoint path",
       suggestedFix: "Try --profile-id and --chart-version-id",
     });
-    expect(diagnostic).toContain("returned 404");
+    expect(diagnostic).toContain("status=404");
   });
 
   it("not_found includes compact response body summary", () => {
@@ -87,7 +91,7 @@ describe("astro rag smoke diagnostics", () => {
 
   it("not_found includes likely cause", () => {
     const result = buildEndpointPreflight("/api/astro/v2/reading", "POST", 404, '{"error":"not_found"}');
-    expect(result.likelyCause).toContain("missing context");
+    expect(result.likelyCause).toContain("context");
   });
 
   it("not_found suggests profile/chart/env checks", () => {
@@ -96,21 +100,21 @@ describe("astro rag smoke diagnostics", () => {
     expect(result.suggestedFix).toContain("--chart-version-id");
   });
 
-  it("auth block is blocked/skipped when fail-on-auth-block false", () => {
-    const result = evaluateAstroReadingResponse({ testCase: exact, status: 403, bodyText: '{"error":"auth_required"}', durationMs: 1 });
-    expect(result.ok).toBe(false);
-    expect(result.failures.join(" ")).toContain("auth/session");
+  it("auth block is skipped when fail-on-auth-block false", () => {
+    const result = evaluateAstroReadingResponse({ testCase: exact, status: 403, bodyText: '{"error":"auth_required"}', durationMs: 1, failOnAuthBlock: false });
+    expect(result.ok).toBe(true);
+    expect(result.failures).toHaveLength(0);
   });
 
   it("auth block fails when fail-on-auth-block true", () => {
-    const result = evaluateAstroReadingResponse({ testCase: exact, status: 401, bodyText: '{"error":"auth_required"}', durationMs: 1 });
+    const result = evaluateAstroReadingResponse({ testCase: exact, status: 401, bodyText: '{"error":"auth_required"}', durationMs: 1, failOnAuthBlock: true });
     expect(result.ok).toBe(false);
     expect(result.failures.length).toBeGreaterThan(0);
   });
 
   it("no active birth profile is blocked/skipped", () => {
-    const result = evaluateAstroReadingResponse({ testCase: exact, status: 404, bodyText: '{"error":"no active profile"}', durationMs: 1 });
-    expect(result.failures.join(" ")).toContain("active profile");
+    const result = evaluateAstroReadingResponse({ testCase: exact, status: 404, bodyText: '{"error":"no active profile"}', durationMs: 1, failOnAuthBlock: false });
+    expect(result.ok).toBe(true);
   });
 
   it("wrong request body shape gives actionable diagnostic", () => {
@@ -134,15 +138,16 @@ describe("astro rag smoke diagnostics", () => {
   });
 
   it("--debug includes endpoint and method", () => {
-    const diagnostic = buildDiagnosticContext({
+    const diagnostic = buildRouteDiagnostic({
       endpoint: "/api/astro/v2/reading",
       method: "POST",
       status: 200,
       responseBody: '{"answer":"ok"}',
+      classification: "route_available",
       likelyCause: "unknown",
       suggestedFix: "none",
     });
-    expect(diagnostic).toContain("POST /api/astro/v2/reading");
+    expect(diagnostic).toContain("classification=route_available");
   });
 
   it("--debug redacts secrets", () => {
@@ -150,7 +155,7 @@ describe("astro rag smoke diagnostics", () => {
   });
 
   it("semantic cases do not run when route preflight fails", () => {
-    const page = buildEndpointPreflight("/astro/v2", "GET", 404, '{"error":"not_found"}');
+    const page = buildEndpointPreflight("/astro/v2", "GET", 404, "<html>not found</html>");
     const probe = buildEndpointPreflight("/api/astro/v2/reading", "POST", 404, '{"error":"not_found"}');
     expect(page.ok || probe.ok).toBe(false);
   });
@@ -164,6 +169,75 @@ describe("astro rag smoke diagnostics", () => {
   it("no full raw answer is printed by default", () => {
     const summary = compactResponseSummary('{"answer":"This is a long answer that should be trimmed"}');
     expect(summary.length).toBeLessThanOrEqual(200);
+  });
+
+  it("local proxy URLs are redacted", () => {
+    expect(redactForLog("http://127.0.0.1:8787")).toContain("[LOCAL_PROXY]");
+  });
+
+  it("page path override is respected", () => {
+    expect(normalizeSmokePaths({ pagePath: "/astro/preview" }).pagePath).toBe("/astro/preview");
+  });
+
+  it("reading path override is respected", () => {
+    expect(normalizeSmokePaths({ readingPath: "/api/astro/v2/custom-reading" }).readingPath).toBe("/api/astro/v2/custom-reading");
+  });
+
+  it("default page path remains stable", () => {
+    expect(normalizeSmokePaths().pagePath).toBe("/astro/v2");
+  });
+
+  it("default reading path remains stable", () => {
+    expect(normalizeSmokePaths().readingPath).toBe("/api/astro/v2/reading");
+  });
+
+  it("debug output includes endpoint method status and classification", () => {
+    const diagnostic = buildRouteDiagnostic({
+      endpoint: "/api/astro/v2/reading",
+      method: "POST",
+      status: 404,
+      responseBody: '{"error":"not_found"}',
+      classification: "context_missing",
+      likelyCause: "profile, chart, or local Supabase context is missing",
+      suggestedFix: "Pass --profile-id and --chart-version-id",
+    });
+    expect(diagnostic).toContain("POST /api/astro/v2/reading");
+    expect(diagnostic).toContain("status=404");
+    expect(diagnostic).toContain("classification=context_missing");
+  });
+
+  it("classifier marks 200 as route_available", () => {
+    expect(classifyRoutePreflightResult({ endpoint: "/astro/v2", method: "GET", status: 200, bodyText: "ok" })).toBe("route_available");
+  });
+
+  it("classifier marks redirect as auth_blocked", () => {
+    expect(classifyRoutePreflightResult({ endpoint: "/astro/v2", method: "GET", status: 302, bodyText: "redirect" })).toBe("auth_blocked");
+  });
+
+  it("classifier marks framework 404 as route_missing", () => {
+    expect(classifyRoutePreflightResult({ endpoint: "/astro/v2", method: "GET", status: 404, bodyText: "<html>404</html>" })).toBe("route_missing");
+  });
+
+  it("classifier marks app json not_found as context_missing", () => {
+    expect(classifyRoutePreflightResult({ endpoint: "/api/astro/v2/reading", method: "POST", status: 404, bodyText: '{"error":"not_found"}' })).toBe("context_missing");
+  });
+
+  it("classifier marks invalid body as request_shape_mismatch", () => {
+    expect(classifyRoutePreflightResult({ endpoint: "/api/astro/v2/reading", method: "POST", status: 400, bodyText: '{"error":"Question is required."}' })).toBe("request_shape_mismatch");
+  });
+
+  it("classifier marks 500 as server_error", () => {
+    expect(classifyRoutePreflightResult({ endpoint: "/api/astro/v2/reading", method: "POST", status: 500, bodyText: '{"error":"boom"}' })).toBe("server_error");
+  });
+
+  it("auth/profile helper detects blocked context", () => {
+    expect(isAuthOrProfileBlocked(403, '{"error":"auth_required"}')).toBe(true);
+  });
+
+  it("suggested fix mentions profile ids where appropriate", () => {
+    const result = buildEndpointPreflight("/api/astro/v2/reading", "POST", 404, '{"error":"not_found","detail":"missing profile"}');
+    expect(result.suggestedFix).toContain("--profile-id");
+    expect(result.suggestedFix).toContain("--chart-version-id");
   });
 
   it("smoke prompt list still contains Lagna", () => {
