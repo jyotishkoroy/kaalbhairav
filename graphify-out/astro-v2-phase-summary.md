@@ -74,3 +74,44 @@ Deployment:
 - skipped or completed
 Remaining blockers:
 - none or exact blockers
+Phase: 11 Timing engine
+Branch: phase-rag-foundation
+Runtime behavior changed: no route/app integration
+UI changed: no
+DB changed: no new migration
+Groq runtime call added: no
+Groq integration tests/contracts: checked if present; otherwise full suite passed and Groq writer not implemented yet
+Ollama live call added: no
+Ollama/proxy/analyzer integration contracts: checked through existing proxy/local-analyzer tests
+Supabase live call added: no
+Supabase schema/retrieval contracts: checked through existing tests
+Timing:
+- lib/astro/rag/timing-engine.ts
+- lib/astro/rag/python-timing-adapter.ts
+- deterministic only
+- uses stored timing windows, dasha facts, Varshaphal facts, explicit user dates, optional injected Python adapter
+- never invents vague timing windows
+- blocks timing when safety/planner restricts it
+Validation:
+- python timing adapter test:
+- timing engine test:
+- reasoning graph tests:
+- retrieval service/repository tests:
+- required data tests:
+- analyzer schema/local analyzer tests:
+- proxy test:
+- rag safety gate test:
+- exact fact tests:
+- extractor test:
+- repository test:
+- schema test:
+- feature flag test:
+- groq/provider tests if present:
+- typecheck:
+- lint:
+- build:
+- full tests:
+Deployment:
+- skipped
+Remaining blockers:
+- none
