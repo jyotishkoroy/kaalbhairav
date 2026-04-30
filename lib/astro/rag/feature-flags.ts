@@ -34,6 +34,7 @@ export type AstroRagFlags = {
   validateLlmOutput: boolean;
   storeValidationResults: boolean;
   companionPipelineEnabled?: boolean;
+  companionCompassionateSynthesisEnabled?: boolean;
   companionMemoryEnabled?: boolean;
   companionMemoryStoreEnabled?: boolean;
   companionMemoryRetrieveEnabled?: boolean;
@@ -98,6 +99,7 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
     validateLlmOutput: readBool(env.ASTRO_VALIDATE_LLM_OUTPUT, true),
     storeValidationResults: readBool(env.ASTRO_STORE_VALIDATION_RESULTS, true),
     companionPipelineEnabled: readBool(env.ASTRO_COMPANION_PIPELINE_ENABLED, false),
+    companionCompassionateSynthesisEnabled: readBool(env.ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED, false),
     companionMemoryEnabled: readBool(env.ASTRO_COMPANION_MEMORY_ENABLED, false),
     companionMemoryStoreEnabled: readBool(env.ASTRO_COMPANION_MEMORY_STORE_ENABLED, false),
     companionMemoryRetrieveEnabled: readBool(env.ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED, false),

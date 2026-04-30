@@ -1,0 +1,28 @@
+# Phase 3 - Groq Compassionate Synthesis from Plan
+- Goal: add a compassionate Groq synthesis layer that rewrites a deterministic `ReadingPlan` into warm, astrologer-companion language without changing the underlying truth source.
+- Position in pipeline: synthesis sits after `ReadingPlan` creation and before any user-facing rendering, but it remains disabled by default and is not wired into the live route/orchestrator by default.
+- Files added: `lib/astro/synthesis/compassionate-synthesizer.ts`, `lib/astro/synthesis/synthesis-prompts.ts`, `lib/astro/synthesis/synthesis-acceptance.ts`, `lib/astro/synthesis/synthesis-fallback.ts`, `tests/astro/synthesis/compassionate-synthesizer.test.ts`, `tests/astro/synthesis/synthesis-acceptance.test.ts`, `docs/astro-companion/phase-3-groq-compassionate-synthesis.md`.
+- Feature flags: `ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED=false` by default, `ASTRO_COMPANION_PIPELINE_ENABLED=false` remains the default, and `ASTRO_READING_PLAN_ENABLED` or `ASTRO_RAG_ENABLED` alone do not enable synthesis.
+- Input contract: synthesis consumes only `question`, `ListeningAnalysis`, `ReadingPlan`, `safetyBoundaries`, optional `memorySummary`, fallback text, environment flags, and an injected client for tests.
+- Prompt rules: Groq is told to use the supplied `ReadingPlan` only, begin with emotional acknowledgement, translate chart signals into lived experience, give practical guidance, include remedies only when permitted, and avoid any internal metadata.
+- Acceptance checks: deterministic validation rejects empty, generic, unsafe, unsupported timing, unsupported remedy, invented chart fact, guarantee, fear-language, and internal-metadata output.
+- Fallback behavior: rejected or failed synthesis falls back to the deterministic `renderReadingPlanFallback` path, with the supplied fallback answer used only when it is at least as safe and stable as the renderer output.
+- Groq client/testing behavior: the synthesizer accepts an injected mock client, does not require a live Groq key in tests, and no real Groq calls are used in test coverage.
+- Safety behavior: Groq may paraphrase allowed chart evidence and guidance, but it may not invent chart truth, timing, remedies, guarantees, or safety advice.
+- What Groq may do: warm language, emotional acknowledgement, paraphrase the ReadingPlan, and present practical next steps already present in the plan.
+- What Groq must not do: invent placements, houses, nakshatras, dashas, timing windows, remedies, certainty, curse language, or medical/legal/financial stoppage advice.
+- Tests run: focused synthesis tests, synthesis acceptance tests, ReadingPlan regression, listening regression, feature flag regression, Groq writer regression, and the existing validator suites listed for Phase 3.
+- Runtime behavior changed: no production behavior change by default; synthesis stays off unless both synthesis flags are explicitly enabled.
+- UI changed: no.
+- DB changed: no.
+- Rollback: set `ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED=false` and `ASTRO_COMPANION_PIPELINE_ENABLED=false` and keep using the deterministic ReadingPlan renderer or the existing human-generator path.
+- Required statement: Groq writes from `ReadingPlan` only.
+- Required statement: Groq does not generate truth.
+- Required statement: Groq output is rejected if it invents chart facts.
+- Required statement: Groq output is rejected if it invents timing.
+- Required statement: Groq output is rejected if it invents remedies.
+- Required statement: Groq output is rejected if it violates safety boundaries.
+- Required statement: disabled by default.
+- Required statement: no real Groq calls in tests.
+- Required statement: no DB changes.
+- Required statement: no UI changes.

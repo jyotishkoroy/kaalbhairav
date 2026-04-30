@@ -24,6 +24,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.validateLlmOutput).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(false);
     expect(flags.companionPipelineEnabled).toBe(false);
+    expect(flags.companionCompassionateSynthesisEnabled).toBe(false);
     expect(flags.companionMemoryStoreEnabled).toBe(false);
     expect(flags.companionMemoryRetrieveEnabled).toBe(false);
     expect(flags.companionMemoryMaxChars).toBe(1200);
@@ -41,6 +42,7 @@ describe("getAstroRagFlags", () => {
       ASTRO_TIMING_ENGINE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_ENABLED: "true",
       ASTRO_COMPANION_PIPELINE_ENABLED: "true",
+      ASTRO_COMPASSIONATE_SYNTHESIS_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_STORE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_RETRIEVE_ENABLED: "true",
       ASTRO_COMPANION_MEMORY_MAX_CHARS: "2400",
@@ -56,6 +58,7 @@ describe("getAstroRagFlags", () => {
     expect(flags.timingEngineEnabled).toBe(true);
     expect(flags.companionMemoryEnabled).toBe(true);
     expect(flags.companionPipelineEnabled).toBe(true);
+    expect(flags.companionCompassionateSynthesisEnabled).toBe(true);
     expect(flags.companionMemoryStoreEnabled).toBe(true);
     expect(flags.companionMemoryRetrieveEnabled).toBe(true);
     expect(flags.companionMemoryMaxChars).toBe(2400);
