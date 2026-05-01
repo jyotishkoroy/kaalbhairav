@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { getAstroFeatureFlags, isAstroMemoryRelevanceGateEnabled, isAstroReadingV2Enabled, isAstroUserFacingPlanEnabled } from '@/lib/astro/config/feature-flags'
+import { getAstroFeatureFlags, isAstroFinalAnswerQualityGateEnabled, isAstroMemoryRelevanceGateEnabled, isAstroReadingV2Enabled, isAstroUserFacingPlanEnabled } from '@/lib/astro/config/feature-flags'
 
 const originalEnv = { ...process.env }
 
@@ -91,5 +91,18 @@ describe('astro feature flags', () => {
     process.env.ASTRO_DOMAIN_AWARE_EVIDENCE_ENABLED = value
 
     expect(getAstroFeatureFlags().domainAwareEvidenceEnabled).toBe(expected)
+  })
+
+  it.each([
+    ['true', true],
+    ['1', true],
+    ['false', false],
+    ['0', false],
+    ['maybe', false],
+  ])('parses ASTRO_FINAL_ANSWER_QUALITY_GATE_ENABLED %s as %s', (value, expected) => {
+    process.env.ASTRO_FINAL_ANSWER_QUALITY_GATE_ENABLED = value
+
+    expect(isAstroFinalAnswerQualityGateEnabled()).toBe(expected)
+    expect(getAstroFeatureFlags().finalAnswerQualityGateEnabled).toBe(expected)
   })
 })

@@ -9,6 +9,7 @@ export type AstroFeatureFlags = {
   memoryEnabled: boolean
   memoryRelevanceGateEnabled: boolean
   domainAwareEvidenceEnabled: boolean
+  finalAnswerQualityGateEnabled: boolean
   remediesEnabled: boolean
   monthlyEnabled: boolean
   voiceEnabled: boolean
@@ -33,6 +34,7 @@ export function getAstroFeatureFlags(): AstroFeatureFlags {
     memoryEnabled: readBooleanEnv(process.env.ASTRO_MEMORY_ENABLED),
     memoryRelevanceGateEnabled: readBooleanEnv(process.env.ASTRO_MEMORY_RELEVANCE_GATE_ENABLED),
     domainAwareEvidenceEnabled: readBooleanEnv(process.env.ASTRO_DOMAIN_AWARE_EVIDENCE_ENABLED),
+    finalAnswerQualityGateEnabled: readBooleanEnv(process.env.ASTRO_FINAL_ANSWER_QUALITY_GATE_ENABLED),
     remediesEnabled: readBooleanEnv(process.env.ASTRO_REMEDIES_ENABLED),
     monthlyEnabled: readBooleanEnv(process.env.ASTRO_MONTHLY_ENABLED),
     voiceEnabled: readBooleanEnv(process.env.ASTRO_VOICE_ENABLED),
@@ -50,4 +52,8 @@ export function isAstroUserFacingPlanEnabled(): boolean {
 
 export function isAstroMemoryRelevanceGateEnabled(): boolean {
   return getAstroFeatureFlags().memoryRelevanceGateEnabled
+}
+
+export function isAstroFinalAnswerQualityGateEnabled(): boolean {
+  return getAstroFeatureFlags().finalAnswerQualityGateEnabled
 }
