@@ -26,6 +26,10 @@ import {
   renderMainSignal,
   renderTimingHint,
 } from '@/lib/astro/reading/templates'
+import {
+  userExplicitlyAskedForChartBasis,
+  userExplicitlyAskedForMemory,
+} from '@/lib/astro/reading/final-response-gate'
 
 export type HumanReadingInput = {
   concern: UserConcern
@@ -44,7 +48,7 @@ function renderMemoryBridge(memorySummary?: string): string {
     .replace(/\s+/g, ' ')
     .trim()
   if (!cleaned) return ''
-  return 'You have touched on this theme before, so I will keep the guidance consistent and practical.'
+  return cleaned
 }
 
 function joinUniqueParagraphs(paragraphs: Array<string | undefined>): string {
@@ -125,6 +129,7 @@ function hasAnyText(question: string, phrases: string[]): boolean {
 function buildOpening(concern: UserConcern, question?: string): string {
   const datePhrase = question ? extractDatePhrase(question) : undefined
   const familyPressure = question && /family.*(marriage|career)|(marriage|career).*(family)/i.test(question)
+  const allowChartBasis = question ? userExplicitlyAskedForChartBasis(question) : false
 
   if (concern.topic === 'career') {
     if (question && /(business|profit|startup|partnership)/i.test(question)) {
@@ -135,9 +140,12 @@ function buildOpening(concern: UserConcern, question?: string): string {
     if (familyPressure) {
       return 'Family pressure can make a career question feel heavier than it should. Keep the focus on clarity, boundaries, and the next practical step.'
     }
-    return datePhrase
-      ? `If ${datePhrase} is the key window, the useful focus is on visibility, responsibility, and what can realistically move then.`
-      : 'It makes sense that this feels frustrating when effort is not turning into recognition. Clarify your responsibilities, make your work more visible, and avoid forcing a single guaranteed outcome.'
+    if (allowChartBasis) {
+      return datePhrase
+        ? `If ${datePhrase} is the key window, the useful focus is on visibility, responsibility, and what can realistically move then.`
+        : 'It makes sense that this feels frustrating when effort is not turning into recognition. Clarify your responsibilities, make your work more visible, and avoid forcing a single guaranteed outcome.'
+    }
+    return 'Focus on the controllable part of career growth: clearer ownership, visible progress updates, and one direct conversation about expectations.'
   }
 
   if (concern.topic === 'money') {
@@ -203,6 +211,9 @@ function dedupeRepeatedLines(text: string): string {
 }
 
 function buildChartBasis(concern: UserConcern, question?: string): string {
+  if (!question || !userExplicitlyAskedForChartBasis(question)) {
+    return ''
+  }
   const profile = getChartProfileForTopic(concern.subtopic ?? concern.topic)
   if (!profile) {
     return 'What I can safely anchor this to: the chart patterns available in the reading, with uncertainty where the evidence is broad.'
@@ -345,7 +356,9 @@ export function generateHumanReading(input: HumanReadingInput): string {
     && !(input.concern.topic === 'career' && businessQuestion)
     ? pickTopicOpening(input.concern.topic)
     : ''
-  const memoryBridge = renderMemoryBridge(input.memorySummary)
+  const memoryBridge = userExplicitlyAskedForMemory(input.question ?? '')
+    ? renderMemoryBridge(input.memorySummary)
+    : ''
   const mainSignal = renderMainSignal(visibleEvidence)
   const experience = renderLikelyExperience(visibleEvidence)
   const timingHint =

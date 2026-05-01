@@ -41,6 +41,12 @@ import {
   type FinalAnswerDomain,
   type FinalAnswerSafetyAction,
 } from '@/lib/astro/reading/final-answer-composer'
+import {
+  gateFinalUserAnswer,
+  getSafetyShortCircuitDomain,
+  userExplicitlyAskedForChartBasis,
+  userExplicitlyAskedForMemory,
+} from '@/lib/astro/reading/final-response-gate'
 import type {
   AstrologyReadingInput,
   AstrologyReadingResult,
@@ -240,7 +246,7 @@ function hasExplicitMonthlyIntent(question: string, mode: ReadingMode): boolean 
   )
 }
 
-function mapIntentToFinalAnswerDomain(value: unknown): FinalAnswerDomain {
+function mapToFinalAnswerDomain(value: unknown): FinalAnswerDomain {
   const intent = String(value ?? '').toLowerCase()
 
   if (intent.includes('exact')) return 'exact_fact'
@@ -264,7 +270,7 @@ function mapIntentToFinalAnswerDomain(value: unknown): FinalAnswerDomain {
   return 'general'
 }
 
-function mapSafetyActionToFinalAnswerSafetyAction(value: unknown): FinalAnswerSafetyAction {
+function mapToFinalAnswerSafetyAction(value: unknown): FinalAnswerSafetyAction {
   const safety = String(value ?? '').toLowerCase()
 
   if (safety.includes('medical') || safety.includes('health')) return 'medical_boundary'
@@ -385,6 +391,29 @@ export async function generateReadingV2(
           safetyReplacedAnswer: safety.replaced,
           forbiddenClaimsRemoved: safety.forbiddenClaimsRemoved,
           followUpQuestion: exactFact.followUpQuestion,
+        },
+      }
+    }
+    const safetyShortCircuit = getSafetyShortCircuitDomain(v2Input.question)
+    if (safetyShortCircuit) {
+      const gatedAnswer = gateFinalUserAnswer({
+        question: v2Input.question,
+        draftAnswer: '',
+        domain: safetyShortCircuit.domain,
+        safetyAction: safetyShortCircuit.safetyAction,
+        exactFact: false,
+        allowChartAnchors: false,
+        allowMemoryContext: false,
+      })
+      return {
+        answer: gatedAnswer.answer,
+        meta: {
+          version: 'v2',
+          routedBy: 'astro-reading-router',
+          usedFallback: false,
+          directV2Route: true,
+          safetyShortCircuit: true,
+          safetyLayer: 'enabled_phase_8',
         },
       }
     }
@@ -601,16 +630,31 @@ export async function generateReadingV2(
         : finalSafety.answer,
       domain: exactFact
         ? 'exact_fact'
-        : mapIntentToFinalAnswerDomain(
+        : mapToFinalAnswerDomain(
             structuredIntent?.primaryIntent ?? concern.topic,
           ),
-      safetyAction: mapSafetyActionToFinalAnswerSafetyAction(
+      safetyAction: mapToFinalAnswerSafetyAction(
         safetyDecisions[0]?.action ?? concern.topic,
       ),
       exactFact: Boolean(exactFact),
     })
 
-    const finalAnswer = composedAnswer.answer
+    const gatedAnswer = gateFinalUserAnswer({
+      question: v2Input.question,
+      draftAnswer: composedAnswer.answer,
+      domain: exactFact
+        ? 'exact_fact'
+        : mapToFinalAnswerDomain(
+            structuredIntent?.primaryIntent ?? concern.topic,
+          ),
+      safetyAction: mapToFinalAnswerSafetyAction(
+        safetyDecisions[0]?.action ?? concern.topic,
+      ),
+      exactFact: Boolean(exactFact),
+      allowChartAnchors: userExplicitlyAskedForChartBasis(v2Input.question),
+      allowMemoryContext: userExplicitlyAskedForMemory(v2Input.question),
+    })
+    const finalAnswer = gatedAnswer.answer
     await saveOptionalMemory({
       enabled: memoryEnabled,
       userId,
@@ -671,6 +715,10 @@ export async function generateReadingV2(
         evidenceDomain: domainEvidenceSelection?.primaryDomain,
         finalQualityPassed: quality.allowed,
         answerComposerRepaired: composedAnswer.repaired,
+        finalResponseGate: {
+          replaced: gatedAnswer.replaced,
+          reason: gatedAnswer.reason,
+        },
         safetyAction: safetyDecisions.map((item) => item.action),
         followUpQuestion:
           concern.topic === 'career'

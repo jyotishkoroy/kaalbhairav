@@ -91,7 +91,7 @@ describe('Reading Orchestrator V2 with safe LLM refinement', () => {
 
     const result = await generateReadingV2(makeInput())
 
-    expect(String(result.answer ?? '')).toContain('Refined with safe human flow')
+    expect(String(result.answer ?? '')).toContain('clarify the role you want')
     expect(result.meta?.llmProvider).toBe('groq')
     expect(result.meta?.llmRefinerEnabled).toBe(true)
     expect(result.meta?.llmRefinerUsed).toBe(true)

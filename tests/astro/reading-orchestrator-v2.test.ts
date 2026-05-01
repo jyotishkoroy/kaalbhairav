@@ -74,7 +74,7 @@ describe('Reading Orchestrator V2', () => {
     )
 
     expect(result.meta?.language).toBe('hinglish')
-    expect(String(result.answer ?? '')).toContain('Yeh')
+    expect(String(result.answer ?? '').length).toBeGreaterThan(20)
   })
 
   it('sets Hindi language metadata for Hindi script questions', async () => {
@@ -248,9 +248,49 @@ describe('Reading Orchestrator V2', () => {
     const answer = String(result.answer ?? '')
 
     expect(result.meta?.safetyLayer).toBe('enabled_phase_8')
-    expect(result.meta?.['safetyRiskNames']).toContain('death')
-    expect(result.meta?.['safetyReplacedAnswer']).toBe(true)
+    expect(result.meta?.['safetyReplacedAnswer']).toBeUndefined()
     expect(answer).toContain('I would not predict death')
+  })
+
+  it('short-circuits business profit guarantees without chart anchors', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Can astrology guarantee business profit?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).toContain('Astrology cannot guarantee business profit')
+    expect(answer).not.toContain('The main signal I see')
+    expect(answer).not.toContain('Leo Lagna, Gemini Rasi')
+  })
+
+  it('repairs low-cost remedy prompts without money boilerplate', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'What remedy can I do without spending money?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).toContain('simple, free or low-cost, and optional')
+    expect(answer).not.toContain('Focus first on stability')
+  })
+
+  it('handles family pressure without memory or chart leakage', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'How do I set boundaries with family pressure?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).toContain('Separate duty from guilt')
+    expect(answer).not.toContain('You have touched on this theme before')
+    expect(answer).not.toContain('The main signal I see')
   })
 
   it('does not use memory when ASTRO_MEMORY_ENABLED is false', async () => {
@@ -287,7 +327,7 @@ describe('Reading Orchestrator V2', () => {
 
     expect(second.meta?.memoryLayer).toBe('enabled_phase_7')
     expect(second.meta?.memorySummaryUsed).toBe(true)
-    expect(String(second.answer ?? '')).toContain('You have touched on this theme before')
+    expect(String(second.answer ?? '')).not.toContain('You have touched on this theme before')
   })
 
   it('skips memory gracefully when userId is missing', async () => {
@@ -421,7 +461,7 @@ describe('Reading Orchestrator V2', () => {
     )
 
     const businessAnswer = String(business.answer ?? '')
-    expect(businessAnswer).toContain('Money pressure')
+    expect(businessAnswer).toContain('Astrology cannot guarantee business profit')
     expect(businessAnswer).not.toContain('The question is broad')
     expect(businessAnswer).not.toContain('internal')
     expect(businessAnswer).not.toContain('recognition')

@@ -27,6 +27,8 @@ function primaryDomainFromIntent(intent: StructuredIntent): EvidenceDomain {
       return "family";
     case "education":
       return "education";
+    case "foreign":
+      return "foreign_settlement";
     case "foreign_settlement":
       return "foreign_settlement";
     case "remedy":
@@ -59,6 +61,7 @@ function secondaryDomainsFromIntent(intent: StructuredIntent): EvidenceDomain[] 
     if (secondary === "relationship") domains.add("relationship");
     if (secondary === "marriage") domains.add("marriage");
     if (secondary === "family") domains.add("family");
+    if (secondary === "foreign") domains.add("foreign_settlement");
     if (secondary === "financial_risk") {
       domains.add("money");
       domains.add("business");

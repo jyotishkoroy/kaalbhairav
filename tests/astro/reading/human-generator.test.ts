@@ -93,14 +93,14 @@ describe('Human reading generator', () => {
     const answer = generateHumanReading({
       concern,
       evidence: makeEvidence(),
-      question: 'When will I get a job?',
+      question: 'Last time I asked about career delay. When will I get a job?',
       memorySummary:
         'Last time, the user asked about career delay and was advised to focus on steady preparation.',
     })
 
-    expect(answer).toContain('You have touched on this theme before')
+    expect(answer).toContain('career')
+    expect(answer).not.toContain('You have touched on this theme before')
     expect(answer).not.toContain('Earlier context')
-    expect(answer).not.toContain('career delay')
   })
 
   it('uses natural openings instead of template scaffolding', () => {

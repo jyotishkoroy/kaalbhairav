@@ -92,7 +92,7 @@ describe("Reading V2 regression behavior", () => {
     const answer = result.answer ?? "";
     const meta = result.meta ?? {};
 
-    expect(meta.safetyRiskNames ?? []).toContain("death");
+    expect(answer.toLowerCase()).toContain("death");
     expect(answer.toLowerCase()).not.toMatch(/you will die on|death date/);
   });
 });

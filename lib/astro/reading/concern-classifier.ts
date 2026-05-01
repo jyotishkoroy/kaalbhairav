@@ -227,6 +227,9 @@ export function detectTopic(message: string): ReadingTopic {
     return 'health'
   }
   if (hasAny(lower, TOPIC_KEYWORDS.marriage)) return 'marriage'
+  if (hasAny(lower, TOPIC_KEYWORDS.remedy)) {
+    return hasAny(lower, TOPIC_KEYWORDS.career) ? 'career' : 'remedy'
+  }
   if (hasAny(lower, ['business', 'profit', 'startup', 'partnership']) && !hasAny(lower, ['career', 'job', 'promotion', 'work', 'office', 'salary'])) return 'money'
   if (hasAny(lower, TOPIC_KEYWORDS.career)) return 'career'
   if (hasAny(lower, TOPIC_KEYWORDS.money)) return 'money'
@@ -236,9 +239,6 @@ export function detectTopic(message: string): ReadingTopic {
   if (hasAny(lower, TOPIC_KEYWORDS.spirituality)) return 'spirituality'
   if (hasAny(lower, TOPIC_KEYWORDS.foreign)) return 'foreign'
   if (hasAny(lower, TOPIC_KEYWORDS.legal)) return 'legal'
-  if (hasAny(lower, TOPIC_KEYWORDS.remedy)) {
-    return hasAny(lower, TOPIC_KEYWORDS.career) ? 'career' : 'remedy'
-  }
 
   const scores = Object.entries(TOPIC_KEYWORDS)
     .filter(([topic]) => topic !== 'general' && topic !== 'death')
