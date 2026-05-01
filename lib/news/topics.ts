@@ -4,8 +4,8 @@
  * Project: tarayai — https://tarayai.com
  */
 
-import { normalizeText } from './hash'
-import type { NewsTopic } from './types'
+import { normalizeText } from './hash.ts'
+import type { NewsTopic } from './types.ts'
 
 const topicWeights: Array<{ topic: NewsTopic; keywords: string[]; weight: number }> = [
   { topic: 'tantra', keywords: ['tantra', 'tantric', 'shaiva', 'shakta', 'agama'], weight: 10 },

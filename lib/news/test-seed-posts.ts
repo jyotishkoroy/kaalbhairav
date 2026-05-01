@@ -4,11 +4,11 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
-import { titleHash, contentHash } from './dedupe'
-import { isProbablyEnglishText } from './language'
-import { classifyTopic } from './topics'
-import { createSlug } from './slug'
-import { getKolkataDate } from './kolkata'
+import { titleHash, contentHash } from './dedupe.ts'
+import { isProbablyEnglishText } from './language.ts'
+import { classifyTopic } from './topics.ts'
+import { createSlug } from './slug.ts'
+import { getKolkataDate } from './kolkata.ts'
 
 export type SeedPost = {
   title: string

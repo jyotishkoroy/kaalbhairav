@@ -4,8 +4,8 @@
  * Project: tarayai — https://tarayai.com
  */
 
-import { normalizeTitle, sha256 } from './hash'
-import { canonicalizeUrl } from './normalize'
+import { normalizeTitle, sha256 } from './hash.ts'
+import { canonicalizeUrl } from './normalize.ts'
 
 export function titleHash(title: string) {
   return sha256(normalizeTitle(title))

@@ -4,7 +4,7 @@
  * Project: tarayai — https://tarayai.com
  */
 
-import { decodeHtmlEntities, normalizeText } from './hash'
+import { decodeHtmlEntities, normalizeText } from './hash.ts'
 
 export function stripHtml(input: string) {
   return decodeHtmlEntities(

@@ -4,7 +4,7 @@
  * Project: tarayai — https://tarayai.com
  */
 
-import { sha256, normalizeText } from './hash'
+import { sha256, normalizeText } from './hash.ts'
 
 export function createSlug(title: string, existingSlugs: Set<string> = new Set()) {
   const base = normalizeText(title)

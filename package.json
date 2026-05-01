@@ -37,7 +37,7 @@
     "check:astro-final-300": "node --experimental-strip-types scripts/check-astro-final-300.ts",
     "check:astro-companion-production-smoke": "node --experimental-strip-types scripts/check-astro-companion-production-smoke.ts",
     "compare:astro-v2-local-live": "node scripts/compare-astro-v2-local-vs-live.mjs",
-    "seed:news-test": "npx tsx scripts/seed-news-test-posts.ts",
+    "seed:news-test": "node --experimental-strip-types scripts/seed-news-test-posts.ts",
     "check:astro-rag-smoke": "npx tsx scripts/check-astro-rag-smoke.ts",
     "check:astro-rag-live": "npx tsx scripts/check-astro-rag-live.ts",
     "compare:astro-rag-local-live": "npx tsx scripts/compare-astro-rag-local-vs-live.ts",
