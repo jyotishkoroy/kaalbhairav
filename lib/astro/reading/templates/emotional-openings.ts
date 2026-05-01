@@ -8,32 +8,32 @@ import type { EmotionalTone, UserConcern } from '@/lib/astro/reading/reading-typ
 
 const OPENINGS_BY_TONE: Record<EmotionalTone, string[]> = {
   calm: [
-    'The first thing I would look at here is the pattern behind the question, not just a simple yes or no.',
-    'Let me read this in a grounded way, without making the answer dramatic.',
+    'I am reading this in a grounded way, starting with the actual question rather than a canned prediction.',
+    'This can be answered directly, without turning it into a dramatic story.',
   ],
   anxious: [
-    'I can understand why this feels heavy right now. You are looking for clarity, not just a prediction.',
-    'This question carries pressure, so I would read it carefully rather than give a quick generic answer.',
+    'I can understand why this feels heavy right now. The useful answer is the one that reduces confusion.',
+    'Because there is pressure here, I am keeping the answer direct and specific.',
   ],
   sad: [
-    'I can feel the tiredness behind this question. This is not something you are asking casually.',
-    'This seems to be coming from a place of emotional exhaustion, so the answer needs to be steady and honest.',
+    'I can feel the tiredness behind this question, so I will keep the answer steady and honest.',
+    'This deserves a careful answer that does not add more pressure.',
   ],
   angry: [
-    'I can sense the frustration behind this. Let us separate the pressure of the moment from the actual pattern.',
-    'This does not need a dramatic answer. It needs a clear reading and a practical next step.',
+    'I can sense the frustration behind this. I will separate the pressure of the moment from the actual issue.',
+    'This needs a clear reading and one practical next step.',
   ],
   confused: [
-    'The confusion itself is important here. It shows that your mind is trying to make sense of too many signals at once.',
-    'This looks like a phase where clarity has to be built step by step, not forced in one moment.',
+    'The confusion itself matters here, so I will keep the answer simple and structured.',
+    'Clarity here needs a few clean points, not a long speech.',
   ],
   hopeful: [
-    'There is hope in the way you are asking this, but I would still read it with balance and care.',
-    'This question has a forward-looking quality, so the useful answer is what can grow and what needs patience.',
+    'There is hope in the way you are asking this, and I will still keep the answer balanced.',
+    'The useful part is what can grow next and what needs patience now.',
   ],
   urgent: [
-    'Because this feels urgent, I would be careful not to turn pressure into a rushed decision.',
-    'This needs a calm answer first. Urgency can make the situation feel more final than it actually is.',
+    'Because this feels urgent, I am keeping the answer calm and specific.',
+    'Urgency can distort the picture, so I will stay with what is actually known.',
   ],
 }
 

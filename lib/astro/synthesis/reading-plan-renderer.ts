@@ -52,6 +52,22 @@ function pushSection(sections: UserFacingAnswerSection[], kind: UserFacingAnswer
   sections.push({ kind, text: cleaned });
 }
 
+function joinUniqueParagraphs(paragraphs: Array<string | undefined>): string {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const cleaned = paragraph?.replace(/\s+/g, " ").trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleaned);
+  }
+
+  return result.join("\n\n");
+}
+
 type ReadingPlanLike = Partial<ReadingPlan> & {
   questionFrame?: { coreQuestion?: string };
   intent?: { primaryIntent?: string };
@@ -103,7 +119,7 @@ export function renderUserFacingAnswerPlan(plan: UserFacingAnswerPlan): string {
     rendered.unshift(acknowledgement);
   }
   if (!rendered.length) return "I’m keeping this grounded and focused on the chart.";
-  return rendered.join(" ");
+  return joinUniqueParagraphs(rendered);
 }
 
 export function renderReadingPlanFallback(plan: ReadingPlan): string {

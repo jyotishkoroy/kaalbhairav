@@ -78,6 +78,9 @@ describe("final answer quality validator", () => {
       "For spiritual questions, the answer should stay",
       "So my honest reading is",
       "The main signal I would take from this is",
+      "A useful career reading stays practical",
+      "Marriage questions are best handled without fear or pressure",
+      "This is an emotional question, so I would keep the reading gentle and practical",
       "[REDACTED]",
     ]
 
@@ -238,7 +241,7 @@ describe("final answer quality validator", () => {
     expect(validateFinalAnswerQuality({ answerText: "The overall pattern matters more than one isolated prediction. A responsible reading should reduce fear.", rawQuestion: "x" }).failures).toContain("generic_boilerplate")
   })
   it("passes specific career answer", () => {
-    expect(validateFinalAnswerQuality({ answerText: "Your career may improve through consistent effort and clear timing.", rawQuestion: "Will my career improve?" }).allowed).toBe(true)
+    expect(validateFinalAnswerQuality({ answerText: "It makes sense that this feels frustrating. Clarify your responsibilities, make your work more visible, and ask directly about promotion criteria.", rawQuestion: "Will my career improve?" }).allowed).toBe(true)
   })
 
   it("blocks the safety overreplacement regression pattern", () => {

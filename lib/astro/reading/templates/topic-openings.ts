@@ -8,30 +8,30 @@ import type { ReadingTopic } from '@/lib/astro/interpretation/evidence'
 
 const TOPIC_OPENINGS: Record<ReadingTopic, string> = {
   career:
-    'Career questions work best when the answer stays practical: visibility, responsibility, and steady effort matter more than a dramatic promise.',
+    'Your work may need clearer visibility, stronger ownership, and a more direct ask for recognition.',
   marriage:
-    'Marriage questions are best handled without fear or pressure. Readiness, timing, and emotional maturity all matter.',
+    'Marriage timing is best read through readiness, compatibility, and steady communication.',
   relationship:
-    'Relationship questions should stay grounded in consistency, respect, and emotional steadiness.',
+    'This relationship question calls for consistency, respect, and a clear look at the repeating pattern.',
   money:
-    'Money questions usually need a grounded answer, not fear. Discipline, planning, and timing all matter.',
+    'Money pressure becomes easier to handle when it is turned into a concrete plan.',
   health:
-    'Health questions should stay safe, practical, and non-diagnostic.',
+    'If health is part of this, keep the reading safe, practical, and non-diagnostic.',
   family:
-    'Family questions often point to patience, communication, and healthy boundaries.',
+    'Family pressure is easier to handle when duty and guilt are separated clearly.',
   education:
-    'Education questions are usually about consistency, concentration, and the learning environment that supports follow-through.',
+    'For study choices, consistency and the right environment matter more than a dramatic promise.',
   spirituality:
-    'Spiritual questions should reduce fear and keep the practice simple and steady.',
+    'Spiritual practice should stay calm, simple, and steady.',
   remedy:
-    'Remedy questions should stay safe, practical, and not fear-based.',
+    'Remedy questions should stay low-pressure, safe, and practical.',
   foreign:
-    'Foreign travel or relocation questions need both timing awareness and practical planning.',
+    'Foreign travel or relocation works best when timing is matched with real preparation.',
   legal:
-    'Legal questions should stay focused on documentation, evidence, and professional advice.',
+    'Legal questions should stay focused on documentation, evidence, and qualified advice.',
   death:
     'I would not use astrology to predict death or lifespan. A responsible reading can only discuss wellbeing and caution.',
-  general: 'The overall pattern matters more than one isolated prediction.',
+  general: 'I can help, but the question is broad. Pick one area first: career, relationship, money, family, health, study, or spiritual practice.',
 }
 
 export function pickTopicOpening(topic: ReadingTopic): string {

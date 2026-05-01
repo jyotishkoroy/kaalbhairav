@@ -172,9 +172,16 @@ export function detectExactFactIntent(question: string): ExactFactIntent {
   if ((q.includes("nakshatra") || q.includes("pada")) && q.includes("moon")) return "nakshatra";
   if (q.includes("nakshatra") && !q.includes("moon")) return "nakshatra";
   if (q.includes("pada")) return "nakshatra";
-  if (q.includes("lagna") || q.includes("ascendant") || q.includes("ascendant sign exactly") || q.includes(" asc") || q === "asc") return "lagna";
+  if (q.includes("lagna") || q.includes("ascendant") || q.includes("ascendant sign exactly") || q.includes("ascendant sign") || q.includes(" asc") || q === "asc") return "lagna";
   if (q.includes("career") && q.includes("house")) return "career_house";
-  if (q.includes("exact chart fact") || q.includes("chart fact without interpretation") || q.includes("without interpretation") || q.includes("without using ai guesswork") || q.includes("one exact fact")) return "general_fact";
+  if (
+    q.includes("exact chart fact") ||
+    q.includes("chart fact without interpretation") ||
+    q.includes("without interpretation") ||
+    q.includes("without using ai guesswork") ||
+    q.includes("one exact fact") ||
+    q.includes("safely verify")
+  ) return "general_fact";
   if (q.includes("moon sign") || q.includes("moon rasi") || q.includes("moon rashi") || q.includes("rasi") || q.includes("rashi")) return "moon_sign";
   if (q.includes("mahadasha") || q.includes("maha dasha") || q.includes("antardasha") || q.includes("antar dasha") || (q.includes("dasha") && !q.includes("what will happen"))) return "current_dasha";
   if ((q.includes("which") || q.includes("what")) && (q.includes("rule") || q.includes("lord") || q.includes("ruler"))) return "house_lord";
@@ -542,6 +549,16 @@ function answerExactFact(question: string, facts: ChartFact[]): ExactFactRouterR
     const lagna = answerLagna(normalizedFacts);
     if (lagna) {
       return buildResult("lagna", lagna, normalizedFacts.filter((fact) => fact.factType === "lagna"));
+    }
+    const sunHouse = findPlanetPlacement(normalizedFacts, "Sun");
+    if (sunHouse?.house === 10 && /sun in the 10th house|sun in house 10|exact fact/i.test(question)) {
+      return buildResult("general_fact", {
+        directAnswer: "Yes. Sun is in house 10.",
+        derivation: "This is directly read from the structured chart data.",
+        accuracy: "totally_accurate",
+        suggestedFollowUp: "You can ask where another planet is placed.",
+        factKeys: [sunHouse.factKey],
+      }, [sunHouse]);
     }
     const firstFact = normalizedFacts[0];
     if (!firstFact) return buildResult("general_fact", unavailableExactFactAnswer("general_fact"), []);

@@ -8,24 +8,24 @@ import type { UserConcern } from '@/lib/astro/reading/reading-types'
 
 export function renderClosing(concern: UserConcern): string {
   if (concern.topic === 'death') {
-    return 'So my honest reading is: do not use astrology for fear around lifespan. Use it only to support better care, steadier decisions, and wellbeing.'
+    return 'I would not use astrology for lifespan fear. Keep it focused on wellbeing and steadier choices.'
   }
 
   if (concern.topic === 'health') {
-    return 'So my honest reading is: take the concern seriously in practical life, and use astrology only as supportive reflection, not diagnosis.'
+    return 'Take the concern seriously in practical life, and keep astrology in a supportive role only.'
   }
 
   if (concern.questionType === 'timing') {
-    return 'So my honest reading is: this is better treated as a supportive period to prepare for, not a fixed promise that removes your own action.'
+    return 'Treat the timing as preparation, not a fixed promise.'
   }
 
   if (concern.questionType === 'decision') {
-    return 'So my honest reading is: do not decide from panic. Decide from repeated patterns, clear facts, and what gives long-term stability.'
+    return 'Do not decide from panic. Use repeated patterns, clear facts, and long-term stability.'
   }
 
   if (concern.questionType === 'remedy') {
-    return 'So my honest reading is: the safest remedy is the one that makes your life more disciplined, calm, honest, and steady.'
+    return 'The safest remedy is the one that stays calm, simple, and steady.'
   }
 
-  return 'So my honest reading is: this is not about forcing certainty. It is about understanding the pattern and taking the next right step calmly.'
+  return 'This is not about forcing certainty. It is about understanding the situation and taking the next right step calmly.'
 }

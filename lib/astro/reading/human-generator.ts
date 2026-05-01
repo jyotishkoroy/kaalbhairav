@@ -47,6 +47,64 @@ function renderMemoryBridge(memorySummary?: string): string {
   return 'You have touched on this theme before, so I will keep the guidance consistent and practical.'
 }
 
+function joinUniqueParagraphs(paragraphs: Array<string | undefined>): string {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const paragraph of paragraphs) {
+    const cleaned = paragraph?.replace(/\s+/g, ' ').trim()
+    if (!cleaned) continue
+
+    const key = cleaned.toLowerCase()
+    if (seen.has(key)) continue
+
+    seen.add(key)
+    result.push(cleaned)
+  }
+
+  return result.join('\n\n')
+}
+
+function removeRepeatedSentences(answer: string): string {
+  const parts = answer.split(/(?<=[.!?])\s+/)
+  const seen = new Set<string>()
+  const kept: string[] = []
+
+  for (const part of parts) {
+    const cleaned = part.replace(/\s+/g, ' ').trim()
+    if (!cleaned) continue
+    const key = cleaned.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    kept.push(cleaned)
+  }
+
+  return kept.join(' ').trim()
+}
+
+function cleanUserFacingBoilerplate(answer: string): string {
+  let cleaned = answer
+
+  const removableSentences = [
+    'The overall pattern matters more than one isolated prediction.',
+    'The overall pattern in your chart is more important than any isolated prediction.',
+    'So my honest reading is this:',
+    'The first thing I would look at here is the pattern behind the question, not just a simple yes or no.',
+    'Let us make this practical rather than overly predictive.',
+    'Name the area that feels most urgent, then choose one grounded next step.',
+  ]
+
+  for (const sentence of removableSentences) {
+    cleaned = cleaned.split(sentence).join('')
+  }
+
+  return cleaned
+    .replace(/\s+\./g, '.')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function extractDatePhrase(question: string): string | undefined {
   const monthMatch = question.match(
     /\b(\d{1,2}(st|nd|rd|th)?\s+)?(january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b/i,
@@ -74,21 +132,21 @@ function buildOpening(concern: UserConcern, question?: string): string {
     }
     return datePhrase
       ? `If ${datePhrase} is the key window, the useful focus is on visibility, responsibility, and what can realistically move then.`
-      : `It makes sense that this feels frustrating when effort is not turning into recognition. A useful career reading stays practical: clarify your responsibilities, make your work more visible, and avoid forcing a single guaranteed outcome.`
+      : 'It makes sense that this feels frustrating when effort is not turning into recognition. Clarify your responsibilities, make your work more visible, and avoid forcing a single guaranteed outcome.'
   }
 
   if (concern.topic === 'money') {
     return datePhrase
       ? `If ${datePhrase} matters here, the useful focus is on stability, cash flow, and what can be prepared in advance.`
-      : `Money anxiety usually needs a grounded answer, not fear. Focus first on stability: know your monthly baseline, reduce avoidable pressure, and make decisions from numbers rather than panic.`
+      : 'Money pressure needs a grounded answer, not fear. Focus first on stability: know your monthly baseline, reduce avoidable pressure, and make decisions from numbers rather than panic.'
   }
 
   if (concern.topic === 'relationship' || concern.topic === 'marriage') {
     return datePhrase
       ? `If ${datePhrase} matters here, the useful focus is on communication, readiness, and the pattern you want to create next.`
       : concern.topic === 'marriage'
-        ? 'Marriage questions are best handled without fear or pressure. I would look at readiness, communication, family expectations, and whether the decision supports emotional steadiness.'
-        : 'This is an emotional question, so I would keep the reading gentle and practical. Look for the repeated pattern: how trust is built, how conflict is handled, and whether your choices are coming from fear or clarity.'
+        ? 'Marriage timing is best read through readiness, communication, family expectations, and whether the decision supports emotional steadiness.'
+        : 'This relationship question is emotionally heavy, so I will keep it gentle and practical. Look for the repeated pattern: how trust is built, how conflict is handled, and whether your choices are coming from fear or clarity.'
   }
 
   if (concern.topic === 'education') {
@@ -110,10 +168,10 @@ function buildOpening(concern: UserConcern, question?: string): string {
   }
 
   if (concern.questionType === 'remedy' || concern.topic === 'remedy') {
-    return 'Spiritual guidance should reduce fear, not increase it. Keep the practice simple, optional, and steady.'
+    return 'Spiritual practice should reduce fear, not increase it. Keep it simple, optional, and steady.'
   }
 
-  return 'Let us make this practical rather than overly predictive. Name the area that feels most urgent, then choose one grounded next step.'
+  return 'The question is broad, so start with the area that feels most urgent and choose one grounded next step.'
 }
 
 function dedupeAdjacentWords(text: string): string {
@@ -249,7 +307,7 @@ function buildQuestionModeLine(question: string | undefined): string {
   if (text.includes('how does 2026-2027 varshaphal affect')) {
     return 'The 2026-2027 annual cycle should be read as a mixed window with both momentum and caution.'
   }
-  return 'The answer should stay tied to the exact question wording rather than drifting into generic guidance.'
+  return 'The answer should stay close to the exact question wording rather than drifting into generic guidance.'
 }
 
 function renderEmptyEvidenceReading(concern: UserConcern): string {
@@ -257,7 +315,7 @@ function renderEmptyEvidenceReading(concern: UserConcern): string {
   const topicOpening = pickTopicOpening(concern.topic)
   const closing = renderClosing(concern)
 
-  return lintHumanStyle([opening, topicOpening, closing].filter(Boolean).join('\n\n'))
+  return lintHumanStyle(joinUniqueParagraphs([opening, topicOpening, closing]))
 }
 
 export function generateHumanReading(input: HumanReadingInput): string {
@@ -331,9 +389,10 @@ export function generateHumanReading(input: HumanReadingInput): string {
     .join('\n\n')
 
   const deduped = dedupeRepeatedLines(dedupeAdjacentWords(raw))
+  const polished = cleanUserFacingBoilerplate(removeRepeatedSentences(deduped))
 
   return applyLanguageTone({
-    text: lintHumanStyle(deduped),
+    text: lintHumanStyle(polished),
     language: input.language ?? detectPreferredLanguage(input.question ?? ''),
   })
 }

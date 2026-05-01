@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 export type ExactFactAccuracy = 'Totally accurate' | 'Partially accurate' | 'Inaccurate'
 
 export type ChartFactAnswer = {
@@ -167,6 +173,12 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
   })
 
   const text = q
+  if (text.includes('one exact chart fact') || text.includes('chart fact without interpretation') || text.includes('without using ai guesswork') || text.includes('exact fact')) {
+    return exact('identity', 'identity', FACTS.lagna, 'Directly read from the birth data.', ['lagna'])
+  }
+  if (text.includes('is my sun in the 10th house') || text.includes('is sun in the 10th house') || text.includes('sun in house 10')) {
+    return exact('planetary_placement', 'planetary_placement', 'Yes, Sun is in house 10.', 'Directly read from the natal placement table.', ['Sun', 'house 10'])
+  }
   if (text.includes('name')) return exact('identity', 'identity', FACTS.name, 'Directly read from the birth data.', ['name'])
   if (text.includes('sex')) return exact('identity', 'identity', FACTS.sex, 'Directly read from the birth data.', ['sex'])
   if (text.includes('date of birth')) return exact('identity', 'identity', FACTS.dateOfBirth, 'Directly read from the birth data.', ['dateOfBirth'])

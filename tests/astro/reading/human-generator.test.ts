@@ -120,10 +120,12 @@ describe('Human reading generator', () => {
       question: 'What spiritual practice should I follow?',
     })
 
-    expect(career).not.toContain('For career, the chart should be read through')
-    expect(timing).not.toContain('You are asking about timing, so I will keep this focused')
-    expect(spiritual).not.toContain('For spiritual questions, the answer should stay')
-    expect(career).not.toContain('You are asking for guidance on a specific situation')
+    expect(career).not.toContain('A useful career reading stays practical')
+    expect(career).not.toContain('The overall pattern matters more than one isolated prediction')
+    expect(career).not.toContain('The first thing I would look at here')
+    expect(timing).not.toContain('Let us make this practical rather than overly predictive')
+    expect(spiritual).not.toContain('Spiritual guidance should reduce fear')
+    expect(spiritual).not.toContain('So my honest reading is')
   })
 
   it('lints common AI-style phrases', () => {
