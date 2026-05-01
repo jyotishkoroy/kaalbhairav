@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RagReadingOrchestratorResult } from "@/lib/astro/rag/rag-reading-orchestrator";
-import { handleAstroV2ReadingRequest } from "@/app/api/astro/v2/reading/route";
+import { handleAstroV2ReadingRequest } from "@/lib/astro/rag/astro-v2-reading-handler";
 
 type RouteDeps = Parameters<typeof handleAstroV2ReadingRequest>[1];
 type OldRoute = Exclude<NonNullable<RouteDeps>["oldRoute"], undefined>;

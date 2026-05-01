@@ -4,8 +4,15 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 export type AstroRagFlags = {
   ragEnabled: boolean;
+  questionFrameParserEnabled?: boolean;
   readingPlanEnabled?: boolean;
   reasoningGraphEnabled: boolean;
   listeningAnalyzerEnabled?: boolean;
@@ -77,6 +84,7 @@ function readMemoryMaxItems(value: string | undefined, defaultValue: number): nu
 export function getAstroRagFlags(env: Record<string, string | undefined> = process.env): AstroRagFlags {
   return {
     ragEnabled: readBool(env.ASTRO_RAG_ENABLED, false),
+    questionFrameParserEnabled: readBool(env.ASTRO_QUESTION_FRAME_PARSER_ENABLED, false),
     readingPlanEnabled: readBool(env.ASTRO_READING_PLAN_ENABLED, false),
     reasoningGraphEnabled: readBool(env.ASTRO_REASONING_GRAPH_ENABLED, false),
     listeningAnalyzerEnabled: readBool(env.ASTRO_LISTENING_ANALYZER_ENABLED, false),
