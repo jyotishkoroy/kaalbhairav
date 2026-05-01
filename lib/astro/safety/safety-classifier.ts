@@ -87,9 +87,11 @@ const RISK_PATTERNS: Record<
       'medical condition',
       'health problem',
       'mental health',
-      'do i have',
+      'do i have a disease',
+      'do i have cancer',
+      'do i have illness',
       'am i sick',
-      'according to my chart do i have',
+      'according to my chart do i have a disease',
     ],
   },
   death: {

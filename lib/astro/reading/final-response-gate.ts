@@ -133,6 +133,22 @@ export function isLongHorizonPremiumPrediction(
     }
   }
 
+  const hyphenYearMatch = normalized.match(/\b(\d{1,2})[\s-]year(?:\s+prediction|s?)?\b/)
+  if (hyphenYearMatch) {
+    const years = Number.parseInt(hyphenYearMatch[1] ?? "", 10)
+    if (Number.isFinite(years) && years > 3) {
+      return true
+    }
+  }
+
+  const fullYearMatch = normalized.match(/\bfull\s+(\d{1,2})\s+year\b/)
+  if (fullYearMatch) {
+    const years = Number.parseInt(fullYearMatch[1] ?? "", 10)
+    if (Number.isFinite(years) && years > 3) {
+      return true
+    }
+  }
+
   const inYearsMatch = normalized.match(/\bin\s+(\d{1,2})\s+years?\b/)
   if (inYearsMatch) {
     const years = Number.parseInt(inYearsMatch[1] ?? "", 10)

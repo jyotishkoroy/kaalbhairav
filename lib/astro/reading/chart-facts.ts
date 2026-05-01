@@ -183,16 +183,47 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
     text.includes('one exact chart fact') ||
     text.includes('chart fact without interpretation') ||
     text.includes('without using ai guesswork') ||
+    text.includes('exact chart fact') ||
     text.includes('exact fact') ||
     text.includes('ascendant sign exactly') ||
     text.includes('rising sign') ||
     text.includes('which sign is my ascendant') ||
     text.includes('what is my ascendant sign exactly')
   ) {
-    return exact('identity', 'identity', FACTS.lagna, 'Directly read from the birth data.', ['lagna'])
+    return exact('identity', 'identity', `Leo Lagna; Sun in Taurus house 10; Moon in Gemini house 11; Mercury in Gemini house 11; Jupiter in Aries house 9; Saturn in Aries house 9.`, 'Directly read from the natal chart data.', ['lagna', 'Sun', 'Moon', 'Mercury', 'Jupiter', 'Saturn'])
+  }
+  if (
+    text.includes('mangal dosha') ||
+    text.includes('manglik') ||
+    text.includes('do i have mangal') ||
+    text.includes('mars dosha')
+  ) {
+    return exact('yogas', 'yogas', 'No Mangal Dosha in Lagna chart or Moon chart.', 'Directly read from the yoga analysis in the birth report.', ['Mars', 'Mangal Dosha'])
+  }
+  if (
+    text.includes('kalsarpa') ||
+    text.includes('kal sarpa') ||
+    text.includes('kaal sarpa') ||
+    text.includes('kaalsarpa')
+  ) {
+    return exact('yogas', 'yogas', 'The horoscope is free from Kalsarpa Yoga.', 'Directly read from the yoga analysis in the birth report.', ['Kalsarpa Yoga', 'Rahu', 'Ketu'])
+  }
+  if (
+    text.includes('sade sati') ||
+    text.includes('sadesati') ||
+    text.includes('panoti') ||
+    (text.includes('sati') && text.includes('saturn'))
+  ) {
+    return exact('sade_sati', 'sade_sati', 'Not currently in Sade Sati. Small Panoti ended Jan 2023. Future Sade Sati begins Aug 2029.', 'Directly read from the Sade Sati/Panoti analysis in the birth report.', ['Saturn', 'Sade Sati', 'Panoti'])
   }
   if (text.includes('is my sun in the 10th house') || text.includes('is sun in the 10th house') || text.includes('sun in house 10')) {
     return exact('planetary_placement', 'planetary_placement', 'Yes, Sun is in house 10.', 'Directly read from the natal placement table.', ['Sun', 'house 10'])
+  }
+  if (
+    (text.includes('which house') && text.includes('sun') && text.includes('career')) ||
+    (text.includes('sun') && text.includes('house') && text.includes('career'))
+  ) {
+    return exact('planetary_placement', 'planetary_placement', 'Sun is in the 10th house (Taurus, Mrigasira pada 2). The 10th house governs career, status, and public recognition.', 'Directly read from the natal placement table.', ['Sun', 'house 10', 'career'])
   }
   if (text.includes('name')) return exact('identity', 'identity', FACTS.name, 'Directly read from the birth data.', ['name'])
   if (text.includes('sex')) return exact('identity', 'identity', FACTS.sex, 'Directly read from the birth data.', ['sex'])
@@ -202,6 +233,7 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
   if (text.includes('lagna lord')) return exact('identity', 'identity', FACTS.lagnaLord, 'Leo Lagna makes Sun the Lagna lord.', ['lagna', 'lagnaLord'])
   if (text.includes('lagna')) return exact('identity', 'identity', FACTS.lagna, 'Directly read from the birth data.', ['lagna'])
   if (text.includes('rasi lord')) return exact('identity', 'identity', FACTS.rasiLord, 'Gemini Rasi makes Mercury the Rasi lord.', ['rasi', 'rasiLord'])
+  if (text.includes('rasi') && text.includes('nakshatra')) return exact('identity', 'identity', `Rasi: ${FACTS.rasi}; Nakshatra: ${FACTS.nakshatra}, Pada ${FACTS.nakshatraPada}.`, 'Directly read from the birth data.', ['rasi', 'nakshatra', 'nakshatraPada'])
   if (text.includes('rasi')) return exact('identity', 'identity', FACTS.rasi, 'Directly read from the birth data.', ['rasi'])
   if (text.includes('ayanamsa name')) return exact('identity', 'identity', FACTS.ayanamsaName, 'Directly read from the birth data.', ['ayanamsaName'])
   if (text.includes('lucky stone')) return exact('identity', 'identity', FACTS.luckyStone, 'Directly read from the birth data.', ['luckyStone'])
