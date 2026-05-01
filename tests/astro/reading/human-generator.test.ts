@@ -98,8 +98,32 @@ describe('Human reading generator', () => {
         'Last time, the user asked about career delay and was advised to focus on steady preparation.',
     })
 
-    expect(answer).toContain('Earlier context')
-    expect(answer).toContain('career delay')
+    expect(answer).toContain('You have touched on this theme before')
+    expect(answer).not.toContain('Earlier context')
+    expect(answer).not.toContain('career delay')
+  })
+
+  it('uses natural openings instead of template scaffolding', () => {
+    const career = generateHumanReading({
+      concern: classifyUserConcern('I am working hard but not getting promotion.'),
+      evidence: makeEvidence(),
+      question: 'I am working hard but not getting promotion.',
+    })
+    const timing = generateHumanReading({
+      concern: classifyUserConcern('When will I get a job?'),
+      evidence: makeEvidence(),
+      question: 'When will I get a job?',
+    })
+    const spiritual = generateHumanReading({
+      concern: classifyUserConcern('What spiritual practice should I follow?'),
+      evidence: makeEvidence(),
+      question: 'What spiritual practice should I follow?',
+    })
+
+    expect(career).not.toContain('For career, the chart should be read through')
+    expect(timing).not.toContain('You are asking about timing, so I will keep this focused')
+    expect(spiritual).not.toContain('For spiritual questions, the answer should stay')
+    expect(career).not.toContain('You are asking for guidance on a specific situation')
   })
 
   it('lints common AI-style phrases', () => {

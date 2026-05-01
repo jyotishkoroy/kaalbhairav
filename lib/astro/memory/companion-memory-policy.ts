@@ -160,15 +160,15 @@ export function buildMemorySummary(memories: CompanionMemoryItem[] | { previousR
     if (!last) return "";
     const topic = normalizeMemoryTopic(last.topic);
     return topic === "general"
-      ? "Earlier context was general. Keep the answer practical and non-fear-based."
-      : `Earlier context involved ${topic}. Keep the answer practical and non-fear-based.`;
+      ? "The user has mentioned this theme before, so keep the answer practical and non-fear-based."
+      : `The user has mentioned ${topic} before, so keep the answer practical and non-fear-based.`;
   }
   const items = memories.slice(0, 2).map((memory) => {
     const topic = normalizeMemoryTopic(memory.topic);
     const noun = topic === "general" || topic === "unknown" ? "earlier themes" : `${topic} concern`;
     return `${noun}`;
   });
-  return `Earlier context: ${[...new Set(items)].join(", ")}.`.slice(0, 180);
+  return `The user has touched on ${[...new Set(items)].join(", ")} before, so keep the answer practical and non-fear-based.`.slice(0, 180);
 }
 
 export function shouldStoreDraft(draft: CompanionMemoryDraft): { allowed: boolean; reason?: string } {

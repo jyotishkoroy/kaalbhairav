@@ -8,27 +8,27 @@ import type { ReadingTopic } from '@/lib/astro/interpretation/evidence'
 
 const TOPIC_OPENINGS: Record<ReadingTopic, string> = {
   career:
-    'For career, the chart should be read through effort, timing, responsibility, and practical choices.',
+    'Career questions work best when the answer stays practical: visibility, responsibility, and steady effort matter more than a dramatic promise.',
   marriage:
-    'For marriage, I would not reduce this to only a yes or no. Readiness, timing, and emotional maturity all matter.',
+    'Marriage questions are best handled without fear or pressure. Readiness, timing, and emotional maturity all matter.',
   relationship:
-    'For relationships, the most important thing is whether the connection brings consistency, respect, and peace.',
+    'Relationship questions should stay grounded in consistency, respect, and emotional steadiness.',
   money:
-    'For money, the useful reading is not fear. It is where discipline, planning, and timing need to come together.',
+    'Money questions usually need a grounded answer, not fear. Discipline, planning, and timing all matter.',
   health:
-    'For health, astrology can only give general wellbeing reflection. It should never replace medical advice.',
+    'Health questions should stay safe, practical, and non-diagnostic.',
   family:
-    'For family matters, the chart often shows where patience, communication, and boundaries are needed.',
+    'Family questions often point to patience, communication, and healthy boundaries.',
   education:
-    'For education, the reading should focus on effort, concentration, timing, and the right learning environment.',
+    'Education questions are usually about consistency, concentration, and the learning environment that supports follow-through.',
   spirituality:
-    'For spiritual questions, the answer should stay simple, grounded, and free from fear.',
+    'Spiritual questions should reduce fear and keep the practice simple and steady.',
   remedy:
-    'For remedies, I would keep the guidance safe, practical, and not fear-based.',
+    'Remedy questions should stay safe, practical, and not fear-based.',
   foreign:
-    'For foreign travel or relocation, the reading should weigh timing, paperwork, cost, and adjustment.',
+    'Foreign travel or relocation questions need both timing awareness and practical planning.',
   legal:
-    'For legal questions, I would keep the answer focused on documentation, evidence, and professional advice.',
+    'Legal questions should stay focused on documentation, evidence, and professional advice.',
   death:
     'I would not use astrology to predict death or lifespan. A responsible reading can only discuss wellbeing and caution.',
   general: 'The overall pattern matters more than one isolated prediction.',

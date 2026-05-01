@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import type { ChartFact } from "./chart-fact-extractor";
 
 export type ExactFactAnswerAccuracy = "totally_accurate" | "unavailable";
@@ -11,23 +17,20 @@ export type ExactFactAnswer = {
 };
 
 export function formatExactFactAnswer(answer: ExactFactAnswer): string {
-  const accuracy =
+  const directAnswer = answer.directAnswer
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b(\d+)\s+house\b/gi, (_, value: string) => `${value}${value === "1" ? "st" : value === "2" ? "nd" : value === "3" ? "rd" : "th"} house`)
+    .replace(/\.$/, "");
+  const sourceSentence =
     answer.accuracy === "totally_accurate"
-      ? "Totally accurate — this is a deterministic chart fact."
+      ? "This is a deterministic chart fact read from the chart data."
       : "Unavailable — this exact fact is not available from the current structured data.";
 
   return [
-    "Direct answer:",
-    answer.directAnswer,
+    `Direct answer: ${directAnswer}.`,
     "",
-    "How this is derived:",
-    answer.derivation,
-    "",
-    "Accuracy:",
-    accuracy,
-    "",
-    "Suggested follow-up:",
-    answer.suggestedFollowUp,
+    sourceSentence,
   ].join("\n");
 }
 

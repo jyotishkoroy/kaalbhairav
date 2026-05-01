@@ -144,6 +144,24 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.topic).toBe('marriage')
   })
 
+  it('formats exact facts without raw labels', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'What is my Lagna?',
+        message: 'What is my Lagna?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).toContain('Direct answer: Leo.')
+    expect(answer).not.toContain('Accuracy:')
+    expect(answer).not.toContain('How this is derived:')
+    expect(answer).not.toContain('Totally accurate')
+    expect(result.meta?.exactFactAnswered).toBe(true)
+    expect(result.meta?.llmRefinerUsed).toBe(false)
+  })
+
   it('does not throw when evidence is sparse', async () => {
     const result = await generateReadingV2(
       makeInput({
@@ -190,6 +208,19 @@ describe('Reading Orchestrator V2', () => {
 
     expect(result.meta?.memoryLayer).toBe('disabled')
     expect(result.meta?.safetyLayer).toBe('enabled_phase_8')
+  })
+
+  it('does not render raw memory scaffolding', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Will my career improve?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).not.toContain('Earlier context:')
+    expect(answer).not.toContain('Previous concern:')
   })
 
   it('runs safety layer on medical questions', async () => {
@@ -256,7 +287,7 @@ describe('Reading Orchestrator V2', () => {
 
     expect(second.meta?.memoryLayer).toBe('enabled_phase_7')
     expect(second.meta?.memorySummaryUsed).toBe(true)
-    expect(String(second.answer ?? '')).toContain('Earlier context')
+    expect(String(second.answer ?? '')).toContain('You have touched on this theme before')
   })
 
   it('skips memory gracefully when userId is missing', async () => {

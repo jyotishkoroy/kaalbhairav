@@ -66,6 +66,51 @@ describe("final answer quality validator", () => {
     expect(validateFinalAnswerQuality({ answerText: "metadata chartAnchorsUsed directV2Route", rawQuestion: "x" }).failures).toContain("metadata_leak")
   })
 
+  describe("strict live output cleanliness", () => {
+    const blockedPhrases = [
+      "Accuracy:",
+      "How this is derived:",
+      "For career, the chart should be read through",
+      "Earlier context:",
+      "You are asking for guidance on a specific situation",
+      "The overall pattern matters more than one isolated prediction",
+      "For education, the reading should focus",
+      "For spiritual questions, the answer should stay",
+      "So my honest reading is",
+      "The main signal I would take from this is",
+      "[REDACTED]",
+    ]
+
+    it.each(blockedPhrases)("blocks visible scaffolding phrase: %s", (phrase) => {
+      const result = validateFinalAnswerQuality({
+        answerText: `This is a normal answer. ${phrase} This should not be visible.`,
+        rawQuestion: "Why does my career feel stuck?",
+        mode: "interpretive",
+        primaryIntent: "career",
+        exactFactExpected: false,
+      })
+
+      expect(result.allowed).toBe(false)
+      expect(result.failures).toContain("internal_instruction_leak")
+    })
+
+    it("blocks repeated long sentence openings", () => {
+      const repeated =
+        "I would not suggest strong gemstones or expensive remedies without a careful full-chart review by a trusted expert."
+
+      const result = validateFinalAnswerQuality({
+        answerText: `${repeated} Start simple. ${repeated}`,
+        rawQuestion: "Should I wear blue sapphire immediately?",
+        mode: "remedy",
+        primaryIntent: "remedy",
+        exactFactExpected: false,
+      })
+
+      expect(result.allowed).toBe(false)
+      expect(result.failures).toContain("duplicate_topic_phrase")
+    })
+  })
+
   it("blocks Previous concern", () => {
     expect(validateFinalAnswerQuality({ answerText: "Previous concern: money stress.", rawQuestion: "x" }).failures).toContain("memory_contamination")
   })

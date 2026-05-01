@@ -30,6 +30,7 @@ import { getLLMProviderConfig, getLLMRefinerConfig } from '@/lib/llm/config'
 import { refineReadingWithSafeLLM } from '@/lib/astro/reading/local-ai-refiner'
 import { getChartProfileForTopic } from '@/lib/astro/reading/chart-anchors'
 import { answerExactChartFact } from '@/lib/astro/reading/chart-facts'
+import { formatExactFactAnswer } from '@/lib/astro/rag/exact-fact-answer'
 import { parseQuestionFrame } from '@/lib/astro/rag/question-frame-parser'
 import { routeStructuredIntent } from '@/lib/astro/rag/structured-intent-router'
 import { classifySafetyIntent } from '@/lib/astro/rag/safety-intent-classifier'
@@ -307,14 +308,16 @@ export async function generateReadingV2(
         : v2Input.question
     const exactFact = answerExactChartFact(exactFactQuestion)
     if (exactFact) {
-      const exactAnswer = [
-        `Direct answer:\n${exactFact.answer}`,
-        `How this is derived:\n${exactFact.reasoning}`,
-        `Accuracy:\nTotally accurate — this is directly read from the report or deterministically derived from listed chart data.`,
-        exactFact.followUpQuestion ? `Suggested follow-up:\n${exactFact.followUpQuestion}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n\n')
+      const exactFactAccuracy = exactFact.accuracy === 'Totally accurate'
+        ? 'totally_accurate' as const
+        : 'unavailable' as const
+      const exactAnswer = formatExactFactAnswer({
+        directAnswer: exactFact.answer,
+        derivation: exactFact.reasoning,
+        accuracy: exactFactAccuracy,
+        suggestedFollowUp: exactFact.followUpQuestion ?? 'You can ask another exact chart fact.',
+        factKeys: exactFact.anchors,
+      })
       const safety = applySafetyFilter({
         question: v2Input.question,
         answer: exactAnswer,

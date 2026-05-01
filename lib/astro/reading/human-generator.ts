@@ -38,9 +38,13 @@ export type HumanReadingInput = {
 
 function renderMemoryBridge(memorySummary?: string): string {
   if (!memorySummary) return ''
-  const cleaned = memorySummary.replace(/\s+/g, ' ').trim()
-  if (/previous concern:/i.test(cleaned)) return cleaned.length > 160 ? `${cleaned.slice(0, 157).trimEnd()}...` : cleaned
-  return cleaned.length > 160 ? `Earlier context: ${cleaned.slice(0, 149).trimEnd()}...` : `Earlier context: ${cleaned}`
+  const cleaned = memorySummary
+    .replace(/Earlier context:/gi, '')
+    .replace(/Previous concern:/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return ''
+  return 'You have touched on this theme before, so I will keep the guidance consistent and practical.'
 }
 
 function extractDatePhrase(question: string): string | undefined {
@@ -66,48 +70,50 @@ function buildOpening(concern: UserConcern, question?: string): string {
 
   if (concern.topic === 'career') {
     if (familyPressure) {
-      return 'You are balancing family pressure with career and marriage concerns, so I would keep this grounded in clarity, boundaries, and practical next steps.'
+      return 'Family pressure can make a career question feel heavier than it should. Keep the focus on clarity, boundaries, and the next practical step.'
     }
     return datePhrase
-      ? `You are asking about ${datePhrase} and your career. I would read this as a work-and-progress question first.`
-      : `You are asking about career progress, so I would focus on work, effort, timing, and practical next steps.`
+      ? `If ${datePhrase} is the key window, the useful focus is on visibility, responsibility, and what can realistically move then.`
+      : `It makes sense that this feels frustrating when effort is not turning into recognition. A useful career reading stays practical: clarify your responsibilities, make your work more visible, and avoid forcing a single guaranteed outcome.`
   }
 
   if (concern.topic === 'money') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and money. I would read this as a financial timing question first.`
-      : `You are asking about money, so the useful answer is about stability, planning, and cash-flow discipline.`
+      ? `If ${datePhrase} matters here, the useful focus is on stability, cash flow, and what can be prepared in advance.`
+      : `Money anxiety usually needs a grounded answer, not fear. Focus first on stability: know your monthly baseline, reduce avoidable pressure, and make decisions from numbers rather than panic.`
   }
 
   if (concern.topic === 'relationship' || concern.topic === 'marriage') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and your relationship or marriage. I would read this as a timing-and-connection question first.`
-      : `You are asking about a relationship or marriage, so the useful answer is about consistency, clarity, and emotional steadiness.`
+      ? `If ${datePhrase} matters here, the useful focus is on communication, readiness, and the pattern you want to create next.`
+      : concern.topic === 'marriage'
+        ? 'Marriage questions are best handled without fear or pressure. I would look at readiness, communication, family expectations, and whether the decision supports emotional steadiness.'
+        : 'This is an emotional question, so I would keep the reading gentle and practical. Look for the repeated pattern: how trust is built, how conflict is handled, and whether your choices are coming from fear or clarity.'
   }
 
   if (concern.topic === 'education') {
-    return `You are asking about education, so the useful answer is about study, preparation, and the right environment.`
+    return 'For education, the useful focus is consistency, attention, and the learning environment that helps you follow through.'
   }
 
   if (concern.topic === 'health') {
-    return `You are asking about health or wellbeing, so I will keep this safe, practical, and non-diagnostic.`
+    return 'Health or wellbeing questions should stay safe, practical, and non-diagnostic.'
   }
 
   if (concern.topic === 'death') {
-    return `You are asking about death or lifespan, so I will keep this safe and refuse to make a fatal prediction.`
+    return 'Questions about death or lifespan need a firm boundary: I will not make a fatal prediction.'
   }
 
   if (concern.questionType === 'timing') {
     return datePhrase
-      ? `You are asking about ${datePhrase}, so I will keep this focused on timing and what to prepare for.`
-      : `You are asking about timing, so I will keep this focused on when, how long, and what to prepare for.`
+      ? `If ${datePhrase} is the key window, the most useful answer is what to prepare for and what not to force.`
+      : 'Timing questions are best answered as preparation windows, not guarantees. I would look at what can be prepared now and what should not be forced.'
   }
 
   if (concern.questionType === 'remedy' || concern.topic === 'remedy') {
-    return `You are asking for a remedy, so I will keep this safe, practical, and not fear-based.`
+    return 'Spiritual guidance should reduce fear, not increase it. Keep the practice simple, optional, and steady.'
   }
 
-  return `You are asking for guidance on a specific situation, so I will keep the answer focused and practical.`
+  return 'Let us make this practical rather than overly predictive. Name the area that feels most urgent, then choose one grounded next step.'
 }
 
 function dedupeAdjacentWords(text: string): string {

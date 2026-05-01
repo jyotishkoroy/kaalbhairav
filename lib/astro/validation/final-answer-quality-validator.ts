@@ -6,6 +6,39 @@
 
 import type { FinalAnswerQualityFailure, FinalAnswerQualityInput, FinalAnswerQualityResult } from "./final-answer-quality-types"
 
+const POLISH_BLOCKED_RENDER_PHRASES = [
+  "Accuracy:",
+  "How this is derived:",
+  "Chart anchors that matter:",
+  "Chart anchors:",
+  "Chart basis:",
+  "Key anchors:",
+  "Suggested follow-up:",
+  "Earlier context:",
+  "Safety note:",
+  "Previous concern:",
+  "metadata",
+  "primaryIntent:",
+  "secondaryIntents:",
+  "directV2Route",
+  "For career, the chart should be read through",
+  "For education, the reading should focus",
+  "For spiritual questions, the answer should stay",
+  "For remedies, I would keep the guidance",
+  "You are asking for guidance on a specific situation",
+  "You are asking about timing, so I will keep this focused",
+  "You are asking about career progress, so I would focus",
+  "The overall pattern matters more than one isolated prediction",
+  "The first thing I would look at here is the pattern behind the question",
+  "So my honest reading is",
+  "The main signal I would take from this is",
+  "This question should be read",
+  "The person may be seeking",
+  "The answer should stay tied",
+  "Keep the answer tied",
+  "[REDACTED]",
+] as const
+
 const INTERNAL_LEAK_PHRASES = [
   "this question should be read",
   "this question should be read through",
@@ -88,7 +121,7 @@ const GENERIC_PHRASES = [
   "a responsible reading should reduce fear",
 ]
 
-function normalize(text: string): string {
+function normalizeForPolishCheck(text: string): string {
   return text
     .replace(/\*\*/g, "")
     .replace(/[_`#>-]/g, " ")
@@ -97,12 +130,40 @@ function normalize(text: string): string {
     .toLowerCase()
 }
 
+function normalize(text: string): string {
+  return normalizeForPolishCheck(text)
+}
+
 function containsPhrase(text: string, phrase: string): boolean {
-  return normalize(text).includes(normalize(phrase))
+  return normalizeForPolishCheck(text).includes(normalizeForPolishCheck(phrase))
 }
 
 function hasAnyPhrase(text: string, phrases: string[]): boolean {
   return phrases.some((phrase) => containsPhrase(text, phrase))
+}
+
+function containsBlockedPolishPhrase(answerText: string): boolean {
+  const normalized = normalizeForPolishCheck(answerText)
+  return POLISH_BLOCKED_RENDER_PHRASES.some((phrase) => normalized.includes(normalizeForPolishCheck(phrase)))
+}
+
+function getRepeatedSentences(answerText: string): string[] {
+  const sentences = answerText
+    .split(/[.!?]\s+/)
+    .map((sentence) => normalizeForPolishCheck(sentence).replace(/[.!?]+$/g, ""))
+    .filter((sentence) => sentence.length >= 24)
+
+  const seen = new Set<string>()
+  const repeated = new Set<string>()
+
+  for (const sentence of sentences) {
+    if (seen.has(sentence)) {
+      repeated.add(sentence)
+    }
+    seen.add(sentence)
+  }
+
+  return Array.from(repeated)
 }
 
 function isEmptyOrMeaningless(answerText: string, allowCompactExactFact: boolean): boolean {
@@ -160,10 +221,12 @@ export function validateFinalAnswerQuality(input: FinalAnswerQualityInput): Fina
 
   if (isEmptyOrMeaningless(answer, isExactFactContext(input))) failures.add("empty_answer")
   const normalizedAnswer = normalize(answer)
+  if (containsBlockedPolishPhrase(answer)) failures.add("internal_instruction_leak")
   if (hasAnyPhrase(answer, INTERNAL_LEAK_PHRASES)) failures.add("internal_instruction_leak")
   if (hasAnyPhrase(answer, METADATA_LEAK_PHRASES)) failures.add("metadata_leak")
   if (hasAnyPhrase(answer, MEMORY_LEAK_PHRASES)) failures.add("memory_contamination")
   if (hasAnyPhrase(answer, DUPLICATE_PHRASES)) failures.add("duplicate_topic_phrase")
+  if (getRepeatedSentences(answer).length > 0) failures.add("duplicate_topic_phrase")
   if (hasAnyPhrase(answer, UNSAFE_CLAIM_PHRASES)) failures.add("unsafe_claim")
   if (hasAnyPhrase(answer, UNSAFE_REMEDY_PHRASES)) failures.add("unsafe_remedy")
   if (genericOnly(answer)) failures.add("generic_boilerplate")
@@ -189,10 +252,11 @@ export function validateFinalAnswerQuality(input: FinalAnswerQualityInput): Fina
     failures.add(hasAnyPhrase(answer, ["chart basis:", "key anchors:", "accuracy:", "suggested follow-up:"]) ? "metadata_leak" : "internal_instruction_leak")
   }
 
+  const uniqueFailures = [...failures]
   const rewriteHint =
     failures.has("internal_instruction_leak") ? "Remove internal planning/debug labels and render only user-facing answer sections." :
     failures.has("memory_contamination") ? "Remove raw memory labels; use at most one natural relevance sentence." :
-    failures.has("duplicate_topic_phrase") ? "Deduplicate topic/domain labels." :
+    failures.has("duplicate_topic_phrase") ? "Deduplicate repeated openings or boilerplate sentences." :
     failures.has("wrong_domain_answer") ? "Rebuild answer from the primary intent/domain." :
     failures.has("safety_overreplacement") ? "Answer the exact fact directly or state deterministic unavailability; append only minimal boundary." :
     failures.has("unsafe_claim") ? "Remove guarantee, deterministic timing, or fatalistic claim." :
@@ -200,8 +264,8 @@ export function validateFinalAnswerQuality(input: FinalAnswerQualityInput): Fina
     undefined
 
   return {
-    allowed: failures.size === 0,
-    failures: [...failures],
+    allowed: uniqueFailures.length === 0,
+    failures: uniqueFailures,
     rewriteHint,
   }
 }

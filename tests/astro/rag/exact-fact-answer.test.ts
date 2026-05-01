@@ -11,19 +11,20 @@ describe("exact fact answer formatting", () => {
       factKeys: ["lagna"],
     });
 
-    expect(formatted).toContain("Direct answer:");
-    expect(formatted).toContain("How this is derived:");
-    expect(formatted).toContain("Accuracy:");
-    expect(formatted).toContain("Suggested follow-up:");
-    expect(formatted).toContain("Totally accurate — this is a deterministic chart fact.");
+    expect(formatted).toContain("Direct answer: Your Lagna is Leo.");
+    expect(formatted).toContain("This is a deterministic chart fact read from the chart data.");
+    expect(formatted).not.toContain("How this is derived:");
+    expect(formatted).not.toContain("Accuracy:");
+    expect(formatted).not.toContain("Suggested follow-up:");
   });
 
   it("formats unavailable facts", () => {
     const formatted = formatExactFactAnswer(unavailableExactFactAnswer("planet_placement:mars"));
 
-    expect(formatted).toContain("I do not have that exact chart fact available");
+    expect(formatted).toContain("Direct answer: I do not have that exact chart fact available in the structured chart data yet. Missing: planet_placement:mars.");
     expect(formatted).toContain("Unavailable — this exact fact is not available from the current structured data.");
-    expect(formatted).not.toContain("Totally accurate");
+    expect(formatted).not.toContain("How this is derived:");
+    expect(formatted).not.toContain("Accuracy:");
   });
 
   it("keeps unavailable wording deterministic", () => {

@@ -109,7 +109,7 @@ describe("exact fact router", () => {
     expect(derived.answered).toBe(true);
     expect(text(derived)).toContain("Venus");
     expect(text(derived)).toContain("Taurus");
-    expect(text(derived)).toContain("derived deterministically");
+    expect(text(derived)).toContain("This is a deterministic chart fact read from the chart data.");
     expect(derived.factKeys).toContain("house_10");
   });
 
