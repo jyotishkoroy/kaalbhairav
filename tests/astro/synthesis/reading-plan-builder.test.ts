@@ -125,6 +125,17 @@ describe("buildReadingPlan", () => {
   it("memory summary included only when provided", () => {
     expect(buildReadingPlan({ question: "x", memorySummary: "summary" }).memoryUse?.used).toBe(true);
   });
+  it("internal memory summary stays in internal plan", () => {
+    const plan = buildReadingPlan({ question: "x", memoryInternalSummary: "Previous concern: career" });
+    expect(plan.internalPlan?.memoryPolicy.join(" ")).toContain("career");
+  });
+  it("gated memory summary can be blocked", () => {
+    const original = process.env.ASTRO_MEMORY_RELEVANCE_GATE_ENABLED;
+    process.env.ASTRO_MEMORY_RELEVANCE_GATE_ENABLED = "true";
+    const plan = buildReadingPlan({ question: "career", concern: { topic: "career" }, memorySummary: "Previous concern: career" });
+    process.env.ASTRO_MEMORY_RELEVANCE_GATE_ENABLED = original;
+    expect(plan.memoryUse?.used).toBe(false);
+  });
   it("memory summary sanitized", () => {
     expect(buildReadingPlan({ question: "x", memorySummary: "sk-secret-1" }).memoryUse?.summary).toBe("[REDACTED]");
   });
@@ -187,6 +198,10 @@ describe("buildReadingPlan", () => {
     const plan = buildReadingPlan({ question: "x", memorySummary: "note" });
     expect(plan.memoryUse?.used).toBe(true);
     expect(plan.internalPlan).toBeTruthy();
+  });
+  it("memory policy does not leak raw labels", () => {
+    const plan = buildReadingPlan({ question: "x", memoryInternalSummary: "Previous concern: Previous concern: career guidance." });
+    expect(plan.internalPlan?.memoryPolicy.join(" ")).not.toMatch(/Previous concern:/i);
   });
   it("leak phrases are absent from acknowledgement", () => {
     const plan = buildReadingPlan({ question: "x", concern: { topic: "career" } });

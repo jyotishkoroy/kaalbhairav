@@ -153,6 +153,31 @@ describe("renderReadingPlanFallback", () => {
     const text = renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, memorySummary: "Previous concern: career" }));
     expect(text).not.toContain("Previous concern:");
   });
+  it("blocks Preference raw label", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, memorySummary: "Preference: practical" }))).not.toContain("Preference:");
+  });
+  it("blocks Guidance already given raw label", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, memorySummary: "Guidance already given: keep calm" }))).not.toContain("Guidance already given:");
+  });
+  it("blocks duplicate previous concern labels", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, memorySummary: "Previous concern: Previous concern: career" }))).not.toMatch(/Previous concern:.*Previous concern:/i);
+  });
+  it("exact fact answers do not render memory", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "What is my Lagna?", concern: { mode: "exact_fact", topic: "career" }, memorySummary: "career memory" }))).not.toContain("career memory");
+  });
+  it("relationship prompt does not render career memory", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "relationship issue", concern: { topic: "relationship" }, memorySummary: "career memory" }))).not.toContain("career memory");
+  });
+  it("sleep remedy prompt does not render career memory", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "sleep remedy", concern: { topic: "sleep" }, memorySummary: "career memory" }))).not.toContain("career memory");
+  });
+  it("vague spiritual prompt does not render career memory", () => {
+    expect(renderReadingPlanFallback(buildReadingPlan({ question: "spiritual question", concern: { topic: "spirituality" }, memorySummary: "career memory" }))).not.toContain("career memory");
+  });
+  it("final rendered answer does not contain raw labels", () => {
+    const text = renderReadingPlanFallback(buildReadingPlan({ question: "Career", concern: { topic: "career" }, memorySummary: "Previous concern: Previous concern: Previous concern: Preference: Guidance already given:" }));
+    expect(text).not.toMatch(/Previous concern:|Preference:|Guidance already given:/i);
+  });
   it("blocks validator label", () => {
     const plan = toUserFacingAnswerPlan({
       internalPlan: {

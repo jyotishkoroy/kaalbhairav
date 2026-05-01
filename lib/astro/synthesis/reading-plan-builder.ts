@@ -1,11 +1,14 @@
 /*
-Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
-commercially use, train models on, scrape, or create derivative works from this
-repository or any part of it without prior written permission from Jyotishko Roy.
-*/
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
 
 import type { ReadingPlan, ReadingPlanBuilderInput, InternalReadingPlan } from "./reading-plan-types";
 import { applyReadingPlanSafetyPolicy, buildReadingPlanLimitations, determineReadingPlanMode, normalizeReadingPlanTopic, sanitizeReadingPlanText, shouldIncludeRemedies } from "./reading-plan-policy";
+import { decideCompanionMemoryUse } from "../memory/companion-memory-policy";
+import { redactCompanionMemoryForUserFacingText } from "../memory/companion-memory-redactor";
+import { isAstroMemoryRelevanceGateEnabled } from "../config/feature-flags";
 
 function topicLabel(topic: string): string {
   if (topic === "general") return "general";
@@ -169,6 +172,30 @@ export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
     memoryUse: input.memorySummary ? { used: true, summary: sanitizeReadingPlanText(input.memorySummary, 260), warnings: [] } : { used: false },
     internalPlan: buildInternalReadingPlan(),
   };
+  if (isAstroMemoryRelevanceGateEnabled() && (input.memorySummary || input.memoryInternalSummary)) {
+    const baseInternalPlan = plan.internalPlan ?? buildInternalReadingPlan();
+    const decision = decideCompanionMemoryUse({
+      memoryText: input.memorySummary ?? input.memoryInternalSummary ?? "",
+      memoryTopic: topic,
+      currentPrimaryIntent: mode,
+      currentSecondaryIntents: listening?.humanizationHints ?? [],
+      currentQuestion: question,
+      now: new Date(),
+    });
+    plan.memoryUse = decision.used && decision.userFacingSummary
+      ? { used: true, summary: sanitizeReadingPlanText(decision.userFacingSummary, 180), warnings: [] }
+      : { used: false, warnings: decision.blockedReason ? [decision.blockedReason] : [] };
+    plan.internalPlan = {
+      ...baseInternalPlan,
+      memoryPolicy: decision.internalOnlySummary ? [redactCompanionMemoryForUserFacingText(decision.internalOnlySummary)] : [],
+    };
+  } else if (input.memoryInternalSummary) {
+    const baseInternalPlan = plan.internalPlan ?? buildInternalReadingPlan();
+    plan.internalPlan = {
+      ...baseInternalPlan,
+      memoryPolicy: [redactCompanionMemoryForUserFacingText(input.memoryInternalSummary)],
+    };
+  }
   if (!plan.chartTruth.evidence.length && topic !== "safety") {
     plan.chartTruth.limitations = [...new Set([...plan.chartTruth.limitations, "No direct chart evidence was provided, so the plan must stay cautious and non-committal."])];
   }

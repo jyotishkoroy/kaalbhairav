@@ -1,8 +1,8 @@
 /*
-Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
-commercially use, train models on, scrape, or create derivative works from this
-repository or any part of it without prior written permission from Jyotishko Roy.
-*/
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
 
 import type { CompanionMemoryConfidence, CompanionMemoryDraft, CompanionMemoryTopic, CompanionMemoryType } from "./companion-memory-types";
 
@@ -42,6 +42,15 @@ export function redactCompanionMemoryText(value: string, maxLength = 280): strin
       .replace(/\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[:/]\d{1,2}[:/]\d{2,4})\b/g, "[redacted-date]"),
     maxLength,
   );
+}
+
+export function redactCompanionMemoryForUserFacingText(memoryText: string): string {
+  const compact = redactCompanionMemoryText(memoryText, 220)
+    .replace(/\b(?:previous concern|preference|guidance already given|memory|retrieved memory|companion memory|user memory)\s*:/gi, "")
+    .replace(/\b(?:previous concern)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return compact.slice(0, 180);
 }
 
 export function classifySensitiveMemoryReasons(value: string): string[] {

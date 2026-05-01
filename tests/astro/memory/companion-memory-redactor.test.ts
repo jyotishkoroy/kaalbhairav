@@ -11,6 +11,7 @@ import {
   normalizeMemoryConfidence,
   normalizeMemoryTopic,
   normalizeMemoryType,
+  redactCompanionMemoryForUserFacingText,
   redactCompanionMemoryText,
   sanitizeMemoryDraft,
 } from "@/lib/astro/memory";
@@ -32,6 +33,13 @@ describe("companion memory redactor", () => {
   it("detects raw birth data", () => expect(classifySensitiveMemoryReasons("born at 10:30 in Kolkata")).toContain("raw_birth_data"));
   it("detects secret", () => expect(classifySensitiveMemoryReasons("api key secret token")).toContain("secret_or_token"));
   it("detects sexual private content", () => expect(classifySensitiveMemoryReasons("sexual intimate detail")).toContain("sexual_private"));
+  it("redacts user-facing labels", () => expect(redactCompanionMemoryForUserFacingText("Previous concern: career guidance. Preference: practical.")).not.toMatch(/Previous concern|Preference/i));
+  it("redacts guidance label", () => expect(redactCompanionMemoryForUserFacingText("Guidance already given: keep calm")).not.toMatch(/Guidance already given/i));
+  it("redacts retrieved memory label", () => expect(redactCompanionMemoryForUserFacingText("Retrieved memory: career")).not.toMatch(/Retrieved memory/i));
+  it("redacts companion memory label", () => expect(redactCompanionMemoryForUserFacingText("Companion memory: career")).not.toMatch(/Companion memory/i));
+  it("redacts user memory label", () => expect(redactCompanionMemoryForUserFacingText("User memory: career")).not.toMatch(/User memory/i));
+  it("removes repeated previous concern labels", () => expect(redactCompanionMemoryForUserFacingText("Previous concern: Previous concern: career")).not.toMatch(/Previous concern/i));
+  it("keeps short natural phrasing", () => expect(redactCompanionMemoryForUserFacingText("Previous concern: career guidance")).toMatch(/career guidance/i));
   it("allows Vedic preference", () => expect(sanitizeMemoryDraft({ memoryType: "preference", topic: "spirituality", content: "User prefers Vedic astrology." })?.content).toContain("Vedic"));
   it("allows practical remedy preference", () => expect(sanitizeMemoryDraft({ memoryType: "preference", topic: "remedy", content: "User prefers practical remedies." })?.content).toContain("practical"));
   it("allows career recognition recurring concern", () => expect(sanitizeMemoryDraft({ memoryType: "recurring_concern", topic: "career", content: "Career recognition delay." })?.content).toContain("Career"));
