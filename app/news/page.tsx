@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import { createClient } from '@/lib/supabase/server'
@@ -19,7 +19,8 @@ export default async function NewsPage() {
     .from('news_posts')
     .select('id, slug, title, excerpt, topic, source_name, published_at')
     .eq('status', 'published')
-    .order('published_at', { ascending: false })
+    .order('published_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false, nullsFirst: false })
     .limit(50)
 
   return (
@@ -37,10 +38,14 @@ export default async function NewsPage() {
             <div className="text-xs uppercase tracking-widest text-orange-400">{post.topic || 'other'}</div>
             <h2 className="mt-2 text-2xl">{post.title}</h2>
             {post.excerpt && <p className="mt-2 text-sm text-white/70">{post.excerpt}</p>}
-            <div className="mt-3 text-xs text-white/40">Source: {post.source_name}</div>
+            <div className="mt-3 text-xs text-white/40">
+              <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-IN') : 'Unpublished date'}</span>
+              <span className="mx-2">•</span>
+              <span>Source: {post.source_name || 'Unknown'}</span>
+            </div>
           </Link>
         ))}
-        {!posts?.length && <div className="rounded-xl border border-white/10 p-8 text-white/50">No news posts yet.</div>}
+        {!posts?.length && <div className="rounded-xl border border-white/10 p-8 text-white/50">No published news posts yet.</div>}
       </div>
     </main>
   )

@@ -1,7 +1,7 @@
 /**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import { createClient } from '@/lib/supabase/server'
@@ -25,7 +25,7 @@ export default async function NewsPostPage({ params }: Props) {
     .select('id, slug, title, body, topic, source_name, original_url, source_type')
     .eq('slug', slug)
     .eq('status', 'published')
-    .single()
+    .maybeSingle()
 
   if (!post) notFound()
 
@@ -44,7 +44,12 @@ export default async function NewsPostPage({ params }: Props) {
       <div className="mt-6 text-xs uppercase tracking-widest text-orange-400">{post.topic}</div>
       <h1 className="mt-2 text-4xl font-semibold">{post.title}</h1>
       <div className="mt-6 whitespace-pre-wrap text-white/80 leading-7">{post.body}</div>
-      <div className="mt-3 text-xs text-white/40">Source: <a href={post.original_url} target="_blank" rel="noopener noreferrer" className="underline">{post.source_name}</a></div>
+      <div className="mt-3 text-xs text-white/40">
+        Source:{' '}
+        <a href={post.original_url} target="_blank" rel="noopener noreferrer" className="underline">
+          {post.source_name || 'Original source'}
+        </a>
+      </div>
       <NewsInteractions postId={post.id} slug={post.slug} shareUrl={shareUrl} initiallyLiked={Boolean(liked)} />
     </main>
   )

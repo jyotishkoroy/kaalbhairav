@@ -14,6 +14,7 @@ import { buildExcerpt, canonicalizeUrl, normalizeBodyParts } from './normalize'
 import { contentHash, titleHash, isDuplicateNewsPost } from './dedupe'
 import { getKolkataDate } from './kolkata'
 import { selectSourceQueue } from './select-random-source'
+import { isProbablyEnglishText } from './language'
 import type { NewsIngestRunResult, NewsSourceCandidate, NewsSourceConfig } from './types'
 
 type SupabaseLike = {
@@ -103,6 +104,10 @@ export async function ingestNews({
 
       const topic = classifyTopic(candidate.title, candidate.description, source.topicHints)
       const normalizedBody = normalizeBodyParts(candidate.title, candidate.description, topic)
+      if (![candidate.title, candidate.description, normalizedBody].every(isProbablyEnglishText)) {
+        errors.push({ source: source.key, error: 'rejected_non_english_content' })
+        continue
+      }
       const tHash = titleHash(candidate.title)
       const cHash = contentHash(candidate.title, normalizedBody)
       const duplicate = isDuplicateNewsPost({

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -17,5 +23,9 @@ describe('news auth redirect', () => {
   it('redirects logged-out users from /news', async () => {
     const { default: NewsPage } = await import('@/app/news/page')
     await expect(NewsPage()).rejects.toThrow('redirect')
+  })
+  it('redirects logged-out users from /news/[slug]', async () => {
+    const { default: NewsPostPage } = await import('@/app/news/[slug]/page')
+    await expect(NewsPostPage({ params: Promise.resolve({ slug: 'missing' }) } as never)).rejects.toThrow('redirect')
   })
 })
