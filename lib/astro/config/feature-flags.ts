@@ -10,6 +10,7 @@ export type AstroFeatureFlags = {
   remediesEnabled: boolean
   monthlyEnabled: boolean
   voiceEnabled: boolean
+  userFacingPlanEnabled: boolean
 }
 
 function readBooleanEnv(value: string | undefined, defaultValue = false): boolean {
@@ -31,9 +32,14 @@ export function getAstroFeatureFlags(): AstroFeatureFlags {
     remediesEnabled: readBooleanEnv(process.env.ASTRO_REMEDIES_ENABLED),
     monthlyEnabled: readBooleanEnv(process.env.ASTRO_MONTHLY_ENABLED),
     voiceEnabled: readBooleanEnv(process.env.ASTRO_VOICE_ENABLED),
+    userFacingPlanEnabled: readBooleanEnv(process.env.ASTRO_USER_FACING_PLAN_ENABLED),
   }
 }
 
 export function isAstroReadingV2Enabled(): boolean {
   return getAstroFeatureFlags().readingV2Enabled
+}
+
+export function isAstroUserFacingPlanEnabled(): boolean {
+  return getAstroFeatureFlags().userFacingPlanEnabled
 }

@@ -4,7 +4,7 @@ commercially use, train models on, scrape, or create derivative works from this
 repository or any part of it without prior written permission from Jyotishko Roy.
 */
 
-import type { ReadingPlan, ReadingPlanBuilderInput } from "./reading-plan-types";
+import type { ReadingPlan, ReadingPlanBuilderInput, InternalReadingPlan } from "./reading-plan-types";
 import { applyReadingPlanSafetyPolicy, buildReadingPlanLimitations, determineReadingPlanMode, normalizeReadingPlanTopic, sanitizeReadingPlanText, shouldIncludeRemedies } from "./reading-plan-policy";
 
 function topicLabel(topic: string): string {
@@ -105,6 +105,30 @@ function buildReassurance(topic: string, mode: ReadingPlan["mode"]): ReadingPlan
   return { closingLine: "I’ll keep the reading grounded and avoid pretending certainty where it does not exist.", avoidFalseCertainty: true };
 }
 
+function pruneRepeatedSentenceFragments(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const line of lines) {
+    const normalized = sanitizeReadingPlanText(line, 260).replace(/\s+/g, " ").trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(normalized);
+  }
+  return output;
+}
+
+function buildInternalReadingPlan(): InternalReadingPlan {
+  return {
+    internalGuidance: [],
+    validatorHints: [],
+    safetyPolicy: [],
+    evidencePolicy: [],
+    memoryPolicy: [],
+  };
+}
+
 export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
   const question = sanitizeReadingPlanText(input.question, 240);
   const topic = normalizeReadingPlanTopic(input.listening?.topic ?? input.concern?.topic ?? question);
@@ -143,6 +167,7 @@ export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
       reason: "The question is too broad or missing context for a deeper reading.",
     } : undefined,
     memoryUse: input.memorySummary ? { used: true, summary: sanitizeReadingPlanText(input.memorySummary, 260), warnings: [] } : { used: false },
+    internalPlan: buildInternalReadingPlan(),
   };
   if (!plan.chartTruth.evidence.length && topic !== "safety") {
     plan.chartTruth.limitations = [...new Set([...plan.chartTruth.limitations, "No direct chart evidence was provided, so the plan must stay cautious and non-committal."])];
@@ -167,5 +192,8 @@ export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
     plan.practicalGuidance = ["Focus on safety and immediate support rather than prediction."];
     plan.remedies.include = false;
   }
+  plan.livedExperience = pruneRepeatedSentenceFragments(plan.livedExperience);
+  plan.practicalGuidance = pruneRepeatedSentenceFragments(plan.practicalGuidance);
+  plan.safetyBoundaries = pruneRepeatedSentenceFragments(plan.safetyBoundaries);
   return applyReadingPlanSafetyPolicy(plan, input);
 }

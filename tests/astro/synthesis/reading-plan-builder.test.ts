@@ -140,4 +140,60 @@ describe("buildReadingPlan", () => {
   it("no remedy guarantee appears", () => {
     expect(buildReadingPlan({ question: "x", remedyContext: { remedyRequested: true, safeRemediesAvailable: true } }).remedies.include).toBe(true);
   });
+  it("internal plan exists and stays separate", () => {
+    expect(buildReadingPlan({ question: "x" }).internalPlan?.internalGuidance).toEqual([]);
+  });
+  it("internal guidance can exist without affecting renderable fields", () => {
+    const plan = buildReadingPlan({ question: "x" });
+    expect(plan.internalPlan?.validatorHints).toEqual([]);
+    expect(plan.acknowledgement.openingLine).toContain("listening");
+  });
+  it("internal policy arrays default to empty", () => {
+    const plan = buildReadingPlan({ question: "x" });
+    expect(plan.internalPlan?.safetyPolicy).toEqual([]);
+    expect(plan.internalPlan?.evidencePolicy).toEqual([]);
+    expect(plan.internalPlan?.memoryPolicy).toEqual([]);
+  });
+  it("does not inject forbidden internal labels into plan text", () => {
+    const plan = buildReadingPlan({ question: "x", memorySummary: "Previous concern: internal" });
+    const text = [
+      plan.acknowledgement.emotionalContext,
+      plan.acknowledgement.userNeed,
+      plan.acknowledgement.openingLine,
+      plan.chartTruth.limitations.join(" "),
+      plan.livedExperience.join(" "),
+      plan.practicalGuidance.join(" "),
+      plan.reassurance.closingLine,
+      plan.memoryUse?.summary ?? "",
+    ].join(" ");
+    expect(text).not.toMatch(/validator|metadata|chart basis|key anchors|suggested follow-up/i);
+  });
+  it("exact fact mode trims practical guidance", () => {
+    expect(buildReadingPlan({ question: "x", concern: { mode: "exact_fact" } }).practicalGuidance).toHaveLength(1);
+  });
+  it("follow-up mode always includes a follow-up question", () => {
+    expect(buildReadingPlan({ question: "What will happen?" }).followUp?.question).toBeTruthy();
+  });
+  it("safety topic clears remedies", () => {
+    expect(buildReadingPlan({ question: "When will I die?", concern: { safetyRisks: ["death_lifespan"] } }).remedies.include).toBe(false);
+  });
+  it("topic defaults remain stable for unknown questions", () => {
+    expect(buildReadingPlan({ question: "Something obscure" }).topic).toBe("general");
+  });
+  it("chart anchor sanitization drops url fragments", () => {
+    expect(buildReadingPlan({ question: "x", chartAnchors: ["https://example.com/anchor"] }).chartTruth.chartAnchors.join(" ")).not.toContain("http");
+  });
+  it("memory summary is still tracked separately from internal guidance", () => {
+    const plan = buildReadingPlan({ question: "x", memorySummary: "note" });
+    expect(plan.memoryUse?.used).toBe(true);
+    expect(plan.internalPlan).toBeTruthy();
+  });
+  it("leak phrases are absent from acknowledgement", () => {
+    const plan = buildReadingPlan({ question: "x", concern: { topic: "career" } });
+    expect(plan.acknowledgement.openingLine).not.toMatch(/chart basis|key anchors|suggested follow-up|previous concern/i);
+  });
+  it("career plan remains grounded and compact", () => {
+    const plan = buildReadingPlan({ question: "promotion", concern: { topic: "career" } });
+    expect(plan.practicalGuidance.join(" ")).toContain("next step");
+  });
 });

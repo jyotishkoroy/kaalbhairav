@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { getAstroFeatureFlags, isAstroReadingV2Enabled } from '@/lib/astro/config/feature-flags'
+import { getAstroFeatureFlags, isAstroReadingV2Enabled, isAstroUserFacingPlanEnabled } from '@/lib/astro/config/feature-flags'
 
 const originalEnv = { ...process.env }
 
@@ -21,6 +21,7 @@ describe('astro feature flags', () => {
     expect(isAstroReadingV2Enabled()).toBe(false)
     expect(getAstroFeatureFlags().readingV2Enabled).toBe(false)
     expect(getAstroFeatureFlags().remediesEnabled).toBe(false)
+    expect(isAstroUserFacingPlanEnabled()).toBe(false)
   })
 
   it('defaults remedies to false', () => {
@@ -51,5 +52,17 @@ describe('astro feature flags', () => {
     process.env.ASTRO_READING_V2_ENABLED = value
 
     expect(isAstroReadingV2Enabled()).toBe(expected)
+  })
+
+  it.each([
+    ['true', true],
+    ['1', true],
+    ['false', false],
+    ['0', false],
+    ['maybe', false],
+  ])('parses ASTRO_USER_FACING_PLAN_ENABLED %s as %s', (value, expected) => {
+    process.env.ASTRO_USER_FACING_PLAN_ENABLED = value
+
+    expect(isAstroUserFacingPlanEnabled()).toBe(expected)
   })
 })

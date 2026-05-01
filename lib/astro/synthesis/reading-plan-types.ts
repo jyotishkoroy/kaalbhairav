@@ -45,6 +45,38 @@ export type ReadingPlanValidationResult = {
   errors: string[];
   warnings: string[];
 };
+
+export type InternalReadingPlan = {
+  questionFrame?: import("../rag/question-frame-types").QuestionFrame;
+  intent?: import("../rag/structured-intent-types").StructuredIntent;
+  internalGuidance: string[];
+  validatorHints: string[];
+  safetyPolicy: import("../rag/safety-intent-types").SafetyDecision[];
+  evidencePolicy: string[];
+  memoryPolicy: string[];
+};
+
+export type UserFacingAnswerSectionKind =
+  | "direct_answer"
+  | "chart_anchor"
+  | "interpretation"
+  | "practical_guidance"
+  | "remedy"
+  | "boundary"
+  | "follow_up"
+  | "reassurance";
+
+export type UserFacingAnswerSection = {
+  kind: UserFacingAnswerSectionKind;
+  text: string;
+};
+
+export type UserFacingAnswerPlan = {
+  acknowledgement?: string;
+  answerSections: UserFacingAnswerSection[];
+  forbiddenRenderLabels: string[];
+};
+
 export type ReadingPlan = {
   question: string;
   topic: string;
@@ -103,4 +135,5 @@ export type ReadingPlan = {
     summary?: string;
     warnings?: string[];
   };
+  internalPlan?: InternalReadingPlan;
 };
