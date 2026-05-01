@@ -162,6 +162,42 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.llmRefinerUsed).toBe(false)
   })
 
+  it('forces Mahadasha exact facts through the deterministic path', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Which Mahadasha am I running now?',
+        message: 'Which Mahadasha am I running now?',
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).toContain('Jupiter Mahadasha')
+    expect(answer).toContain('22 Aug 2018')
+    expect(answer).toContain('22 Aug 2034')
+    expect(result.meta?.exactFactAnswered).toBe(true)
+    expect(result.meta?.llmRefinerUsed).toBe(false)
+  })
+
+  it('answers antardasha around 2026 deterministically', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Which Antardasha should be active around 2026 according to my report?',
+        message: 'Which Antardasha should be active around 2026 according to my report?',
+        mode: 'exact_fact' as never,
+      }),
+    )
+
+    const answer = String(result.answer ?? '')
+
+    expect(answer).toContain('Jupiter/Ketu')
+    expect(answer).toContain('28 Jul 2025')
+    expect(answer).toContain('04 Jul 2026')
+    expect(answer).toContain('Jupiter/Venus')
+    expect(answer).toContain('04 Mar 2029')
+    expect(result.meta?.exactFactAnswered).toBe(true)
+  })
+
   it('does not throw when evidence is sparse', async () => {
     const result = await generateReadingV2(
       makeInput({

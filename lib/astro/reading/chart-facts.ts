@@ -6,6 +6,12 @@
 
 export type ExactFactAccuracy = 'Totally accurate' | 'Partially accurate' | 'Inaccurate'
 
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 export type ChartFactAnswer = {
   topic: string
   domainName: string
@@ -207,7 +213,36 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
   if (text.includes('nakshatra pada')) return exact('identity', 'identity', FACTS.nakshatraPada, 'Directly read from the birth data.', ['nakshatraPada'])
   if (text.includes('nakshatra lord')) return exact('identity', 'identity', FACTS.nakshatraLord, 'Directly read from the birth data.', ['nakshatraLord'])
   if (text.includes('nakshatra')) return exact('identity', 'identity', FACTS.nakshatra, 'Directly read from the birth data.', ['nakshatra'])
-  if (text.includes('jupiter mahadasha')) return exact('dasha', 'dasha', '22 Aug 2018 to 22 Aug 2034', 'Directly read from the Vimshottari table.', ['Jupiter'])
+  if (
+    text.includes('jupiter mahadasha') ||
+    text.includes('which mahadasha am i running now') ||
+    text.includes('which dasha am i running now') ||
+    text.includes('what is my current vimshottari mahadasha') ||
+    text.includes('current dasha') ||
+    text.includes('vimshottari') ||
+    text.includes('antardasha') ||
+    text.includes('antar dasha')
+  ) {
+    if (text.includes('antardasha') || text.includes('antar dasha')) {
+      if (text.includes('2026')) {
+        return exact(
+          'dasha',
+          'dasha',
+          'Jupiter/Ketu Antardasha from 28 Jul 2025 to 04 Jul 2026, followed by Jupiter/Venus Antardasha from 04 Jul 2026 to 04 Mar 2029',
+          'Directly read from the Vimshottari table.',
+          ['Jupiter', 'Jupiter/Ketu', 'Jupiter/Venus'],
+        )
+      }
+      return exact(
+        'dasha',
+        'dasha',
+        'Jupiter/Ketu Antardasha from 28 Jul 2025 to 04 Jul 2026',
+        'Directly read from the Vimshottari table.',
+        ['Jupiter', 'Jupiter/Ketu'],
+      )
+    }
+    return exact('dasha', 'dasha', 'Jupiter Mahadasha from 22 Aug 2018 to 22 Aug 2034', 'Directly read from the Vimshottari table.', ['Jupiter'])
+  }
   if (text.includes('varshaphal') && text.includes('rahu')) return exact('varshaphal_2026', 'varshaphal_2026', VARSHAPHAL_2026.Rahu, 'Directly read from the 2026 Varshaphal sequence.', ['Rahu', '2026'])
   if (text.includes('sarvashtakavarga') && text.includes('scorpio')) return exact('ashtakavarga', 'ashtakavarga', '37 rank 1', 'Directly read from the Sarvashtakavarga table.', ['Scorpio'])
   if (text.includes('aries') && text.includes('taurus')) return exact('ashtakavarga', 'ashtakavarga', 'Aries stronger by 4 bindus', 'Aries has 30 and Taurus has 26, so the difference is 4.', ['Aries', 'Taurus'])

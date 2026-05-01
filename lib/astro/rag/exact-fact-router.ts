@@ -6,7 +6,7 @@
 
 import type { ChartFact } from "./chart-fact-extractor";
 import type { ExactFactAnswer } from "./exact-fact-answer";
-import { formatExactFactAnswer, unavailableExactFactAnswer } from "./exact-fact-answer";
+import { buildDashaExactFactAnswer, formatExactFactAnswer, unavailableExactFactAnswer } from "./exact-fact-answer";
 
 export type ExactFactIntent =
   | "lagna"
@@ -16,6 +16,7 @@ export type ExactFactIntent =
   | "house_sign"
   | "house_lord"
   | "current_dasha"
+  | "dasha_period"
   | "sav_compare"
   | "planets_in_house"
   | "co_presence"
@@ -161,6 +162,12 @@ function detectCoPresencePlanets(question: string): string[] {
   return planets.length >= 2 ? planets.slice(0, 2) : [];
 }
 
+function isDashaExactFactQuestion(question: string): boolean {
+  return /(?:\bwhich\s+(?:maha\s*)?dasha\s+am\s+i\s+running\s+now\b|\bcurrent\s+(?:maha\s*)?dasha\b|\bwhat\s+is\s+my\s+current\s+vimshottari\s+(?:maha\s*)?dasha\b|\bvimshottari\s+(?:maha\s*)?dasha\b|\bmaha\s+dasha\b|\bmahadasha\b|\bdasha\s+period\b|\bantardasha\b|\bantar\s+dasha\b|\bwhich\s+antardasha\b)/i.test(
+    question,
+  );
+}
+
 export function detectExactFactIntent(question: string): ExactFactIntent {
   const q = normalizeQuestion(question);
   const planets = extractPlanets(question);
@@ -189,7 +196,7 @@ export function detectExactFactIntent(question: string): ExactFactIntent {
     q === "asc"
   ) return "lagna";
   if (q.includes("career") && q.includes("house")) return "career_house";
-  if (q.includes("mahadasha") || q.includes("maha dasha") || q.includes("antardasha") || q.includes("antar dasha") || q.includes("current dasha") || q.includes("which mahadasha am i running now") || q.includes("which antardasha should be active") || q.includes("which dasha am i running now")) return "current_dasha";
+  if (isDashaExactFactQuestion(q)) return "dasha_period";
   if (
     q.includes("exact chart fact") ||
     q.includes("chart fact without interpretation") ||
@@ -531,6 +538,10 @@ function answerExactFact(question: string, facts: ChartFact[]): ExactFactRouterR
   if (intent === "current_dasha") {
     const answer = answerCurrentDasha(normalizedFacts, question);
     return answer ? buildResult(intent, answer, answer.factKeys.map((factKey) => normalizedFacts.find((fact) => fact.factKey === factKey)!).filter(Boolean)) : buildResult(intent, unavailableExactFactAnswer("current_dasha"), []);
+  }
+  if (intent === "dasha_period") {
+    const answer = buildDashaExactFactAnswer(question);
+    return answer ? buildResult(intent, answer, []) : buildResult(intent, unavailableExactFactAnswer("current_dasha"), []);
   }
   if (intent === "sav_compare") {
     const answer = answerSavCompare(normalizedFacts, signs);

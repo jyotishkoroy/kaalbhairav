@@ -1,5 +1,11 @@
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import { describe, expect, it } from "vitest";
-import { formatExactFactAnswer, unavailableExactFactAnswer } from "../../../lib/astro/rag/exact-fact-answer";
+import { buildDashaExactFactAnswer, formatExactFactAnswer, unavailableExactFactAnswer } from "../../../lib/astro/rag/exact-fact-answer";
 
 describe("exact fact answer formatting", () => {
   it("formats answered facts", () => {
@@ -43,5 +49,19 @@ describe("exact fact answer formatting", () => {
       factKeys: [],
     });
     expect(formatted).not.toContain("|");
+  });
+
+  it("builds deterministic dasha answers", () => {
+    const maha = buildDashaExactFactAnswer("Which Mahadasha am I running now?");
+    expect(maha?.directAnswer).toContain("Jupiter Mahadasha");
+    expect(maha?.directAnswer).toContain("22 Aug 2018");
+    expect(maha?.directAnswer).toContain("22 Aug 2034");
+
+    const antardasha2026 = buildDashaExactFactAnswer("Which Antardasha should be active around 2026 according to my report?");
+    expect(antardasha2026?.directAnswer).toContain("Jupiter/Ketu");
+    expect(antardasha2026?.directAnswer).toContain("28 Jul 2025");
+    expect(antardasha2026?.directAnswer).toContain("04 Jul 2026");
+    expect(antardasha2026?.directAnswer).toContain("Jupiter/Venus");
+    expect(antardasha2026?.directAnswer).toContain("04 Mar 2029");
   });
 });
