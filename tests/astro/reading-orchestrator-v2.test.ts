@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 /**
  * Copyright (c) 2026 Jyotishko Roy.
  * Proprietary and confidential. All rights reserved.
@@ -91,6 +97,35 @@ describe('Reading Orchestrator V2', () => {
 
     expect(result.meta?.language).toBe('bengali')
     expect(String(result.answer ?? '').length).toBeGreaterThan(50)
+  })
+
+  it('preserves the old answer path when structured flags are off', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'What is my Lagna?',
+      }),
+    )
+
+    expect(result.meta?.structuredPipelineVersion).toBeUndefined()
+    expect(result.meta?.questionFrameUsed).toBeUndefined()
+    expect(result.meta?.structuredRoutingUsed).toBeUndefined()
+  })
+
+  it('uses the structured pipeline metadata when structured flags are enabled', async () => {
+    process.env.ASTRO_USER_FACING_PLAN_ENABLED = 'true'
+    process.env.ASTRO_FINAL_ANSWER_QUALITY_GATE_ENABLED = 'true'
+    process.env.ASTRO_DOMAIN_AWARE_EVIDENCE_ENABLED = 'true'
+
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'I am working hard and not getting promotion.',
+      }),
+    )
+
+    expect(result.meta?.structuredPipelineVersion).toBe('phase8')
+    expect(result.meta?.questionFrameUsed).toBe(true)
+    expect(result.meta?.structuredRoutingUsed).toBe(true)
+    expect(result.meta?.finalQualityPassed).toBe(true)
   })
 
   it('uses message when question is missing', async () => {
@@ -221,7 +256,7 @@ describe('Reading Orchestrator V2', () => {
 
     expect(second.meta?.memoryLayer).toBe('enabled_phase_7')
     expect(second.meta?.memorySummaryUsed).toBe(true)
-    expect(String(second.answer ?? '')).toContain('Previous concern')
+    expect(String(second.answer ?? '')).toContain('Earlier context')
   })
 
   it('skips memory gracefully when userId is missing', async () => {

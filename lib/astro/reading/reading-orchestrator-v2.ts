@@ -1,7 +1,16 @@
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import { getAstroFeatureFlags } from '@/lib/astro/config/feature-flags'
 import { buildAstroEvidence } from '@/lib/astro/interpretation'
 import { generateMonthlyGuidance, renderMonthlyGuidance } from '@/lib/astro/monthly'
 import { interpretRemedies } from '@/lib/astro/interpretation/remedies'
+import { selectDomainEvidence } from '@/lib/astro/evidence/domain-evidence-selector'
+import { decideCompanionMemoryUse } from '@/lib/astro/memory/companion-memory-policy'
+import { getAstroRagFlags } from '@/lib/astro/rag/feature-flags'
 import {
   buildMemorySummary,
   extractGuidanceForMemory,
@@ -21,6 +30,11 @@ import { getLLMProviderConfig, getLLMRefinerConfig } from '@/lib/llm/config'
 import { refineReadingWithSafeLLM } from '@/lib/astro/reading/local-ai-refiner'
 import { getChartProfileForTopic } from '@/lib/astro/reading/chart-anchors'
 import { answerExactChartFact } from '@/lib/astro/reading/chart-facts'
+import { parseQuestionFrame } from '@/lib/astro/rag/question-frame-parser'
+import { routeStructuredIntent } from '@/lib/astro/rag/structured-intent-router'
+import { classifySafetyIntent } from '@/lib/astro/rag/safety-intent-classifier'
+import { buildReadingPlan, renderReadingPlanFallback, renderUserFacingAnswerPlan, toUserFacingAnswerPlan } from '@/lib/astro/synthesis'
+import { validateFinalAnswerQuality } from '@/lib/astro/validation/final-answer-quality-validator'
 import type {
   AstrologyReadingInput,
   AstrologyReadingResult,
@@ -258,6 +272,24 @@ export async function generateReadingV2(
     const v2Input = toReadingV2Input(input)
     const concern = classifyUserConcern(v2Input.question)
     const flags = getAstroFeatureFlags()
+    const structuredFlagsEnabled =
+      flags.userFacingPlanEnabled ||
+      flags.finalAnswerQualityGateEnabled ||
+      flags.domainAwareEvidenceEnabled ||
+      flags.memoryRelevanceGateEnabled ||
+      getAstroRagFlags().gradedSafetyActionsEnabled
+    const questionFrame = structuredFlagsEnabled ? parseQuestionFrame(v2Input.question) : undefined
+    const structuredIntent = structuredFlagsEnabled
+      ? routeStructuredIntent({ rawQuestion: v2Input.question, questionFrame })
+      : undefined
+    const safetyDecisions = structuredFlagsEnabled
+      ? classifySafetyIntent({
+          rawQuestion: v2Input.question,
+          coreQuestion: questionFrame?.coreQuestion ?? v2Input.question,
+          questionFrame,
+          structuredIntent,
+        })
+      : []
     const memoryEnabled = flags.memoryEnabled
     const remediesEnabled = flags.remediesEnabled
     const monthlyEnabled = flags.monthlyEnabled
@@ -269,7 +301,11 @@ export async function generateReadingV2(
     const dasha = getDashaSource(input)
     const transits = getTransitSource(input)
     const mode = selectReadingMode(concern)
-    const exactFact = answerExactChartFact(v2Input.question)
+    const exactFactQuestion =
+      structuredIntent?.primaryIntent === 'exact_fact' && questionFrame?.coreQuestion
+        ? questionFrame.coreQuestion
+        : v2Input.question
+    const exactFact = answerExactChartFact(exactFactQuestion)
     if (exactFact) {
       const exactAnswer = [
         `Direct answer:\n${exactFact.answer}`,
@@ -341,6 +377,41 @@ export async function generateReadingV2(
     } else {
       evidence = evidence.filter((item) => item.topic !== 'remedy')
     }
+    const domainEvidenceSelection =
+      structuredIntent && flags.domainAwareEvidenceEnabled
+        ? selectDomainEvidence({
+            intent: structuredIntent,
+            availableAnchors: evidence.map((item, index) => ({
+              id: item.id ?? `evidence-${index}`,
+              domain:
+                concern.topic === 'money'
+                  ? 'money'
+                  : concern.topic === 'relationship'
+                    ? 'relationship'
+                    : concern.topic === 'marriage'
+                      ? 'marriage'
+                      : concern.topic === 'career'
+                        ? 'career'
+                        : concern.topic === 'remedy'
+                          ? 'remedy'
+                          : concern.topic === 'health'
+                            ? 'health_adjacent'
+                            : concern.topic === 'family'
+                              ? 'family'
+                              : concern.topic === 'education'
+                                ? 'education'
+                                : concern.topic === 'foreign'
+                                  ? 'foreign_settlement'
+                                  : 'general',
+              text: `${item.factor}: ${item.humanMeaning}`,
+              deterministic: true,
+              relevanceScore: item.confidence === 'high' ? 3 : item.confidence === 'medium' ? 2 : 1,
+              source: item.visibleToUser ? 'chart' : 'manual',
+            })),
+            maxAnchors: 6,
+            requireQuestionRelevance: true,
+          })
+        : undefined
     const remedyEvidenceIncluded = evidence.some((item) => item.topic === 'remedy')
     const language = detectPreferredLanguage(v2Input.question)
     const memoryContext: {
@@ -353,8 +424,20 @@ export async function generateReadingV2(
       })) ?? {}
     const memorySummary =
       typeof memoryContext.summary === 'string' ? memoryContext.summary : undefined
+    const memoryDecision =
+      flags.memoryRelevanceGateEnabled && memorySummary
+        ? decideCompanionMemoryUse({
+            memoryText: memorySummary,
+            memoryTopic: memoryContext.topic ?? concern.topic,
+            currentPrimaryIntent: structuredIntent?.primaryIntent ?? concern.topic,
+            currentSecondaryIntents: structuredIntent?.secondaryIntents,
+            currentQuestion: questionFrame?.coreQuestion ?? v2Input.question,
+          })
+        : undefined
     const shouldIncludeMemory =
-      Boolean(memorySummary) && memoryContext.topic === concern.topic
+      Boolean(memorySummary) &&
+      memoryContext.topic === concern.topic &&
+      (memoryDecision?.used ?? true)
     const shouldIncludeMonthlyGuidance =
       monthlyEnabled && hasExplicitMonthlyIntent(v2Input.question, mode)
     const llmConfig = getLLMProviderConfig()
@@ -417,18 +500,69 @@ export async function generateReadingV2(
         concern,
       })
     }
+    const internalPlan = buildReadingPlan({
+      question: v2Input.question,
+      structuredIntent,
+      concern: {
+        topic: concern.topic,
+        mode:
+          structuredIntent?.mode ??
+          (concern.questionType === 'timing'
+            ? 'timing'
+            : concern.topic === 'remedy'
+              ? 'remedy'
+              : concern.topic === 'death' || concern.topic === 'legal'
+                ? 'safety'
+                : 'interpretive'),
+        safetyRisks: safetyDecisions.map((item) => item.risk),
+      },
+      evidence: evidence.map((item) => ({
+        id: item.id,
+        label: item.factor,
+        explanation: item.humanMeaning,
+        confidence: item.confidence,
+        source: 'chart',
+      })),
+      chartAnchors: domainEvidenceSelection?.selectedAnchors.map((anchor) => anchor.text) ?? chartProfile?.mustUseAnchors ?? [],
+      memorySummary: shouldIncludeMemory ? memorySummary : undefined,
+      memoryInternalSummary: memoryDecision?.internalOnlySummary ?? undefined,
+      safetyRestrictions: safetyDecisions.map((item) => `${item.action}:${item.reason}`),
+    })
+    const renderedAnswer = flags.userFacingPlanEnabled
+      ? renderUserFacingAnswerPlan(toUserFacingAnswerPlan(internalPlan))
+      : renderReadingPlanFallback(internalPlan)
+    const quality = flags.finalAnswerQualityGateEnabled
+      ? validateFinalAnswerQuality({
+          answerText: renderedAnswer,
+          rawQuestion: v2Input.question,
+          coreQuestion: questionFrame?.coreQuestion ?? v2Input.question,
+          mode: structuredIntent?.mode ?? mode,
+          primaryIntent: structuredIntent?.primaryIntent,
+          secondaryIntents: structuredIntent?.secondaryIntents,
+          exactFactExpected: structuredIntent?.primaryIntent === 'exact_fact',
+          expectedDomain: structuredIntent?.primaryIntent,
+          metadata: {
+            structuredPipelineVersion: 'phase8',
+          },
+        })
+      : { allowed: true, failures: [] as never[] }
+    const finalAnswer = structuredFlagsEnabled
+      ? quality.allowed
+        ? renderedAnswer
+        : renderReadingPlanFallback(internalPlan)
+      : finalSafety.answer
     await saveOptionalMemory({
       enabled: memoryEnabled,
       userId,
       topic: concern.topic,
       question: v2Input.question,
-      answer: finalSafety.answer,
+      answer: finalAnswer,
       emotionalTone: concern.emotionalTone,
       birthDetails: input.birthDetails,
     })
 
     return {
-      answer: finalSafety.answer,
+      answer: finalAnswer,
       meta: {
         ...result.meta,
         version: 'v2',
@@ -470,6 +604,13 @@ export async function generateReadingV2(
         llmRefinerUsed,
         llmRefinerFallback,
         llmModel,
+        structuredPipelineVersion: 'phase8',
+        questionFrameUsed: Boolean(questionFrame),
+        structuredRoutingUsed: Boolean(structuredIntent),
+        memoryUsed: Boolean(shouldIncludeMemory),
+        evidenceDomain: domainEvidenceSelection?.primaryDomain,
+        finalQualityPassed: quality.allowed,
+        safetyAction: safetyDecisions.map((item) => item.action),
         followUpQuestion:
           concern.topic === 'career'
             ? 'Which part matters most: role, boss, visibility, or income?'
