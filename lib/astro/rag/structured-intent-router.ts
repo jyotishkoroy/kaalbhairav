@@ -4,9 +4,9 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
-import { parseQuestionFrame } from "./question-frame-parser";
-import type { QuestionFrame } from "./question-frame-types";
-import type { StructuredIntent, StructuredIntentInput } from "./structured-intent-types";
+import { parseQuestionFrame } from "./question-frame-parser.ts";
+import type { QuestionFrame } from "./question-frame-types.ts";
+import type { StructuredIntent, StructuredIntentInput } from "./structured-intent-types.ts";
 
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[\u2018\u2019\u201c\u201d]/g, "'").replace(/\s+/g, " ").trim();

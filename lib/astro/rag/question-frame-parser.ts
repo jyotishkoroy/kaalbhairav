@@ -9,7 +9,7 @@ import type {
   QuestionNegativeSafetyConstraint,
   QuestionRequestedStyle,
   QuestionSituationContext,
-} from "./question-frame-types";
+} from "./question-frame-types.ts";
 
 type FrameToken = {
   suffix: string;
