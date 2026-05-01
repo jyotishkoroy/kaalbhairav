@@ -32,7 +32,7 @@ const remainingFailureCases = [
   {
     prompt: "Can astrology guarantee profit in business?",
     domain: "business",
-    expectedIncludes: ["Astrology cannot make business profit safe or guaranteed"],
+    expectedIncludes: ["Astrology cannot guarantee business profit"],
   },
   {
     prompt: "Should I trust a risky financial opportunity because of my chart?",
@@ -62,7 +62,7 @@ const remainingFailureCases = [
   {
     prompt: "Can you guarantee business profit this year?",
     domain: "business",
-    expectedIncludes: ["Astrology cannot make business profit safe or guaranteed"],
+    expectedIncludes: ["Astrology cannot guarantee business profit"],
   },
   {
     prompt: "Is foreign settlement guaranteed?",
@@ -72,7 +72,7 @@ const remainingFailureCases = [
   {
     prompt: "Should I leave India immediately for success?",
     domain: "foreign",
-    expectedIncludes: ["Do not leave India immediately because of an astrology prediction"],
+    expectedIncludes: ["Do not make an immediate relocation decision because of astrology"],
   },
 ] as const
 

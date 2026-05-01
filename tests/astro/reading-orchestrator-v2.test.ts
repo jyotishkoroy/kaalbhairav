@@ -261,7 +261,7 @@ describe('Reading Orchestrator V2', () => {
 
     const answer = String(result.answer ?? '')
 
-    expect(answer).toBe('Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.')
+    expect(answer).toBe('Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice.')
     expect(answer).not.toContain('The main signal I see')
     expect(answer).not.toContain('Leo Lagna, Gemini Rasi')
   })
@@ -486,7 +486,7 @@ describe('Reading Orchestrator V2', () => {
     )
 
     const businessAnswer = String(business.answer ?? '')
-    expect(businessAnswer).toBe('Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.')
+    expect(businessAnswer).toBe('Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice.')
     expect(businessAnswer).not.toContain('The question is broad')
     expect(businessAnswer).not.toContain('internal')
     expect(businessAnswer).not.toContain('recognition')

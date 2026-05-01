@@ -68,7 +68,7 @@ describe("final response gate", () => {
       domain: "money",
     })
 
-    expect(result.answer).toBe("Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.")
+    expect(result.answer).toBe("Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice.")
     expect(result.answer).not.toContain("Focus first on stability")
     expect(validateFinalAnswerQuality({
       answerText: result.answer,

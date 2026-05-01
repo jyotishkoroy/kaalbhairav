@@ -107,7 +107,7 @@ function getDomainFallback(domain: FinalAnswerDomain): string {
     case "career":
       return "Start with the controllable part: clarify the role you want, document visible wins, and ask for feedback tied to promotion criteria."
     case "business":
-      return "Astrology cannot guarantee business profit. Treat the chart as reflective support only, and test the decision with numbers, risk limits, written assumptions, and practical advice."
+      return "Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice."
     case "money":
       return "Do not make the money decision from panic. Check your monthly baseline, protect essential cash flow, and avoid risks that depend on one guaranteed outcome."
     case "relationship":
@@ -119,7 +119,7 @@ function getDomainFallback(domain: FinalAnswerDomain): string {
     case "education":
       return "Compare the options by effort, time, cost, and long-term usefulness. Choose the path you can sustain with routine, not just the one that reduces fear today."
     case "foreign":
-      return "Foreign settlement is not something to treat as guaranteed. Check documents, skills, savings, visa realities, and whether the move improves stability rather than only escaping pressure."
+      return "Do not make an immediate relocation decision because of astrology. Astrology cannot guarantee success abroad. Check visa status, confirmed work or study, housing, budget, documents, and family responsibilities first."
     case "remedy":
       return "Keep the remedy simple, low-cost, and optional. Use steady routine, reflection, prayer if meaningful, and practical action before considering anything expensive or intense."
     case "spiritual":

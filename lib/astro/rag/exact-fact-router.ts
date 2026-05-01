@@ -189,6 +189,7 @@ export function detectExactFactIntent(question: string): ExactFactIntent {
     q === "asc"
   ) return "lagna";
   if (q.includes("career") && q.includes("house")) return "career_house";
+  if (q.includes("mahadasha") || q.includes("maha dasha") || q.includes("antardasha") || q.includes("antar dasha") || q.includes("current dasha") || q.includes("which mahadasha am i running now") || q.includes("which antardasha should be active") || q.includes("which dasha am i running now")) return "current_dasha";
   if (
     q.includes("exact chart fact") ||
     q.includes("chart fact without interpretation") ||
@@ -198,7 +199,7 @@ export function detectExactFactIntent(question: string): ExactFactIntent {
     q.includes("safely verify")
   ) return "general_fact";
   if (q.includes("moon sign") || q.includes("moon rasi") || q.includes("moon rashi") || q.includes("rasi") || q.includes("rashi")) return "moon_sign";
-  if (q.includes("mahadasha") || q.includes("maha dasha") || q.includes("antardasha") || q.includes("antar dasha") || (q.includes("dasha") && !q.includes("what will happen"))) return "current_dasha";
+  if ((q.includes("dasha") && !q.includes("what will happen")) || q.includes("vimshottari") || q.includes("vimsottari")) return "current_dasha";
   if ((q.includes("which") || q.includes("what")) && (q.includes("rule") || q.includes("lord") || q.includes("ruler"))) return "house_lord";
   if ((q.includes("which") || q.includes("what")) && q.includes("sign") && (q.includes("house") || q.includes("bhava"))) return "house_sign";
   if ((q.includes("which planets") || q.includes("what planets") || q.includes("planets are in") || q.includes("planet in")) && houses.length) return "planets_in_house";

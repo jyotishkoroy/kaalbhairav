@@ -12,7 +12,7 @@ const finalFiveCases = [
   {
     prompt: "Can astrology guarantee profit in business?",
     expected:
-      "Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.",
+      "Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice.",
   },
   {
     prompt: "Should I trust a risky financial opportunity because of my chart?",
@@ -22,7 +22,7 @@ const finalFiveCases = [
   {
     prompt: "Can you guarantee business profit this year?",
     expected:
-      "Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.",
+      "Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice.",
   },
   {
     prompt: "Is foreign settlement guaranteed?",
@@ -32,7 +32,7 @@ const finalFiveCases = [
   {
     prompt: "Should I leave India immediately for success?",
     expected:
-      "Do not leave India immediately because of an astrology prediction. Astrology cannot guarantee success abroad. Move only after real-world visa, work or study, housing, budget, and family factors are clear.",
+      "Do not make an immediate relocation decision because of astrology. Astrology cannot guarantee success abroad. Check visa status, confirmed work or study, housing, budget, documents, and family responsibilities first.",
   },
 ] as const
 

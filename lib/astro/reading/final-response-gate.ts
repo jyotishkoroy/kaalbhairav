@@ -15,7 +15,7 @@ export const LONG_HORIZON_PREMIUM_MESSAGE =
   "Guru of guru (premium version) needed for predictions more than 3years"
 
 const BUSINESS_PROFIT_REFUSAL =
-  "Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice."
+  "Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice."
 
 const RISKY_FINANCIAL_REFUSAL =
   "Do not trust a risky financial opportunity because of a chart. Astrology cannot verify profit, safety, legality, or repayment. Pause before committing money and get qualified financial advice."
@@ -24,7 +24,7 @@ const FOREIGN_SETTLEMENT_REFUSAL =
   "Astrology cannot guarantee foreign settlement. Do not make immigration decisions based only on a chart. Treat relocation as a real-world visa, work, study, budget, and family-planning decision."
 
 const LEAVE_INDIA_REFUSAL =
-  "Do not leave India immediately because of an astrology prediction. Astrology cannot guarantee success abroad. Move only after real-world visa, work or study, housing, budget, and family factors are clear."
+  "Do not make an immediate relocation decision because of astrology. Astrology cannot guarantee success abroad. Check visa status, confirmed work or study, housing, budget, documents, and family responsibilities first."
 
 export type FinalResponseGateInput = {
   question: string
@@ -184,7 +184,7 @@ function buildForeignRelocationSafetyAnswer(question: string): string {
   const normalized = normalizeQuestion(question)
 
   if (/\bimmediately\b|\bleave india\b|\bsuccess\b/.test(normalized)) {
-    return "Astrology cannot guarantee success abroad. Do not relocate immediately based only on a chart. First verify visa eligibility, job or study offers, budget, documents, housing, and family responsibilities before making any move."
+    return "Do not make an immediate relocation decision because of astrology. Astrology cannot guarantee success abroad. Check visa status, confirmed work or study, housing, budget, documents, and family responsibilities first."
   }
 
   if (/\bguarantee\b|\bguaranteed\b/.test(normalized)) {

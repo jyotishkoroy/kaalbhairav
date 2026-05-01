@@ -48,6 +48,13 @@ function detectExactFact(q: string): boolean {
     "can you answer one exact fact without using ai guesswork",
     "what is my ascendant sign exactly",
     "is my sun in house 10",
+    "which mahadasha am i running now",
+    "which antardasha should be active",
+    "which dasha am i running now",
+    "mahadasha",
+    "antardasha",
+    "antar dasha",
+    "vimshottari",
   ]) || /(?:lagna|ascendant|exact chart fact|without guessing|without interpretation)/.test(q);
 }
 

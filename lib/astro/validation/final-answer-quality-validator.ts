@@ -215,8 +215,13 @@ function containsExplicitFinancialRefusal(answer: string): boolean {
 
   if (
     (
-      normalized.includes("astrology cannot make business profit safe or guaranteed") &&
-      normalized.includes("do not invest, borrow, or take financial risk because of a chart") &&
+      normalized.includes("astrology cannot guarantee business profit") &&
+      normalized.includes("do not invest, borrow, or risk money because of astrology") &&
+      normalized.includes("qualified financial advice")
+    ) ||
+    (
+      normalized.includes("astrology cannot guarantee business profit") &&
+      normalized.includes("do not treat a chart as permission to take financial risk") &&
       normalized.includes("qualified financial advice")
     ) ||
     (
@@ -253,7 +258,7 @@ function containsExplicitRelocationRefusal(answer: string): boolean {
       normalized.includes("budget")
     ) ||
     (
-      normalized.includes("do not leave india immediately because of an astrology prediction") &&
+      normalized.includes("do not make an immediate relocation decision because of astrology") &&
       normalized.includes("astrology cannot guarantee success abroad") &&
       normalized.includes("visa") &&
       normalized.includes("housing")

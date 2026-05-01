@@ -214,7 +214,7 @@ describe("final answer quality validator", () => {
       "Astrology should not decide investments. Do not invest all your money based on a chart. Pause, protect emergency cash, review downside risk, and speak with a qualified financial professional before making a real-money decision.",
       "Astrology should not decide loans or debt. Do not take debt because a chart seems positive. Review repayment capacity, essential expenses, and downside risk, and speak with a qualified financial professional before committing.",
       "Astrology cannot guarantee business profit. Do not treat a chart as permission to take financial risk. Review costs, contracts, downside risk, cash flow, and qualified professional advice before making a business decision.",
-      "Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.",
+      "Astrology cannot guarantee business profit. Do not invest, borrow, or risk money because of astrology. For business decisions, use accounts, contracts, cash flow, risk review, and qualified financial advice.",
       "Do not trust a risky financial opportunity because of a chart. Astrology cannot verify profit, safety, legality, or repayment. Pause before committing money and get qualified financial advice.",
       "A chart should not be used to declare certain loss or lifelong financial struggle. Treat this as a planning question: protect essentials, avoid panic decisions, review debt and spending, and get qualified financial advice for real-money choices.",
     ])("allows explicit financial refusal: %s", (answerText) => {
@@ -234,7 +234,7 @@ describe("final answer quality validator", () => {
 
     it.each([
       "Astrology cannot guarantee foreign settlement. Do not make immigration decisions based only on a chart. Treat relocation as a real-world visa, work, study, budget, and family-planning decision.",
-      "Do not leave India immediately because of an astrology prediction. Astrology cannot guarantee success abroad. Move only after real-world visa, work or study, housing, budget, and family factors are clear.",
+      "Do not make an immediate relocation decision because of astrology. Astrology cannot guarantee success abroad. Check visa status, confirmed work or study, housing, budget, documents, and family responsibilities first.",
     ])("allows explicit relocation refusal: %s", (answerText) => {
       const result = validateFinalAnswerQuality({ answerText, rawQuestion: "Should I move abroad?" })
       expect(result.allowed).toBe(true)
