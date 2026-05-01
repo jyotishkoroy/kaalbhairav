@@ -13,6 +13,7 @@
 export type AstroRagFlags = {
   ragEnabled: boolean;
   questionFrameParserEnabled?: boolean;
+  structuredIntentRoutingEnabled?: boolean;
   readingPlanEnabled?: boolean;
   reasoningGraphEnabled: boolean;
   listeningAnalyzerEnabled?: boolean;
@@ -85,6 +86,7 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
   return {
     ragEnabled: readBool(env.ASTRO_RAG_ENABLED, false),
     questionFrameParserEnabled: readBool(env.ASTRO_QUESTION_FRAME_PARSER_ENABLED, false),
+    structuredIntentRoutingEnabled: readBool(env.ASTRO_STRUCTURED_ROUTING_ENABLED, false),
     readingPlanEnabled: readBool(env.ASTRO_READING_PLAN_ENABLED, false),
     reasoningGraphEnabled: readBool(env.ASTRO_REASONING_GRAPH_ENABLED, false),
     listeningAnalyzerEnabled: readBool(env.ASTRO_LISTENING_ANALYZER_ENABLED, false),

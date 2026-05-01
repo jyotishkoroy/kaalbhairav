@@ -4,8 +4,10 @@
 
 import type { AstroRagFlags } from "./feature-flags";
 import { getAstroRagFlags } from "./feature-flags";
+import { parseQuestionFrame } from "./question-frame-parser";
 import { ragSafetyGate } from "./safety-gate";
 import { answerExactFactIfPossible } from "./exact-fact-router";
+import { routeStructuredIntent } from "./structured-intent-router";
 import { analyzeQuestionWithLocalAnalyzer } from "./local-analyzer";
 import type { AnalyzerResult } from "./analyzer-schema";
 import { planRequiredData, type RequiredDataPlan } from "./required-data-planner";
@@ -385,7 +387,10 @@ export async function ragReadingOrchestrator(
     };
   }
 
-  const exactFact = (input.dependencies?.answerExactFact ?? answerExactFactIfPossible)(question, []);
+  const questionFrame = flags.questionFrameParserEnabled ? parseQuestionFrame(question) : undefined;
+  const structuredIntent = flags.structuredIntentRoutingEnabled ? routeStructuredIntent({ rawQuestion: question, questionFrame }) : undefined;
+  const exactFactQuestion = structuredIntent?.primaryIntent === "exact_fact" && questionFrame?.coreQuestion ? questionFrame.coreQuestion : question;
+  const exactFact = (input.dependencies?.answerExactFact ?? answerExactFactIfPossible)(exactFactQuestion, []);
   withStep(meta, "exact_fact_router", true);
   if (exactFact.answered && exactFact.answer) {
     meta.exactFactAnswered = true;
