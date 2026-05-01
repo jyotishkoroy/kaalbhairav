@@ -6,6 +6,11 @@
 
 import { NextResponse } from "next/server";
 import {
+  createAstroE2ETrace,
+  sanitizeTraceForResponse,
+  shouldExposeAstroE2ETrace,
+} from "@/lib/astro/e2e/trace";
+import {
   ragReadingOrchestrator,
   type RagReadingOrchestratorInput,
   type RagReadingOrchestratorResult,
@@ -56,6 +61,13 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
   const context = getRequestContext(body);
   const birthDetails = parseBirthDetails(body.birthDetails);
   const metadata = context.metadata;
+  const trace = createAstroE2ETrace();
+  const exposeTrace = shouldExposeAstroE2ETrace({
+    isProduction: process.env.NODE_ENV === "production",
+    envEnabled: process.env.ASTRO_E2E_TRACE_ENABLED === "true",
+    metadataDebugTrace: metadata?.debugTrace,
+    headerDebugTrace: request.headers.get("x-tarayai-debug-trace"),
+  });
   const flags = (deps.flags ?? getAstroRagFlags)(process.env);
   const ragBranchEnabled = shouldUseRagReadingRoute(flags, question);
   const ragInput: Partial<RagReadingOrchestratorInput> = { question, userId: context.userId, profileId: context.profileId ?? undefined, chartVersionId: context.chartVersionId ?? undefined, env: process.env, explicitUserDates: Array.isArray((body as Record<string, unknown>).explicitUserDates) ? ((body as Record<string, unknown>).explicitUserDates as NonNullable<RagReadingOrchestratorInput["explicitUserDates"]>) : undefined, memorySummary: readString(metadata?.memorySummary) };
@@ -63,7 +75,10 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
     if (ragBranchEnabled) {
       try { const ragResult = await (deps.ragOrchestrator ?? ragReadingOrchestrator)(ragInput); if (!shouldFallbackToOldV2FromRagResult(ragResult)) return NextResponse.json(normalizeRagRouteResponse(ragResult, { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata })); console.error("Astro V2 reading route falling back to old path after rag result"); } catch (error) { console.error("Astro V2 reading route rag branch failed, falling back to old path", error); }
     }
-    const result = await (deps.oldRoute ?? generateReadingV2)({ userId: context.userId, question, mode: readMode(body.mode), birthDetails: birthDetails as | { dateOfBirth?: string; timeOfBirth?: string; placeOfBirth?: string; latitude?: number; longitude?: number; timezone?: string; } | undefined, chart: isRecord(body.chart) ? body.chart : undefined, context: isRecord(body.context) ? body.context : undefined, dasha: isRecord(body.dasha) ? body.dasha : undefined, transits: isRecord(body.transits) ? body.transits : undefined, metadata: { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata }, });
-    return NextResponse.json({ answer: result.answer, followUpQuestion: result.meta?.followUpQuestion, followUpAnswer: result.meta?.followUpAnswer, sections: normalizeSections((result as { sections?: unknown }).sections), meta: { ...result.meta, source: "astro-v2-page", directV2Route: true } });
+    const result = await (deps.oldRoute ?? generateReadingV2)({ userId: context.userId, question, mode: readMode(body.mode), birthDetails: birthDetails as | { dateOfBirth?: string; timeOfBirth?: string; placeOfBirth?: string; latitude?: number; longitude?: number; timezone?: string; } | undefined, chart: isRecord(body.chart) ? body.chart : undefined, context: isRecord(body.context) ? body.context : undefined, dasha: isRecord(body.dasha) ? body.dasha : undefined, transits: isRecord(body.transits) ? body.transits : undefined, metadata: { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata }, }, { trace, exposeTrace });
+    const responseMeta: Record<string, unknown> = { ...result.meta, source: "astro-v2-page", directV2Route: true };
+    if (exposeTrace) responseMeta.e2eTrace = sanitizeTraceForResponse(trace);
+    trace.response.debugTraceExposed = exposeTrace;
+    return NextResponse.json({ answer: result.answer, followUpQuestion: result.meta?.followUpQuestion, followUpAnswer: result.meta?.followUpAnswer, sections: normalizeSections((result as { sections?: unknown }).sections), meta: responseMeta });
   } catch (error) { console.error("Astro V2 reading route failed", error); return NextResponse.json({ error: "Unable to generate a reading right now. Please try again." }, { status: 500 }); }
 }

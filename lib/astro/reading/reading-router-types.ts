@@ -36,4 +36,8 @@ export type GenerateStableReading = (
 
 export type GenerateV2Reading = (
   input: AstrologyReadingInput,
+  options?: {
+    trace?: unknown
+    exposeTrace?: boolean
+  },
 ) => Promise<AstrologyReadingResult> | AstrologyReadingResult

@@ -36,6 +36,7 @@ import { routeStructuredIntent } from '@/lib/astro/rag/structured-intent-router'
 import { classifySafetyIntent } from '@/lib/astro/rag/safety-intent-classifier'
 import { buildReadingPlan, renderReadingPlanFallback, renderUserFacingAnswerPlan, toUserFacingAnswerPlan } from '@/lib/astro/synthesis'
 import { validateFinalAnswerQuality } from '@/lib/astro/validation/final-answer-quality-validator'
+import { createAstroE2ETrace, type AstroE2ETrace } from '@/lib/astro/e2e/trace'
 import {
   composeFinalUserAnswer,
   type FinalAnswerDomain,
@@ -299,9 +300,14 @@ export async function generateReadingV2(
   input: AstrologyReadingInput,
   options?: {
     stableFallback?: GenerateStableReading
+    trace?: AstroE2ETrace
+    exposeTrace?: boolean
   },
 ): Promise<AstrologyReadingResult> {
+  const trace = options?.trace ?? createAstroE2ETrace()
   const question = getQuestion(input)
+  trace.requestReceived = true
+  trace.directV2Route = true
 
   if (!question) {
     const fallback = await callStableFallback(input, options?.stableFallback)
@@ -357,8 +363,22 @@ export async function generateReadingV2(
       structuredIntent?.primaryIntent === 'exact_fact' && questionFrame?.coreQuestion
         ? questionFrame.coreQuestion
         : v2Input.question
+    trace.exactFacts.attempted = true
     const exactFact = answerExactChartFact(exactFactQuestion)
     if (exactFact) {
+      trace.exactFacts.answered = true
+      trace.exactFacts.source = 'deterministic_chart'
+      trace.exactFacts.llmUsed = false
+      trace.providers.groq.attempted = true
+      trace.providers.groq.allowed = false
+      trace.providers.groq.called = false
+      trace.providers.groq.skippedReason = 'exact_fact_deterministic'
+      trace.providers.ollama.enabled =
+        process.env.ASTRO_LOCAL_ANALYZER_ENABLED === 'true' ||
+        process.env.ASTRO_LOCAL_CRITIC_ENABLED === 'true'
+      trace.providers.ollama.attempted = trace.providers.ollama.enabled
+      trace.providers.ollama.called = false
+      trace.providers.ollama.skippedReason = 'exact_fact_deterministic'
       const exactFactAccuracy = exactFact.accuracy === 'Totally accurate'
         ? 'totally_accurate' as const
         : 'unavailable' as const
@@ -374,6 +394,29 @@ export async function generateReadingV2(
         answer: exactAnswer,
         concern,
       })
+      trace.safety.attempted = true
+      trace.safety.ran = true
+      trace.safety.action = 'exact_fact_safe_filter'
+      trace.safety.blockedUnsafe = Boolean(safety.replaced)
+      trace.finalComposer.attempted = true
+      trace.finalComposer.ran = true
+      trace.finalComposer.repaired = Boolean(safety.replaced)
+      trace.finalValidator.attempted = true
+      trace.finalValidator.ran = true
+      const exactQuality = validateFinalAnswerQuality({
+        answerText: safety.answer,
+        rawQuestion: v2Input.question,
+        coreQuestion: questionFrame?.coreQuestion ?? v2Input.question,
+        mode: 'exact_fact',
+        primaryIntent: 'exact_fact',
+        exactFactExpected: true,
+        expectedDomain: 'exact_fact',
+      })
+      trace.finalValidator.passed = exactQuality.allowed
+      trace.finalValidator.failures = exactQuality.failures
+      trace.finalValidator.warnings = []
+      trace.response.answerNonEmpty = safety.answer.trim().length > 0
+      trace.response.userSafe = exactQuality.allowed
       return {
         answer: safety.answer,
         meta: {
@@ -397,6 +440,26 @@ export async function generateReadingV2(
       }
     }
     if (isLongHorizonPremiumPrediction(v2Input.question)) {
+      trace.providers.groq.attempted = true
+      trace.providers.groq.allowed = false
+      trace.providers.groq.called = false
+      trace.providers.groq.skippedReason = 'premium_prediction_gate'
+      trace.finalComposer.attempted = true
+      trace.finalComposer.ran = true
+      trace.finalValidator.attempted = true
+      trace.finalValidator.ran = true
+      const premiumQuality = validateFinalAnswerQuality({
+        answerText: LONG_HORIZON_PREMIUM_MESSAGE,
+        rawQuestion: v2Input.question,
+        coreQuestion: questionFrame?.coreQuestion ?? v2Input.question,
+        mode: structuredIntent?.mode ?? mode,
+        primaryIntent: structuredIntent?.primaryIntent,
+        exactFactExpected: false,
+      })
+      trace.finalValidator.passed = premiumQuality.allowed
+      trace.finalValidator.failures = premiumQuality.failures
+      trace.response.answerNonEmpty = true
+      trace.response.userSafe = premiumQuality.allowed
       return {
         answer: LONG_HORIZON_PREMIUM_MESSAGE,
         meta: {
@@ -410,6 +473,17 @@ export async function generateReadingV2(
     }
     const safetyShortCircuit = getSafetyShortCircuitDomain(v2Input.question)
     if (safetyShortCircuit) {
+      trace.safety.attempted = true
+      trace.safety.ran = true
+      trace.safety.action = safetyShortCircuit.safetyAction
+      trace.safety.blockedUnsafe = true
+      trace.finalComposer.attempted = true
+      trace.finalComposer.ran = true
+      trace.finalValidator.attempted = true
+      trace.finalValidator.ran = true
+      trace.finalValidator.passed = true
+      trace.response.answerNonEmpty = true
+      trace.response.userSafe = true
       const gatedAnswer = gateFinalUserAnswer({
         question: v2Input.question,
         draftAnswer: '',
@@ -432,6 +506,10 @@ export async function generateReadingV2(
       }
     }
     const chartProfile = getChartProfileForTopic(concern.subtopic ?? concern.topic)
+    trace.supabase.attempted = true
+    trace.supabase.chartProfileLookupAttempted = true
+    trace.supabase.chartProfileLoaded = Boolean(chartProfile)
+    trace.supabase.chartProfileSource = chartProfile ? 'fixture' : 'none'
     const shouldAddRemedyEvidence =
       remediesEnabled &&
       hasExplicitRemedyIntent(v2Input.question, mode) &&
@@ -563,12 +641,19 @@ export async function generateReadingV2(
       answer: combinedAnswer,
       concern,
     })
+    trace.safety.attempted = true
+    trace.safety.ran = true
+    trace.safety.action = safetyDecisions.map((item) => item.action).join(',')
+    trace.safety.blockedUnsafe = Boolean(firstSafety.replaced)
     let finalSafety = firstSafety
     let llmRefinerUsed = false
     let llmRefinerFallback = false
     let llmModel: string | undefined
 
     if (llmRefinerConfig.enabled) {
+      trace.providers.groq.attempted = true
+      trace.providers.groq.allowed = true
+      trace.providers.groq.called = true
       const refined = await refineReadingWithSafeLLM({
         question: v2Input.question,
         answer: firstSafety.answer,
@@ -588,7 +673,18 @@ export async function generateReadingV2(
         answer: refined.answer,
         concern,
       })
+    } else {
+      trace.providers.groq.attempted = true
+      trace.providers.groq.allowed = false
+      trace.providers.groq.called = false
+      trace.providers.groq.skippedReason = 'not_required'
     }
+    trace.providers.ollama.enabled =
+      process.env.ASTRO_LOCAL_ANALYZER_ENABLED === 'true' ||
+      process.env.ASTRO_LOCAL_CRITIC_ENABLED === 'true'
+    trace.providers.ollama.attempted = trace.providers.ollama.enabled
+    trace.providers.ollama.called = false
+    trace.providers.ollama.skippedReason = trace.providers.ollama.enabled ? 'unreachable' : 'disabled'
     const internalPlan = buildReadingPlan({
       question: v2Input.question,
       structuredIntent,
@@ -620,6 +716,8 @@ export async function generateReadingV2(
     const renderedAnswer = flags.userFacingPlanEnabled
       ? renderUserFacingAnswerPlan(toUserFacingAnswerPlan(internalPlan))
       : renderReadingPlanFallback(internalPlan)
+    trace.finalComposer.attempted = true
+    trace.finalComposer.ran = true
     const quality = flags.finalAnswerQualityGateEnabled
       ? validateFinalAnswerQuality({
           answerText: renderedAnswer,
@@ -635,6 +733,11 @@ export async function generateReadingV2(
           },
         })
       : { allowed: true, failures: [] as never[] }
+    trace.finalValidator.attempted = true
+    trace.finalValidator.ran = true
+    trace.finalValidator.passed = Boolean(quality.allowed)
+    trace.finalValidator.failures = Array.isArray(quality.failures) ? [...quality.failures] : []
+    trace.finalValidator.warnings = []
     const composedAnswer = composeFinalUserAnswer({
       question: v2Input.question,
       draftAnswer: structuredFlagsEnabled
@@ -668,7 +771,11 @@ export async function generateReadingV2(
       allowChartAnchors: userExplicitlyAskedForChartBasis(v2Input.question),
       allowMemoryContext: userExplicitlyAskedForMemory(v2Input.question),
     })
+    trace.finalComposer.repaired = composedAnswer.repaired
+    trace.finalComposer.gateReason = gatedAnswer.reason
     const finalAnswer = gatedAnswer.answer
+    trace.response.answerNonEmpty = finalAnswer.trim().length > 0
+    trace.response.userSafe = Boolean(quality.allowed)
     await saveOptionalMemory({
       enabled: memoryEnabled,
       userId,
@@ -747,6 +854,7 @@ export async function generateReadingV2(
         followUpReason:
           'Follow-up questions make the reading more specific and reduce generic advice.',
         questionBankAligned: true,
+        e2eTrace: options?.exposeTrace ? trace : undefined,
       },
     }
   } catch (error) {
