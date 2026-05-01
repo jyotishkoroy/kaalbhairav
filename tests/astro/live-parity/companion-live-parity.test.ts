@@ -22,6 +22,7 @@ import {
   normalizeFallbackBaseUrls,
   parseCompanionEndpointResponse,
   redactLiveParityText,
+  summarizeCompanionLiveResults,
   summarizeCompanionParity,
   writeCompanionParityReport,
 } from "@/lib/astro/validation/live-parity";
@@ -89,6 +90,62 @@ describe("companion live parity", () => {
   it("auth-required is separated from hard failure", () => {
     const result = endpoint(403, "Login required to continue.");
     expect(evaluateCompanionAnswer(prompts[0], result).passed).toBe(true);
+  });
+  it("page shell warning does not fail live parity summary", () => {
+    const summary = summarizeCompanionLiveResults([
+      {
+        passed: true,
+        failures: [],
+        warnings: ["page_available"],
+      },
+    ]);
+    expect(summary.failed).toBe(0);
+    expect(summary.passed).not.toBe("no");
+  });
+  it("auth-required warning does not fail live parity summary", () => {
+    const summary = summarizeCompanionLiveResults([
+      {
+        passed: true,
+        failures: [],
+        warnings: ["route_available_but_auth_required"],
+      },
+    ]);
+    expect(summary.failed).toBe(0);
+    expect(summary.authRequired).toBe(1);
+    expect(summary.passed).not.toBe("no");
+  });
+  it("unsafe remedy still fails live parity summary", () => {
+    const summary = summarizeCompanionLiveResults([
+      {
+        passed: false,
+        failures: ["unsafe_remedy"],
+        warnings: [],
+      },
+    ]);
+    expect(summary.failed).toBe(1);
+    expect(summary.passed).toBe("no");
+  });
+  it("missing route still fails live parity summary", () => {
+    const summary = summarizeCompanionLiveResults([
+      {
+        passed: false,
+        failures: ["route_missing:/astro/v2"],
+        warnings: [],
+      },
+    ]);
+    expect(summary.failed).toBe(1);
+    expect(summary.passed).toBe("no");
+  });
+  it("never reports passed no when only auth-required is present", () => {
+    const summary = summarizeCompanionLiveResults([
+      {
+        passed: true,
+        failures: [],
+        warnings: ["route_available_but_auth_required"],
+      },
+    ]);
+    expect(summary.failed).toBe(0);
+    expect(summary.passed).not.toBe("no");
   });
   it("api 405 is route exists wrong method", () => {
     const result = endpoint(405, "Method Not Allowed");

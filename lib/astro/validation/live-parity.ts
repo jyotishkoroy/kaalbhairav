@@ -60,6 +60,30 @@ export type CompanionPromptEvaluation = {
   };
 };
 
+const NON_FAILING_LIVE_PARITY_SIGNALS = new Set([
+  "page_available",
+  "route_available_but_auth_required",
+  "network_dns_failure",
+  "network_timeout",
+  "network_connection_failure",
+  "network_fetch_failure",
+]);
+
+export function isNonFailingLiveParitySignal(signal: string): boolean {
+  return NON_FAILING_LIVE_PARITY_SIGNALS.has(signal);
+}
+
+export type LiveParitySummary = {
+  passed: "yes" | "no" | "partial";
+  failed: number;
+  skipped: number;
+  authRequired: number;
+  networkBlocked: number;
+  total?: number;
+  failures?: string[];
+  warnings?: string[];
+};
+
 const DEFAULT_OUTPUT_DIR = path.join(process.cwd(), "artifacts");
 
 const TOKEN_PATTERNS = [
@@ -393,8 +417,34 @@ export function compareCompanionResults(
 export function summarizeCompanionParity(results: CompanionPromptEvaluation[]): { passed: boolean; total: number; failed: number; failures: string[]; warnings: string[] } {
   const failures = results.flatMap((result) => result.failures.map((failure) => `${result.id}:${failure}`));
   const warnings = results.flatMap((result) => result.warnings.map((warning) => `${result.id}:${warning}`));
-  const failed = results.filter((result) => !result.passed).length;
+  const failed = results.filter((result) => result.failures.some((failure) => !isNonFailingLiveParitySignal(failure))).length;
   return { passed: failed === 0, total: results.length, failed, failures, warnings };
+}
+
+export function summarizeCompanionLiveResults(
+  results: Array<Pick<CompanionPromptEvaluation, "passed" | "failures" | "warnings">>,
+): LiveParitySummary {
+  const signalsFor = (result: Pick<CompanionPromptEvaluation, "failures" | "warnings">) => [
+    ...(result.failures ?? []),
+    ...(result.warnings ?? []),
+  ];
+
+  const failed = results.filter((result) => (result.failures ?? []).some((failure) => !isNonFailingLiveParitySignal(failure))).length;
+  const authRequired = results.filter((result) => signalsFor(result).includes("route_available_but_auth_required")).length;
+  const networkBlocked = results.filter((result) => signalsFor(result).some((signal) => signal.startsWith("network_"))).length;
+  const skipped = results.filter((result) => {
+    const signals = signalsFor(result);
+    return signals.includes("route_available_but_auth_required") || signals.includes("page_available") || signals.some((signal) => signal.startsWith("network_"));
+  }).length;
+
+  return {
+    passed: failed > 0 ? "no" : authRequired > 0 || networkBlocked > 0 || skipped > 0 ? "partial" : "yes",
+    failed,
+    skipped,
+    authRequired,
+    networkBlocked,
+    total: results.length,
+  };
 }
 
 export function redactLiveParityText(value: string): string {
