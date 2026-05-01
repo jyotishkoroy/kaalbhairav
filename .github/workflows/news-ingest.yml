@@ -1,0 +1,19 @@
+name: news-ingest
+
+on:
+  schedule:
+    - cron: '30 3 * * *'
+    - cron: '30 11 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [ "${{ github.event.schedule }}" = "30 3 * * *" ]; then
+            SLOT=morning
+          else
+            SLOT=evening
+          fi
+          curl -sS -X GET "https://www.tarayai.com/api/cron/rss-ingest?slot=$SLOT" -H "Authorization: Bearer ${{ secrets.NEWS_CRON_SECRET }}"

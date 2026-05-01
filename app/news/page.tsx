@@ -5,111 +5,42 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import Image from 'next/image'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
 export const revalidate = 300
 
-const categories = [
-  { label: 'All', value: '' },
-  { label: 'Kaal Bhairav', value: 'kaal_bhairav' },
-  { label: 'Shiva', value: 'shiva' },
-  { label: 'Festival', value: 'festival' },
-  { label: 'Occult', value: 'occult' },
-  { label: 'General', value: 'general' },
-]
-
-type NewsPageProps = {
-  searchParams: Promise<{
-    category?: string
-  }>
-}
-
-export default async function NewsPage({ searchParams }: NewsPageProps) {
-  const { category } = await searchParams
+export default async function NewsPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/sign-in?next=/news')
 
-  let query = supabase
+  const { data: posts } = await supabase
     .from('news_posts')
-    .select('id, slug, title, summary, cover_image_url, source_name, category, published_at, like_count, comment_count')
+    .select('id, slug, title, excerpt, topic, source_name, published_at')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
-    .limit(20)
-
-  if (category) {
-    query = query.eq('category', category)
-  }
-
-  const { data: posts } = await query
+    .limit(50)
 
   return (
-    <main className="min-h-screen bg-black text-white px-6 py-12 max-w-5xl mx-auto">
+    <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
       <header className="mb-10">
-        <h1 className="text-6xl font-serif mb-3">News</h1>
-        <p className="text-white/60">
-          Curated occult and Hindu spirituality, always linked to the original source.
+        <h1 className="text-4xl font-semibold">News</h1>
+        <p className="mt-3 text-sm text-white/60">
+          Logged-in readers only. Automated stories are linked to their source.
         </p>
       </header>
 
-      <nav className="mb-10 flex flex-wrap gap-3">
-        {categories.map((item) => {
-          const href = item.value ? `/news?category=${item.value}` : '/news'
-          const active = (category || '') === item.value
-
-          return (
-            <Link
-              key={item.value || 'all'}
-              href={href}
-              className={`rounded-full border px-4 py-2 text-sm ${
-                active
-                  ? 'border-orange-400 bg-orange-400 text-black'
-                  : 'border-white/10 text-white/60 hover:border-white/30 hover:text-white'
-              }`}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="space-y-4">
         {posts?.map((post) => (
-          <Link
-            key={post.id}
-            href={`/news/${post.slug}`}
-            className="group block overflow-hidden rounded-lg border border-white/10 bg-white/[0.03] hover:border-orange-400/60"
-          >
-            {post.cover_image_url && (
-              <Image
-                src={post.cover_image_url}
-                alt=""
-                width={1200}
-                height={675}
-                className="w-full aspect-video object-cover transition duration-500 group-hover:scale-105"
-              />
-            )}
-            <div className="p-6">
-              <div className="text-xs text-orange-400 uppercase tracking-widest mb-3">
-                {post.category?.replace(/_/g, ' ')}
-              </div>
-              <h2 className="text-2xl font-serif mb-3 group-hover:text-orange-300">
-                {post.title}
-              </h2>
-              <p className="text-white/70 line-clamp-3">{post.summary}</p>
-              <div className="mt-4 flex items-center justify-between gap-3 text-xs text-white/40">
-                <span>Source: {post.source_name || 'Unknown'}</span>
-                <span>
-                  {post.like_count ?? 0} likes · {post.comment_count ?? 0} comments
-                </span>
-              </div>
-            </div>
+          <Link key={post.id} href={`/news/${post.slug}`} className="block rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-xs uppercase tracking-widest text-orange-400">{post.topic || 'other'}</div>
+            <h2 className="mt-2 text-2xl">{post.title}</h2>
+            {post.excerpt && <p className="mt-2 text-sm text-white/70">{post.excerpt}</p>}
+            <div className="mt-3 text-xs text-white/40">Source: {post.source_name}</div>
           </Link>
         ))}
-        {!posts?.length && (
-          <p className="py-24 text-center text-white/50 md:col-span-2">
-            No posts found. Check back soon.
-          </p>
-        )}
+        {!posts?.length && <div className="rounded-xl border border-white/10 p-8 text-white/50">No news posts yet.</div>}
       </div>
     </main>
   )
