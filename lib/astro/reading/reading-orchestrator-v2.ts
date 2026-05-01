@@ -44,6 +44,8 @@ import {
 import {
   gateFinalUserAnswer,
   getSafetyShortCircuitDomain,
+  isLongHorizonPremiumPrediction,
+  LONG_HORIZON_PREMIUM_MESSAGE,
   userExplicitlyAskedForChartBasis,
   userExplicitlyAskedForMemory,
 } from '@/lib/astro/reading/final-response-gate'
@@ -391,6 +393,18 @@ export async function generateReadingV2(
           safetyReplacedAnswer: safety.replaced,
           forbiddenClaimsRemoved: safety.forbiddenClaimsRemoved,
           followUpQuestion: exactFact.followUpQuestion,
+        },
+      }
+    }
+    if (isLongHorizonPremiumPrediction(v2Input.question)) {
+      return {
+        answer: LONG_HORIZON_PREMIUM_MESSAGE,
+        meta: {
+          version: 'v2',
+          routedBy: 'astro-reading-router',
+          usedFallback: false,
+          directV2Route: true,
+          premiumPredictionGate: true,
         },
       }
     }

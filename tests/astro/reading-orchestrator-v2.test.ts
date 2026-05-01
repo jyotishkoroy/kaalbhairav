@@ -261,9 +261,34 @@ describe('Reading Orchestrator V2', () => {
 
     const answer = String(result.answer ?? '')
 
-    expect(answer).toContain('Astrology cannot guarantee business profit')
+    expect(answer).toBe('Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.')
     expect(answer).not.toContain('The main signal I see')
     expect(answer).not.toContain('Leo Lagna, Gemini Rasi')
+  })
+
+  it.each([
+    'Give me a prediction for the next 10 years.',
+    'Tell me my future for the next 5 years.',
+    'Will I marry in 2032?',
+    'What will happen after 4 years?',
+  ])('short-circuits long horizon premium requests: %s', async (question) => {
+    const result = await generateReadingV2(makeInput({ question }))
+
+    expect(result.answer).toBe('Guru of guru (premium version) needed for predictions more than 3years')
+    expect(result.meta?.premiumPredictionGate).toBe(true)
+    expect(result.meta?.directV2Route).toBe(true)
+  })
+
+  it('does not premium-gate exact facts', async () => {
+    const result = await generateReadingV2(
+      makeInput({
+        question: 'Where is Sun placed?',
+        message: 'Where is Sun placed?',
+      }),
+    )
+
+    expect(result.answer).not.toBe('Guru of guru (premium version) needed for predictions more than 3years')
+    expect(result.meta?.exactFactAnswered).toBe(true)
   })
 
   it('repairs low-cost remedy prompts without money boilerplate', async () => {
@@ -461,7 +486,7 @@ describe('Reading Orchestrator V2', () => {
     )
 
     const businessAnswer = String(business.answer ?? '')
-    expect(businessAnswer).toContain('Astrology cannot guarantee business profit')
+    expect(businessAnswer).toBe('Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.')
     expect(businessAnswer).not.toContain('The question is broad')
     expect(businessAnswer).not.toContain('internal')
     expect(businessAnswer).not.toContain('recognition')

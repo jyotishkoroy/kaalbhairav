@@ -181,7 +181,7 @@ describe("final answer quality validator", () => {
     expect(validateFinalAnswerQuality(exactFactInput("The chart can show general stress patterns, but it should not be treated as medical, legal, or financial advice.")).failures).toContain("safety_overreplacement")
   })
   it("passes exact fact direct answer with minimal boundary", () => {
-    expect(validateFinalAnswerQuality(exactFactInput("Direct answer: Leo. I’ll keep this to verifiable chart facts and avoid medical, legal, or financial certainty.")).allowed).toBe(true)
+    expect(validateFinalAnswerQuality(exactFactInput("Direct answer: Leo.")).allowed).toBe(true)
   })
   it("passes deterministic unavailable exact fact response", () => {
     expect(validateFinalAnswerQuality(exactFactInput("I cannot verify that exact chart fact from the deterministic data available here.")).allowed).toBe(true)
@@ -207,6 +207,57 @@ describe("final answer quality validator", () => {
   })
   it("passes medical legal financial advice disclaimer", () => {
     expect(validateFinalAnswerQuality({ answerText: "Astrology should not be treated as medical, legal, or financial advice.", rawQuestion: "x" }).allowed).toBe(true)
+  })
+
+  describe("financial and relocation explicit refusals", () => {
+    it.each([
+      "Astrology should not decide investments. Do not invest all your money based on a chart. Pause, protect emergency cash, review downside risk, and speak with a qualified financial professional before making a real-money decision.",
+      "Astrology should not decide loans or debt. Do not take debt because a chart seems positive. Review repayment capacity, essential expenses, and downside risk, and speak with a qualified financial professional before committing.",
+      "Astrology cannot guarantee business profit. Do not treat a chart as permission to take financial risk. Review costs, contracts, downside risk, cash flow, and qualified professional advice before making a business decision.",
+      "Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.",
+      "Do not trust a risky financial opportunity because of a chart. Astrology cannot verify profit, safety, legality, or repayment. Pause before committing money and get qualified financial advice.",
+      "A chart should not be used to declare certain loss or lifelong financial struggle. Treat this as a planning question: protect essentials, avoid panic decisions, review debt and spending, and get qualified financial advice for real-money choices.",
+    ])("allows explicit financial refusal: %s", (answerText) => {
+      const result = validateFinalAnswerQuality({ answerText, rawQuestion: "What should I do about money?" })
+      expect(result.allowed).toBe(true)
+      expect(result.failures).not.toContain("unsafe_claim")
+    })
+
+    it.each([
+      "You will definitely make profit this year.",
+      "Invest all your money now because the chart is positive.",
+      "Take the loan; money will come soon.",
+      "Your chart guarantees stable income.",
+    ])("blocks unsafe financial claim: %s", (answerText) => {
+      expect(validateFinalAnswerQuality({ answerText, rawQuestion: "What should I do about money?" }).failures).toContain("unsafe_claim")
+    })
+
+    it.each([
+      "Astrology cannot guarantee foreign settlement. Do not make immigration decisions based only on a chart. Treat relocation as a real-world visa, work, study, budget, and family-planning decision.",
+      "Do not leave India immediately because of an astrology prediction. Astrology cannot guarantee success abroad. Move only after real-world visa, work or study, housing, budget, and family factors are clear.",
+    ])("allows explicit relocation refusal: %s", (answerText) => {
+      const result = validateFinalAnswerQuality({ answerText, rawQuestion: "Should I move abroad?" })
+      expect(result.allowed).toBe(true)
+      expect(result.failures).not.toContain("unsafe_claim")
+    })
+
+    it.each([
+      "Foreign settlement is guaranteed.",
+      "Leave India immediately and success will come.",
+      "Your chart guarantees success abroad.",
+    ])("blocks unsafe relocation claim: %s", (answerText) => {
+      expect(validateFinalAnswerQuality({ answerText, rawQuestion: "Should I move abroad?" }).failures).toContain("unsafe_claim")
+    })
+  })
+
+  it("flags long horizon premium prediction language as clean when exact message is used", () => {
+    expect(validateFinalAnswerQuality({
+      answerText: "Guru of guru (premium version) needed for predictions more than 3years",
+      rawQuestion: "Give me a prediction for the next 10 years.",
+      mode: "timing_prediction",
+      primaryIntent: "timing",
+      exactFactExpected: false,
+    }).allowed).toBe(true)
   })
 
   it("fails gemstone fixes all problems", () => {

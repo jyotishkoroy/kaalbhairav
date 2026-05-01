@@ -68,7 +68,7 @@ describe("final response gate", () => {
       domain: "money",
     })
 
-    expect(result.answer).toContain("Astrology cannot guarantee business profit")
+    expect(result.answer).toBe("Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice.")
     expect(result.answer).not.toContain("Focus first on stability")
     expect(validateFinalAnswerQuality({
       answerText: result.answer,
@@ -104,7 +104,7 @@ describe("final response gate", () => {
       domain: "foreign",
     })
 
-    expect(result.answer).toContain("should not be treated as guaranteed")
+    expect(result.answer).toContain("cannot guarantee foreign settlement")
     expect(result.answer).not.toContain("The main signal")
     expect(validateFinalAnswerQuality({
       answerText: result.answer,

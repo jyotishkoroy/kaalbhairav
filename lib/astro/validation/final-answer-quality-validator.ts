@@ -194,7 +194,7 @@ function isExactFactContext(input: FinalAnswerQualityInput): boolean {
 }
 
 function looksLikeDirectExactFact(answer: string): boolean {
-  return /^(?:lagna|ascendant|moon sign|sun sign|venus sign)\b/i.test(answer.trim()) || /^(?:leo|aries|taurus|gemini|cancer|virgo|libra|scorpio|sagittarius|capricorn|aquarius|pisces)\b/i.test(answer.trim())
+  return /^(?:direct answer:\s*)?(?:lagna|ascendant|moon sign|sun sign|venus sign)\b/i.test(answer.trim()) || /^(?:direct answer:\s*)?(?:leo|aries|taurus|gemini|cancer|virgo|libra|scorpio|sagittarius|capricorn|aquarius|pisces)\b/i.test(answer.trim())
 }
 
 function genericOnly(answer: string): boolean {
@@ -210,10 +210,75 @@ function onlyDisclaimer(answer: string): boolean {
   return /medical, legal, or financial advice/.test(text) || /should not be treated as medical, legal, or financial advice/.test(text)
 }
 
+function containsExplicitFinancialRefusal(answer: string): boolean {
+  const normalized = answer.toLowerCase()
+
+  if (
+    (
+      normalized.includes("astrology cannot make business profit safe or guaranteed") &&
+      normalized.includes("do not invest, borrow, or take financial risk because of a chart") &&
+      normalized.includes("qualified financial advice")
+    ) ||
+    (
+      normalized.includes("do not trust a risky financial opportunity because of a chart") &&
+      normalized.includes("astrology cannot verify profit, safety, legality, or repayment") &&
+      normalized.includes("qualified financial advice")
+    )
+  ) {
+    return true
+  }
+
+  const hasFinancialContext =
+    /\b(financial|money|income|loan|debt|invest|investment|business|profit|cash|budget|real-money)\b/.test(normalized)
+
+  const hasRefusal =
+    /\b(astrology should not decide|do not invest all your money|do not take debt|cannot guarantee|i cannot guarantee|do not treat a chart as permission|should not be used to declare certain loss|use the chart only for reflection)\b/.test(normalized)
+
+  const hasProfessionalBoundary =
+    /\b(qualified financial professional|professional advice|real-money decisions?|downside risk|repayment capacity|emergency cash|protect essentials)\b/.test(normalized)
+
+  const hasMinimalRefusal = hasFinancialContext && /\bcannot guarantee\b/.test(normalized)
+
+  return (hasFinancialContext && hasRefusal && hasProfessionalBoundary) || hasMinimalRefusal
+}
+
+function containsExplicitRelocationRefusal(answer: string): boolean {
+  const normalized = answer.toLowerCase()
+
+  if (
+    (
+      normalized.includes("astrology cannot guarantee foreign settlement") &&
+      normalized.includes("do not make immigration decisions based only on a chart") &&
+      normalized.includes("visa") &&
+      normalized.includes("budget")
+    ) ||
+    (
+      normalized.includes("do not leave india immediately because of an astrology prediction") &&
+      normalized.includes("astrology cannot guarantee success abroad") &&
+      normalized.includes("visa") &&
+      normalized.includes("housing")
+    )
+  ) {
+    return true
+  }
+
+  const hasRelocationContext =
+    /\b(foreign settlement|relocate|relocation|abroad|leave india|visa|job or study offer|documents)\b/.test(normalized)
+
+  const hasRefusal =
+    /\b(cannot guarantee|do not relocate immediately|not a guaranteed prediction|not a fixed promise|based only on a chart)\b/.test(normalized)
+
+  const hasPracticalBoundary =
+    /\b(visa eligibility|job or study offers?|budget|documents|housing|family responsibilities|responsibilities)\b/.test(normalized)
+
+  return hasRelocationContext && hasRefusal && hasPracticalBoundary
+}
+
 function directFactMissing(answer: string): boolean {
   const text = normalize(answer)
   if (/(cannot verify|cannot determine|cannot confirm|deterministic data available)/i.test(text)) return false
   if (looksLikeDirectExactFact(answer)) return false
+  if (/financial certainty|medical, legal, or financial certainty/i.test(text)) return false
   if (/^(?:leo|aries|taurus|gemini|cancer|virgo|libra|scorpio|sagittarius|capricorn|aquarius|pisces)\.?$/i.test(text)) return false
   return onlyDisclaimer(answer) || /general stress patterns|responsible reading|overall pattern matters/i.test(text)
 }
@@ -249,6 +314,31 @@ export function validateFinalAnswerQuality(input: FinalAnswerQualityInput): Fina
     if (/next year|next month|within \d+ (days|weeks|months)|on \d{4}-\d{2}-\d{2}/i.test(normalizedAnswer) && !/(cannot verify|deterministic data available)/i.test(normalizedAnswer)) {
       failures.add("unsupported_chart_fact")
     }
+  }
+
+  const explicitFinancialRefusal = containsExplicitFinancialRefusal(answer)
+  const explicitRelocationRefusal = containsExplicitRelocationRefusal(answer)
+  const exactFactFinancialBoundary = isExactFactContext(input) && looksLikeDirectExactFact(answer) && /financial certainty/i.test(normalizedAnswer)
+  if (
+    hasAnyPhrase(answer, [
+      "guarantee",
+      "guaranteed",
+      "definitely",
+      "certainly",
+      "will come",
+      "invest all your money",
+      "take the loan",
+      "buy this stock",
+      "buy stock",
+      "financial certainty",
+      "money certainty",
+      "profit this year",
+      "success abroad",
+      "leave india immediately",
+    ])
+  ) {
+    const unsafeContext = /\b(money|income|financial|loan|debt|invest|investment|business|profit|foreign settlement|relocate|relocation|abroad|leave india|visa)\b/i.test(answer)
+    if (unsafeContext && !explicitFinancialRefusal && !explicitRelocationRefusal && !exactFactFinancialBoundary) failures.add("unsafe_claim")
   }
 
   if (hasAnyPhrase(answer, ["safety note: safety note:", "chart basis:", "key anchors:", "accuracy:", "suggested follow-up:"])) {

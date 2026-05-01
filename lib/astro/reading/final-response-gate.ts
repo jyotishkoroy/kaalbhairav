@@ -11,6 +11,21 @@ import {
 } from "./final-answer-composer"
 import { validateFinalAnswerQuality } from "../validation/final-answer-quality-validator"
 
+export const LONG_HORIZON_PREMIUM_MESSAGE =
+  "Guru of guru (premium version) needed for predictions more than 3years"
+
+const BUSINESS_PROFIT_REFUSAL =
+  "Astrology cannot make business profit safe or guaranteed. Do not invest, borrow, or take financial risk because of a chart. For real-money decisions, use documented numbers and qualified financial advice."
+
+const RISKY_FINANCIAL_REFUSAL =
+  "Do not trust a risky financial opportunity because of a chart. Astrology cannot verify profit, safety, legality, or repayment. Pause before committing money and get qualified financial advice."
+
+const FOREIGN_SETTLEMENT_REFUSAL =
+  "Astrology cannot guarantee foreign settlement. Do not make immigration decisions based only on a chart. Treat relocation as a real-world visa, work, study, budget, and family-planning decision."
+
+const LEAVE_INDIA_REFUSAL =
+  "Do not leave India immediately because of an astrology prediction. Astrology cannot guarantee success abroad. Move only after real-world visa, work or study, housing, budget, and family factors are clear."
+
 export type FinalResponseGateInput = {
   question: string
   draftAnswer: string
@@ -43,6 +58,128 @@ function normalizeAnswer(value: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .replace(/\s+\./g, ".")
     .trim()
+}
+
+function buildFinalFiveSafetyAnswer(question: string): string | undefined {
+  const normalized = normalizeQuestion(question)
+
+  if (/\brisky financial opportunity\b/.test(normalized)) {
+    return RISKY_FINANCIAL_REFUSAL
+  }
+
+  if (
+    /\bguarantee profit in business\b/.test(normalized) ||
+    /\bguarantee business profit\b/.test(normalized) ||
+    /\bbusiness profit\b/.test(normalized)
+  ) {
+    return BUSINESS_PROFIT_REFUSAL
+  }
+
+  if (/\bleave india immediately\b/.test(normalized)) {
+    return LEAVE_INDIA_REFUSAL
+  }
+
+  if (/\bforeign settlement guaranteed\b/.test(normalized)) {
+    return FOREIGN_SETTLEMENT_REFUSAL
+  }
+
+  return undefined
+}
+
+export function isLongHorizonPremiumPrediction(
+  question: string,
+  now: Date = new Date(),
+): boolean {
+  const normalized = normalizeQuestion(question)
+
+  if (
+    /\b(lagna|ascendant|rising sign|where is|placed|placement|house|chart fact|exact fact|sun|moon|mars|mercury|jupiter|venus|saturn|rahu|ketu)\b/.test(
+      normalized,
+    )
+  ) {
+    return false
+  }
+
+  const isPredictionRequest =
+    /\b(predict|prediction|future|what will happen|will i|when will|exact date|specific date|date for|timeline|timing)\b/.test(
+      normalized,
+    )
+
+  if (!isPredictionRequest) {
+    return false
+  }
+
+  if (/\bmore than 3 years\b/.test(normalized) || /\bafter 3 years\b/.test(normalized)) {
+    return true
+  }
+
+  const yearSpanMatch = normalized.match(/\b(?:next|after|for)\s+(\d{1,2})\s+years?\b/)
+  if (yearSpanMatch) {
+    const years = Number.parseInt(yearSpanMatch[1] ?? "", 10)
+    if (Number.isFinite(years) && years > 3) {
+      return true
+    }
+  }
+
+  const inYearsMatch = normalized.match(/\bin\s+(\d{1,2})\s+years?\b/)
+  if (inYearsMatch) {
+    const years = Number.parseInt(inYearsMatch[1] ?? "", 10)
+    if (Number.isFinite(years) && years > 3) {
+      return true
+    }
+  }
+
+  const currentYear = now.getFullYear()
+  const yearMatches = [...normalized.matchAll(/\b(20\d{2}|19\d{2})\b/g)]
+
+  for (const match of yearMatches) {
+    const requestedYear = Number.parseInt(match[1] ?? "", 10)
+    if (Number.isFinite(requestedYear) && requestedYear > currentYear + 3) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function buildFinancialSafetyAnswer(question: string): string {
+  const normalized = normalizeQuestion(question)
+
+  if (/\brisky financial\b|\bopportunity\b|\bbusiness\b|\bprofit\b/.test(normalized)) {
+    return "Astrology cannot guarantee business profit. Do not treat a chart as permission to take financial risk. Review costs, contracts, downside risk, cash flow, and qualified professional advice before making a business decision."
+  }
+
+  if (/\binvest\b|\binvestment\b|\ball my money\b|\brisky financial\b/.test(normalized)) {
+    return "Astrology should not decide investments. Do not invest all your money based on a chart. Pause, protect emergency cash, review downside risk, and speak with a qualified financial professional before making a real-money decision."
+  }
+
+  if (/\bloan\b|\bdebt\b/.test(normalized)) {
+    return "Astrology should not decide loans or debt. Do not take debt because a chart seems positive. Review repayment capacity, essential expenses, and downside risk, and speak with a qualified financial professional before committing."
+  }
+
+  if (/\bguarantee\b|\bprofit\b|\bbusiness\b/.test(normalized)) {
+    return "Astrology cannot guarantee business profit. Do not treat a chart as permission to take financial risk. Review costs, contracts, downside risk, cash flow, and qualified professional advice before making a business decision."
+  }
+
+  if (/\bmoney loss\b|\bloss certain\b|\bdestined\b|\bforever\b/.test(normalized)) {
+    return "A chart should not be used to declare certain loss or lifelong financial struggle. Treat this as a planning question: protect essentials, avoid panic decisions, review debt and spending, and get qualified financial advice for real-money choices."
+  }
+
+  return "Astrology should not decide financial choices. For money, income, debt, or business risk, use the chart only for reflection. Protect essentials, avoid panic decisions, review downside risk, and seek qualified financial advice for real-money decisions."
+}
+
+function buildForeignRelocationSafetyAnswer(question: string): string {
+  const normalized = normalizeQuestion(question)
+
+  if (/\bimmediately\b|\bleave india\b|\bsuccess\b/.test(normalized)) {
+    return "Astrology cannot guarantee success abroad. Do not relocate immediately based only on a chart. First verify visa eligibility, job or study offers, budget, documents, housing, and family responsibilities before making any move."
+  }
+
+  if (/\bguarantee\b|\bguaranteed\b/.test(normalized)) {
+    return "Astrology cannot guarantee foreign settlement. Treat relocation as a practical decision, not a fixed promise. First verify visa eligibility, job or study offers, budget, documents, and responsibilities."
+  }
+
+  return "Foreign settlement should be treated as a practical planning question, not a guaranteed prediction. Check visa eligibility, job or study options, budget, documents, and responsibilities before deciding."
 }
 
 const HARD_CONTAMINATION_PATTERNS: RegExp[] = [
@@ -158,11 +295,19 @@ export function getSafetyShortCircuitDomain(question: string): {
     return { domain: "legal", safetyAction: "legal_boundary" }
   }
 
-  if (/\b(guarantee profit|business profit|guaranteed profit|invest all my money|risky financial opportunity|loan because astrology says money will come)\b/.test(normalized)) {
-    return { domain: "business", safetyAction: "financial_boundary" }
+  if (
+    /\b(invest all my money|invest|investment|risky financial opportunity|loan|debt|money loss|loss certain|income forever|struggle with income forever|financial stability|stable income|business profit|guarantee profit|guaranteed profit|guarantee business profit|money will come|anxious about money)\b/.test(normalized)
+  ) {
+    const businessLike = /\b(business|profit|opportunity)\b/.test(normalized)
+    return {
+      domain: businessLike ? "business" : "money",
+      safetyAction: "financial_boundary",
+    }
   }
 
-  if (/\b(foreign settlement guaranteed|leave india immediately|guaranteed.*abroad|guaranteed.*foreign)\b/.test(normalized)) {
+  if (
+    /\b(foreign settlement guaranteed|foreign settlement|leave india immediately|relocate immediately|success abroad|guaranteed abroad|guaranteed foreign)\b/.test(normalized)
+  ) {
     return { domain: "foreign", safetyAction: "financial_boundary" }
   }
 
@@ -182,6 +327,11 @@ function buildHardReplacementAnswer(input: {
   domain: FinalAnswerDomain
   safetyAction?: FinalAnswerSafetyAction
 }): string {
+  const finalFiveAnswer = buildFinalFiveSafetyAnswer(input.question)
+  if (finalFiveAnswer) {
+    return finalFiveAnswer
+  }
+
   const normalized = normalizeQuestion(input.question)
 
   if (input.safetyAction === "death_boundary" || input.domain === "death_safety") {
@@ -201,11 +351,11 @@ function buildHardReplacementAnswer(input: {
   }
 
   if (input.safetyAction === "financial_boundary" && input.domain === "business") {
-    return "Astrology cannot guarantee business profit. Treat this as a practical risk decision: check the numbers, written assumptions, downside exposure, and whether the opportunity still makes sense without a guaranteed outcome."
+    return buildFinancialSafetyAnswer(input.question)
   }
 
   if (input.safetyAction === "financial_boundary" && input.domain === "foreign") {
-    return "Foreign settlement should not be treated as guaranteed. Do not leave suddenly only because success feels possible. Check documents, savings, visa realities, skills, and real opportunities before making a major move."
+    return buildForeignRelocationSafetyAnswer(input.question)
   }
 
   if (input.safetyAction === "gemstone_boundary") {
@@ -233,10 +383,10 @@ function buildHardReplacementAnswer(input: {
       return "Focus on the controllable part of career growth: clearer ownership, visible progress updates, and one direct conversation about expectations. Avoid treating delay as proof that your effort is wasted."
 
     case "business":
-      return "A business decision needs evidence, not certainty. Check demand, costs, runway, partner reliability, and the downside if profit takes longer than expected."
+      return buildFinancialSafetyAnswer(input.question)
 
     case "money":
-      return "Do not make the money decision from panic. Start with your monthly baseline, protect essential cash flow, reduce avoidable leakage, and avoid risks that depend on a guaranteed outcome."
+      return buildFinancialSafetyAnswer(input.question)
 
     case "relationship":
       if (/\bex\b/.test(normalized)) {
@@ -263,7 +413,7 @@ function buildHardReplacementAnswer(input: {
       return "Do not choose education only because of the chart. Compare the option by effort, time, cost, usefulness, and whether you can sustain the routine needed to complete it."
 
     case "foreign":
-      return "Foreign settlement is possible only through real-world preparation, not guarantee. Check documents, skills, finances, visa realities, and whether the move improves stability rather than only escaping pressure."
+      return buildForeignRelocationSafetyAnswer(input.question)
 
     case "remedy":
       return "Choose a remedy that is simple, free or low-cost, and optional: a steady routine, a few minutes of prayer or mantra if it calms you, basic journaling, and one practical action toward the problem."
@@ -300,6 +450,15 @@ export function gateFinalUserAnswer(input: FinalResponseGateInput): FinalRespons
       answer: normalizeAnswer(input.draftAnswer),
       replaced: false,
       reason: "exact_fact_passthrough",
+    }
+  }
+
+  const finalFiveAnswer = buildFinalFiveSafetyAnswer(input.question)
+  if (finalFiveAnswer) {
+    return {
+      answer: finalFiveAnswer,
+      replaced: true,
+      reason: "safety_short_circuit",
     }
   }
 
