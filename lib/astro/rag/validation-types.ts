@@ -7,6 +7,8 @@ import type { RetrievalContext } from "./retrieval-types";
 import type { ReasoningPath } from "./reasoning-path-builder";
 import type { TimingContext } from "./timing-engine";
 import type { GroqAnswerJson } from "./groq-answer-writer";
+import type { QuestionFrame } from "./question-frame-types";
+import type { StructuredIntent } from "./structured-intent-types";
 
 export type ValidationSeverity = "error" | "warning";
 
@@ -52,6 +54,8 @@ export type AnswerValidationInput = {
   context: RetrievalContext;
   reasoningPath: ReasoningPath;
   timing: TimingContext;
+  questionFrame?: QuestionFrame;
+  structuredIntent?: StructuredIntent;
 };
 
 export type AnswerValidationResult = {

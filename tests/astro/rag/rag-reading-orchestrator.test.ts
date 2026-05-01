@@ -37,6 +37,7 @@ function baseFlags(overrides: Partial<AstroRagFlags> = {}): AstroRagFlags {
     llmMaxTokens: 900,
     llmTemperature: 0.2,
     llmRetryOnValidationFail: true,
+    gradedSafetyActionsEnabled: false,
     timingEngineEnabled: true,
     timingSource: "report_only",
     oracleVmTimingEnabled: false,

@@ -37,6 +37,7 @@ export type AstroRagFlags = {
   llmMaxTokens: number;
   llmTemperature: number;
   llmRetryOnValidationFail: boolean;
+  gradedSafetyActionsEnabled: boolean;
   timingEngineEnabled: boolean;
   timingSource: "report_only" | "stored" | "python_oracle";
   oracleVmTimingEnabled: boolean;
@@ -110,6 +111,7 @@ export function getAstroRagFlags(env: Record<string, string | undefined> = proce
     llmMaxTokens: readInt(env.ASTRO_LLM_MAX_TOKENS, 900),
     llmTemperature: readFloat(env.ASTRO_LLM_TEMPERATURE, 0.2),
     llmRetryOnValidationFail: readBool(env.ASTRO_LLM_RETRY_ON_VALIDATION_FAIL, true),
+    gradedSafetyActionsEnabled: readBool(env.ASTRO_GRADED_SAFETY_ACTIONS_ENABLED, false),
     timingEngineEnabled: readBool(env.ASTRO_TIMING_ENGINE_ENABLED, false),
     timingSource:
       env.ASTRO_TIMING_SOURCE === "stored" || env.ASTRO_TIMING_SOURCE === "python_oracle"

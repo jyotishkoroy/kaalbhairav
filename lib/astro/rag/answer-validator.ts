@@ -3,6 +3,8 @@
 // repository or any part of it without prior written permission from Jyotishko Roy.
 
 import type { AnswerValidationInput, AnswerValidationResult, StoreValidationResultInput, ValidationIssue } from "./validation-types";
+import { getAstroRagFlags } from "./feature-flags";
+import { classifySafetyIntent } from "./safety-intent-classifier";
 import { validateFactGrounding } from "./validators/fact-validator";
 import { validateAnswerSafety } from "./validators/safety-validator";
 import { validateAnswerTiming } from "./validators/timing-validator";
@@ -94,6 +96,8 @@ export function validateRagAnswer(input?: Partial<AnswerValidationInput>): Answe
     context: input.context,
     reasoningPath: input.reasoningPath,
     timing: input.timing,
+    questionFrame: input.questionFrame,
+    structuredIntent: input.structuredIntent,
   };
 
   const sections = validateSections(fullInput, answer);
@@ -102,6 +106,14 @@ export function validateRagAnswer(input?: Partial<AnswerValidationInput>): Answe
   const timing = validateAnswerTiming(fullInput);
   const remedy = validateAnswerRemedies(fullInput);
   const generic = validateGenericness(fullInput);
+  const flags = getAstroRagFlags();
+  const gradedSafetyDecisions = flags.gradedSafetyActionsEnabled ? classifySafetyIntent({
+    rawQuestion: fullInput.question,
+    coreQuestion: fullInput.questionFrame?.coreQuestion,
+    questionFrame: fullInput.questionFrame,
+    structuredIntent: fullInput.structuredIntent,
+    answerText: answer,
+  }) : [];
 
   const rawIssues = [...sections.issues, ...fact.issues, ...safety.issues, ...timing, ...remedy, ...generic.issues];
   const seen = new Set<string>();
@@ -129,7 +141,7 @@ export function validateRagAnswer(input?: Partial<AnswerValidationInput>): Answe
   const repairable = issues.some((issue) => ["missing_required_section", "missing_required_anchor", "generic_answer", "too_short", "does_not_answer_question", "accuracy_missing", "followup_missing"].includes(issue.code));
   const ok = strictFailureCount === 0 && score >= 75;
   const retryRecommended = !ok && (repairable || genericnessScore >= 0.65);
-  const fallbackRecommended = safetyCritical || wrongFactCritical || score < 55;
+  const fallbackRecommended = safetyCritical || wrongFactCritical || score < 55 || gradedSafetyDecisions.some((decision) => decision.action === "replace_answer");
 
   return {
     ok,
