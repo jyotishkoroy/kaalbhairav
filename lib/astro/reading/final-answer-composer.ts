@@ -138,7 +138,7 @@ function getDomainFallback(domain: FinalAnswerDomain): string {
       return "Handle this as a prioritization question. Pick the area that carries the highest real-world consequence first, then take one safe step before deciding the rest."
     case "general":
     default:
-      return "Pick one area first: career, relationship, money, family, health, study, spiritual practice, or timing. Then I can give a more useful answer instead of a broad prediction."
+      return "Pick one area first: career, relationship, money, family, health, study, spiritual practice, or timing. Which one should we focus on?"
   }
 }
 

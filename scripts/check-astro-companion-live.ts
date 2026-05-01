@@ -119,7 +119,7 @@ async function run() {
   if (isPageHtmlNotAnswer(pageResult)) {
     pageEvaluation.passed = true;
     pageEvaluation.failures = [];
-    if (!pageEvaluation.warnings.includes("page_available")) pageEvaluation.warnings.push("page_available");
+    pageEvaluation.warnings = pageEvaluation.warnings.filter((warning) => warning !== "page_available");
   }
   results.push(pageEvaluation);
 

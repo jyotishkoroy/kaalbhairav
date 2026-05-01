@@ -134,4 +134,22 @@ describe("final response gate", () => {
       exactFactExpected: false,
     }).allowed).toBe(true)
   })
+
+  it("asks a follow-up with a question mark for vague prompts", () => {
+    const result = gateFinalUserAnswer({
+      question: "What will happen?",
+      draftAnswer: "Pick one area first: career, relationship, money, family, health, study, spiritual practice, or timing. Which one should we focus on",
+      domain: "general",
+    })
+
+    expect(result.answer).toMatch(/\?$/)
+    expect(result.answer).not.toContain("Suggested follow-up:")
+    expect(validateFinalAnswerQuality({
+      answerText: result.answer,
+      rawQuestion: "What will happen?",
+      mode: "practical_guidance",
+      primaryIntent: "follow_up",
+      exactFactExpected: false,
+    }).allowed).toBe(true)
+  })
 })

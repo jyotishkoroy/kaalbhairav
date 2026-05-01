@@ -60,6 +60,18 @@ function normalizeAnswer(value: string): string {
     .trim()
 }
 
+function ensureFollowUpQuestionMark(answer: string, isFollowUp: boolean): string {
+  const trimmed = answer.trim()
+  if (!isFollowUp) return trimmed
+  if (/[?？]$/.test(trimmed)) return trimmed
+  return `${trimmed}?`
+}
+
+function questionSuggestsFollowUp(question: string): boolean {
+  const normalized = normalizeQuestion(question)
+  return /\bwhat will happen\b/.test(normalized) || /\bwhich one should we focus on\b/.test(normalized) || /\bwhich area\b/.test(normalized)
+}
+
 function buildFinalFiveSafetyAnswer(question: string): string | undefined {
   const normalized = normalizeQuestion(question)
 
@@ -440,7 +452,10 @@ function buildHardReplacementAnswer(input: {
         return "Choose one practical action for today: write down the decision causing the most pressure, identify the smallest safe step, and complete that before asking for a bigger prediction."
       }
 
-      return "Pick one area first: career, relationship, money, family, health, study, spiritual practice, or timing. A narrower question will get a more useful answer than a broad prediction."
+      return ensureFollowUpQuestionMark(
+        "Pick one area first: career, relationship, money, family, health, study, spiritual practice, or timing. Which one should we focus on",
+        true,
+      )
   }
 }
 
@@ -468,12 +483,15 @@ export function gateFinalUserAnswer(input: FinalResponseGateInput): FinalRespons
 
   if (shortCircuit) {
     return {
-      answer: normalizeAnswer(
-        buildHardReplacementAnswer({
-          question: input.question,
-          domain: effectiveDomain,
-          safetyAction: effectiveSafetyAction,
-        }),
+      answer: ensureFollowUpQuestionMark(
+        normalizeAnswer(
+          buildHardReplacementAnswer({
+            question: input.question,
+            domain: effectiveDomain,
+            safetyAction: effectiveSafetyAction,
+          }),
+        ),
+        questionSuggestsFollowUp(input.question),
       ),
       replaced: true,
       reason: "safety_short_circuit",
@@ -508,12 +526,15 @@ export function gateFinalUserAnswer(input: FinalResponseGateInput): FinalRespons
 
   if (contaminated || !quality.allowed) {
     return {
-      answer: normalizeAnswer(
-        buildHardReplacementAnswer({
-          question: input.question,
-          domain: effectiveDomain,
-          safetyAction: effectiveSafetyAction,
-        }),
+      answer: ensureFollowUpQuestionMark(
+        normalizeAnswer(
+          buildHardReplacementAnswer({
+            question: input.question,
+            domain: effectiveDomain,
+            safetyAction: effectiveSafetyAction,
+          }),
+        ),
+        questionSuggestsFollowUp(input.question),
       ),
       replaced: true,
       reason: contaminated ? "contaminated_rewrite" : "quality_rewrite",
@@ -521,7 +542,7 @@ export function gateFinalUserAnswer(input: FinalResponseGateInput): FinalRespons
   }
 
   return {
-    answer: normalizeAnswer(composed.answer),
+    answer: ensureFollowUpQuestionMark(normalizeAnswer(composed.answer), questionSuggestsFollowUp(input.question)),
     replaced: composed.repaired,
     reason: composed.repaired ? "composer_cleanup" : "unchanged",
   }

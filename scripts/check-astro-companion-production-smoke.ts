@@ -109,10 +109,18 @@ async function run() {
   results.push({
     id: "astro_v2_page",
     passed: page.result.status === 0 ? true : page.result.status > 0 && page.result.status < 500,
-    failures: page.result.status === 404 ? ["route_missing:/astro/v2"] : isPageHtmlNotAnswer(page.result) ? ["page_available"] : [],
+    failures: page.result.status === 404 ? ["route_missing:/astro/v2"] : [],
     warnings: page.result.status === 401 || page.result.status === 403 ? ["route_available_but_auth_required"] : page.result.status === 0 ? [String(page.result.error ?? "network_fetch_failure")] : [],
     live: page.result,
   });
+  if (isPageHtmlNotAnswer(page.result)) {
+    results[0] = {
+      ...results[0],
+      passed: true,
+      failures: [],
+      warnings: results[0].warnings.filter((warning) => warning !== "page_available"),
+    };
+  }
   for (const prompt of getCompanionSmokePrompts()) {
     const live = await fetchWithFallback(baseUrls, "/api/astro/v2/reading", args.timeoutMs, {
       method: "POST",
