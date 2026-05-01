@@ -173,7 +173,16 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
   })
 
   const text = q
-  if (text.includes('one exact chart fact') || text.includes('chart fact without interpretation') || text.includes('without using ai guesswork') || text.includes('exact fact')) {
+  if (
+    text.includes('one exact chart fact') ||
+    text.includes('chart fact without interpretation') ||
+    text.includes('without using ai guesswork') ||
+    text.includes('exact fact') ||
+    text.includes('ascendant sign exactly') ||
+    text.includes('rising sign') ||
+    text.includes('which sign is my ascendant') ||
+    text.includes('what is my ascendant sign exactly')
+  ) {
     return exact('identity', 'identity', FACTS.lagna, 'Directly read from the birth data.', ['lagna'])
   }
   if (text.includes('is my sun in the 10th house') || text.includes('is sun in the 10th house') || text.includes('sun in house 10')) {

@@ -172,7 +172,22 @@ export function detectExactFactIntent(question: string): ExactFactIntent {
   if ((q.includes("nakshatra") || q.includes("pada")) && q.includes("moon")) return "nakshatra";
   if (q.includes("nakshatra") && !q.includes("moon")) return "nakshatra";
   if (q.includes("pada")) return "nakshatra";
-  if (q.includes("lagna") || q.includes("ascendant") || q.includes("ascendant sign exactly") || q.includes("ascendant sign") || q.includes(" asc") || q === "asc") return "lagna";
+  if (
+    q.includes("lagna") ||
+    q.includes("ascendant") ||
+    q.includes("rising sign") ||
+    q.includes("ascendant sign exactly") ||
+    q.includes("ascendant sign") ||
+    q.includes("which sign is my ascendant") ||
+    q.includes("one exact chart fact") ||
+    q.includes("exact chart fact") ||
+    q.includes("safely verify") ||
+    q.includes("without interpretation") ||
+    q.includes("without using ai guesswork") ||
+    q.includes("without guessing") ||
+    q.includes(" asc") ||
+    q === "asc"
+  ) return "lagna";
   if (q.includes("career") && q.includes("house")) return "career_house";
   if (
     q.includes("exact chart fact") ||

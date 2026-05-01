@@ -16,6 +16,7 @@ export type StructuredIntent = {
     | "marriage"
     | "family"
     | "education"
+    | "foreign"
     | "foreign_settlement"
     | "remedy"
     | "sleep"
@@ -24,6 +25,7 @@ export type StructuredIntent = {
     | "legal"
     | "financial_risk"
     | "vague"
+    | "mixed"
     | "general";
   secondaryIntents: string[];
   mode: "exact_fact" | "interpretive" | "timing" | "remedy" | "follow_up" | "safety";

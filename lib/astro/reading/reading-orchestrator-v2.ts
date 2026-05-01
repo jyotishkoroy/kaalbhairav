@@ -36,6 +36,11 @@ import { routeStructuredIntent } from '@/lib/astro/rag/structured-intent-router'
 import { classifySafetyIntent } from '@/lib/astro/rag/safety-intent-classifier'
 import { buildReadingPlan, renderReadingPlanFallback, renderUserFacingAnswerPlan, toUserFacingAnswerPlan } from '@/lib/astro/synthesis'
 import { validateFinalAnswerQuality } from '@/lib/astro/validation/final-answer-quality-validator'
+import {
+  composeFinalUserAnswer,
+  type FinalAnswerDomain,
+  type FinalAnswerSafetyAction,
+} from '@/lib/astro/reading/final-answer-composer'
 import type {
   AstrologyReadingInput,
   AstrologyReadingResult,
@@ -233,6 +238,44 @@ function hasExplicitMonthlyIntent(question: string, mode: ReadingMode): boolean 
         /\b20\d{2}\b/.test(text) &&
         monthTerms.some((term) => text.includes(term))))
   )
+}
+
+function mapIntentToFinalAnswerDomain(value: unknown): FinalAnswerDomain {
+  const intent = String(value ?? '').toLowerCase()
+
+  if (intent.includes('exact')) return 'exact_fact'
+  if (intent.includes('career') || intent.includes('promotion') || intent.includes('job')) return 'career'
+  if (intent.includes('business') || intent.includes('profit')) return 'business'
+  if (intent.includes('money') || intent.includes('finance') || intent.includes('income')) return 'money'
+  if (intent.includes('relationship') || intent.includes('ex') || intent.includes('partner')) return 'relationship'
+  if (intent.includes('marriage')) return 'marriage'
+  if (intent.includes('family') || intent.includes('parent')) return 'family'
+  if (intent.includes('education') || intent.includes('study') || intent.includes('exam')) return 'education'
+  if (intent.includes('foreign') || intent.includes('abroad') || intent.includes('relocation')) return 'foreign'
+  if (intent.includes('remedy') || intent.includes('gemstone') || intent.includes('puja')) return 'remedy'
+  if (intent.includes('spiritual') || intent.includes('curse') || intent.includes('black_magic')) return 'spiritual'
+  if (intent.includes('sleep') || intent.includes('insomnia')) return 'sleep'
+  if (intent.includes('health') || intent.includes('medical')) return 'health'
+  if (intent.includes('legal') || intent.includes('court')) return 'legal'
+  if (intent.includes('death') || intent.includes('lifespan') || intent.includes('danger_to_life')) return 'death_safety'
+  if (intent.includes('timing')) return 'timing'
+  if (intent.includes('mixed')) return 'mixed'
+
+  return 'general'
+}
+
+function mapSafetyActionToFinalAnswerSafetyAction(value: unknown): FinalAnswerSafetyAction {
+  const safety = String(value ?? '').toLowerCase()
+
+  if (safety.includes('medical') || safety.includes('health')) return 'medical_boundary'
+  if (safety.includes('legal') || safety.includes('court')) return 'legal_boundary'
+  if (safety.includes('financial') || safety.includes('profit') || safety.includes('investment')) return 'financial_boundary'
+  if (safety.includes('death') || safety.includes('lifespan') || safety.includes('danger')) return 'death_boundary'
+  if (safety.includes('gemstone')) return 'gemstone_boundary'
+  if (safety.includes('remedy') || safety.includes('puja')) return 'remedy_boundary'
+  if (safety.includes('curse') || safety.includes('black') || safety.includes('doom')) return 'spiritual_fear_boundary'
+
+  return 'none'
 }
 
 /**
@@ -549,11 +592,25 @@ export async function generateReadingV2(
           },
         })
       : { allowed: true, failures: [] as never[] }
-    const finalAnswer = structuredFlagsEnabled
-      ? quality.allowed
-        ? renderedAnswer
-        : renderReadingPlanFallback(internalPlan)
-      : finalSafety.answer
+    const composedAnswer = composeFinalUserAnswer({
+      question: v2Input.question,
+      draftAnswer: structuredFlagsEnabled
+        ? quality.allowed
+          ? renderedAnswer
+          : renderReadingPlanFallback(internalPlan)
+        : finalSafety.answer,
+      domain: exactFact
+        ? 'exact_fact'
+        : mapIntentToFinalAnswerDomain(
+            structuredIntent?.primaryIntent ?? concern.topic,
+          ),
+      safetyAction: mapSafetyActionToFinalAnswerSafetyAction(
+        safetyDecisions[0]?.action ?? concern.topic,
+      ),
+      exactFact: Boolean(exactFact),
+    })
+
+    const finalAnswer = composedAnswer.answer
     await saveOptionalMemory({
       enabled: memoryEnabled,
       userId,
@@ -613,6 +670,7 @@ export async function generateReadingV2(
         memoryUsed: Boolean(shouldIncludeMemory),
         evidenceDomain: domainEvidenceSelection?.primaryDomain,
         finalQualityPassed: quality.allowed,
+        answerComposerRepaired: composedAnswer.repaired,
         safetyAction: safetyDecisions.map((item) => item.action),
         followUpQuestion:
           concern.topic === 'career'

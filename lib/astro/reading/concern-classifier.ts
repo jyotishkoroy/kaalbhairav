@@ -227,6 +227,7 @@ export function detectTopic(message: string): ReadingTopic {
     return 'health'
   }
   if (hasAny(lower, TOPIC_KEYWORDS.marriage)) return 'marriage'
+  if (hasAny(lower, ['business', 'profit', 'startup', 'partnership']) && !hasAny(lower, ['career', 'job', 'promotion', 'work', 'office', 'salary'])) return 'money'
   if (hasAny(lower, TOPIC_KEYWORDS.career)) return 'career'
   if (hasAny(lower, TOPIC_KEYWORDS.money)) return 'money'
   if (hasAny(lower, TOPIC_KEYWORDS.education)) return 'education'

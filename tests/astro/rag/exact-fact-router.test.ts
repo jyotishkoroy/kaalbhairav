@@ -45,6 +45,8 @@ describe("exact fact router", () => {
     const cases = [
       ["What is my Lagna?", "Leo", "lagna"],
       ["What is my ascendant?", "Leo", "lagna"],
+      ["What is my rising sign?", "Leo", "lagna"],
+      ["Which sign is my ascendant?", "Leo", "lagna"],
       ["Where is Sun placed?", "Taurus", "planet_placement"],
       ["Tell me Sun placement.", "Taurus", "planet_placement"],
       ["Where is Venus placed?", "Cancer", "planet_placement"],
@@ -75,6 +77,13 @@ describe("exact fact router", () => {
     const result = answer("What is my Ascendant sign exactly?");
     expect(result.intent).toBe("lagna");
     expect(text(result)).toContain("Leo");
+  });
+
+  it("routes rising sign and exact chart fact variants to lagna", () => {
+    expect(answer("What is my rising sign?").intent).toBe("lagna");
+    expect(answer("Which sign is my ascendant?").intent).toBe("lagna");
+    expect(answer("Can you answer one exact fact without using AI guesswork?").intent).toBe("lagna");
+    expect(answer("Is my Sun in the 10th house?").intent).toBe("planet_placement");
   });
 
   it("answers career house deterministically", () => {

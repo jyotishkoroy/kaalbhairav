@@ -412,4 +412,30 @@ describe('Reading Orchestrator V2', () => {
     expect(result.meta?.monthlyLayer).toBe('disabled')
     expect(result.meta?.monthlyGuidanceIncluded).toBe(false)
   })
+
+  it('composes business and exact fact answers without scaffolding leaks', async () => {
+    const business = await generateReadingV2(
+      makeInput({
+        question: 'Can astrology guarantee business profit?',
+      }),
+    )
+
+    const businessAnswer = String(business.answer ?? '')
+    expect(businessAnswer).toContain('Money pressure')
+    expect(businessAnswer).not.toContain('The question is broad')
+    expect(businessAnswer).not.toContain('internal')
+    expect(businessAnswer).not.toContain('recognition')
+
+    const exact = await generateReadingV2(
+      makeInput({
+        question: 'What is my Ascendant sign exactly?',
+      }),
+    )
+
+    const exactAnswer = String(exact.answer ?? '')
+    expect(exactAnswer).toContain('Direct answer:')
+    expect(exactAnswer).toContain('Leo')
+    expect(exactAnswer).not.toContain('Accuracy:')
+    expect(exact.meta?.exactFactAnswered).toBe(true)
+  })
 })

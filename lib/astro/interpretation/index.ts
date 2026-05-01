@@ -41,7 +41,7 @@ function dedupeEvidence(evidence: AstroEvidence[]): AstroEvidence[] {
 }
 
 export function buildAstroEvidence(ctx: AstroInterpretationContext): AstroEvidence[] {
-  const profile = getChartProfileForTopic(ctx.concern.topic) ?? getChartProfileForTopic(ctx.concern.subtopic ?? '') 
+  const profile = getChartProfileForTopic(ctx.concern.topic) ?? getChartProfileForTopic(ctx.concern.subtopic ?? '')
   const anchorEvidence: AstroEvidence[] = profile
     ? [
         {

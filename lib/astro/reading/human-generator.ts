@@ -127,6 +127,11 @@ function buildOpening(concern: UserConcern, question?: string): string {
   const familyPressure = question && /family.*(marriage|career)|(marriage|career).*(family)/i.test(question)
 
   if (concern.topic === 'career') {
+    if (question && /(business|profit|startup|partnership)/i.test(question)) {
+      return datePhrase
+        ? `If ${datePhrase} matters here, the useful focus is on cash flow, risk limits, and whether the business plan is actually workable.`
+        : 'Business questions should stay grounded in numbers, risk limits, and whether the idea is workable in practice.'
+    }
     if (familyPressure) {
       return 'Family pressure can make a career question feel heavier than it should. Keep the focus on clarity, boundaries, and the next practical step.'
     }
@@ -171,7 +176,11 @@ function buildOpening(concern: UserConcern, question?: string): string {
     return 'Spiritual practice should reduce fear, not increase it. Keep it simple, optional, and steady.'
   }
 
-  return 'The question is broad, so start with the area that feels most urgent and choose one grounded next step.'
+  if (concern.topic === 'general') {
+    return 'The question is broad, so start with the area that feels most urgent and choose one grounded next step.'
+  }
+
+  return ''
 }
 
 function dedupeAdjacentWords(text: string): string {
@@ -224,7 +233,8 @@ function buildSpecificityLine(question: string | undefined, concern: UserConcern
   if (concern.topic === 'career') {
     if (/(promotion|promote|increment)/i.test(text)) return 'This is a promotion question, so the answer should center on responsibility, visibility, and recognition.'
     if (/(salary|pay|income)/i.test(text)) return 'This is an income question, so the answer should center on earnings growth, leverage, and proof of output.'
-    if (/(business|job|startup|office)/i.test(text)) return 'This is a work-choice question, so the answer should compare stability, ownership, and execution style.'
+    if (/(business|profit|startup|partnership)/i.test(text)) return 'This is a business question, so the answer should compare risk, cash flow, and practical viability.'
+    if (/(job|office)/i.test(text)) return 'This is a work-choice question, so the answer should compare stability, ownership, and execution style.'
     if (/(foreign company|abroad company|multinational)/i.test(text)) return 'This is a work-mobility question, so the answer should weigh networks, adaptation, and practical timing.'
   }
 
@@ -320,6 +330,7 @@ function renderEmptyEvidenceReading(concern: UserConcern): string {
 
 export function generateHumanReading(input: HumanReadingInput): string {
   const visibleEvidence = input.evidence.filter((item) => item.visibleToUser)
+  const businessQuestion = /business|profit|startup|partnership/i.test(input.question ?? '')
 
   if (visibleEvidence.length === 0) {
     return renderEmptyEvidenceReading(input.concern)
@@ -331,6 +342,7 @@ export function generateHumanReading(input: HumanReadingInput): string {
 
   const opening = buildOpening(input.concern, input.question)
   const topicOpening = shouldRenderTopicBlock(input.concern.topic, input.concern)
+    && !(input.concern.topic === 'career' && businessQuestion)
     ? pickTopicOpening(input.concern.topic)
     : ''
   const memoryBridge = renderMemoryBridge(input.memorySummary)

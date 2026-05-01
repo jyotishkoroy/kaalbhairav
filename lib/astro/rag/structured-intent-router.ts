@@ -32,6 +32,8 @@ function detectExactFact(q: string): boolean {
   return hasAny(q, [
     "what is my lagna",
     "what is my ascendant sign exactly",
+    "what is my rising sign",
+    "which sign is my ascendant",
     "where is sun placed",
     "where is moon placed",
     "where is mars placed",
@@ -73,22 +75,20 @@ export function routeStructuredIntent(input: StructuredIntentInput): StructuredI
   const q = normalize(resolved.question);
   if (!q) return buildIntent("general", "follow_up", "low", "fallback_raw_question");
   if (detectExactFact(q)) return buildIntent("exact_fact", "exact_fact", q.includes("exact") ? "high" : "medium", resolved.routedFrom);
-  if (hasAny(q, ["why does my career feel stuck", "working hard but not getting promoted", "should i change my job", "how can i improve recognition at work"])) return buildIntent("career", "interpretive", "high", resolved.routedFrom);
-  if (hasAny(q, ["should i focus on job, business, or study", "i am confused between job business and study"])) return buildIntent("career", "interpretive", "high", resolved.routedFrom, ["job", "business", "study"]);
-  if (hasAny(q, ["why do i feel anxious about money", "how can i build financial stability"])) return buildIntent("money", "interpretive", "high", resolved.routedFrom);
-  if (hasAny(q, ["can astrology guarantee business profit", "can you guarantee business profit this year"])) return buildIntent("business", "safety", "high", resolved.routedFrom, ["financial_risk"]);
-  if (hasAny(q, ["should i invest all my savings now", "should i take a risky financial opportunity"])) return buildIntent("financial_risk", "safety", "high", resolved.routedFrom);
-  if (hasAny(q, ["what relationship pattern should i reflect on", "why do my relationships keep breaking"])) return buildIntent("relationship", "interpretive", "high", resolved.routedFrom);
-  if (hasAny(q, ["why is my marriage getting delayed", "will i definitely get married soon", "should i marry someone just because family is pressuring me"])) return buildIntent("marriage", detectSafety(q) ? "safety" : "interpretive", "high", resolved.routedFrom, q.includes("family") ? ["family"] : []);
-  if (hasAny(q, ["why do i feel responsible for everyone at home", "how do i set boundaries with family pressure", "why do i carry guilt for everyone", "how should i talk to my family about career stress"])) return buildIntent("family", "interpretive", "high", resolved.routedFrom);
-  if (hasAny(q, ["should i continue education or start working", "should i choose education only because of my chart"])) return buildIntent("education", "interpretive", "high", resolved.routedFrom, ["career"]);
-  if (hasAny(q, ["what should i study next"])) return buildIntent("education", "interpretive", "high", resolved.routedFrom);
-  if (hasAny(q, ["will i go abroad", "should i leave india immediately for success", "is foreign settlement guaranteed", "can foreign settlement be guaranteed"])) return buildIntent("foreign_settlement", detectSafety(q) ? "safety" : "timing", "high", resolved.routedFrom);
-  if (hasAny(q, ["give me remedy for bad sleep", "i cannot sleep and feel mentally restless"])) return buildIntent("sleep", "remedy", "high", resolved.routedFrom);
-  if (hasAny(q, ["what remedy can i do without spending money"])) return buildIntent("remedy", "remedy", "high", resolved.routedFrom);
-  if (hasAny(q, ["should i stop medical treatment and use mantra only", "can astrology diagnose my disease"])) return buildIntent("health_adjacent", "safety", "high", resolved.routedFrom);
-  if (hasAny(q, ["can my chart tell when i will die", "how long will i live", "is there danger to my life this year", "is there a death period in my chart", "can astrology predict accidents exactly", "danger to my life", "dangerous for my health", "insomnia caused by planets", "is this year dangerous for my health", "is hanuman chalisa safe as a calming practice"])) return buildIntent("death_lifespan", "safety", "high", resolved.routedFrom);
+  if (hasAny(q, ["can my chart tell when i will die", "how long will i live", "is there danger to my life this year", "is there a death period in my chart", "can astrology predict accidents exactly", "danger to my life", "dangerous for my health"])) return buildIntent("death_lifespan", "safety", "high", resolved.routedFrom);
+  if (hasAny(q, ["should i stop medical treatment and use mantra only", "can astrology diagnose my disease", "is this year dangerous for my health"])) return buildIntent("health_adjacent", "safety", "high", resolved.routedFrom);
   if (hasAny(q, ["will i win my court case", "can astrology guarantee my court case result"])) return buildIntent("legal", "safety", "high", resolved.routedFrom);
+  if (hasAny(q, ["what remedy can i do without spending money", "give me remedy for bad sleep", "i cannot sleep and feel mentally restless", "remedy", "puja", "mantra", "gemstone", "spiritual practice"])) return buildIntent("remedy", "remedy", "high", resolved.routedFrom);
+  if (hasAny(q, ["can astrology guarantee business profit", "can you guarantee business profit this year", "business profit", "profit in business", "startup profit", "partnership profit"])) return buildIntent("business", "safety", "high", resolved.routedFrom, ["financial_risk"]);
+  if (hasAny(q, ["will i go abroad", "should i leave india immediately for success", "is foreign settlement guaranteed", "can foreign settlement be guaranteed", "abroad", "foreign settlement", "relocation", "visa"])) return buildIntent("foreign", hasAny(q, ["guaranteed", "immediately", "should i leave"]) ? "safety" : "timing", "high", resolved.routedFrom);
+  if (hasAny(q, ["should i focus on job, business, or study", "i am confused between job business and study", "job, business, and study"])) return buildIntent("mixed", "follow_up", "high", resolved.routedFrom, ["job", "business", "study"]);
+  if (hasAny(q, ["should i continue education or start working", "should i choose education only because of my chart", "what should i study next", "education", "study", "exam"])) return buildIntent("education", "interpretive", "high", resolved.routedFrom);
+  if (hasAny(q, ["why do i feel responsible for everyone at home", "how do i set boundaries with family pressure", "why do i carry guilt for everyone", "how should i talk to my family about career stress", "family pressure", "parents", "home"])) return buildIntent("family", "interpretive", "high", resolved.routedFrom);
+  if (hasAny(q, ["why is my marriage getting delayed", "will i definitely get married soon", "should i marry someone just because family is pressuring me", "marriage"])) return buildIntent("marriage", hasAny(q, ["definitely", "pressuring", "guarantee"]) ? "safety" : "interpretive", "high", resolved.routedFrom, q.includes("family") ? ["family"] : []);
+  if (hasAny(q, ["what relationship pattern should i reflect on", "why do my relationships keep breaking", "relationship", "ex", "partner"])) return buildIntent("relationship", "interpretive", "high", resolved.routedFrom);
+  if (hasAny(q, ["why do i feel anxious about money", "how can i build financial stability", "money", "finance", "income", "investment", "debt"])) return buildIntent("money", "interpretive", "high", resolved.routedFrom);
+  if (hasAny(q, ["why does my career feel stuck", "working hard but not getting promoted", "should i change my job", "how can i improve recognition at work", "career", "job", "promotion", "work"])) return buildIntent("career", "interpretive", "high", resolved.routedFrom);
+  if (hasAny(q, ["should i invest all my savings now", "should i take a risky financial opportunity"])) return buildIntent("financial_risk", "safety", "high", resolved.routedFrom);
   if (hasAny(q, ["what will happen", "tell me my future", "i do not know what to ask", "ask me a better question for my situation"])) return buildIntent("vague", "follow_up", "high", resolved.routedFrom);
   if (detectSafety(q)) return buildIntent("general", "safety", "medium", resolved.routedFrom);
   if (hasAny(q, ["for the next month", "for this year", "when i feel anxious", "when family pressure is high", "when i feel stuck", "without predicting exact timing"])) return buildIntent("general", "interpretive", "low", resolved.routedFrom);
