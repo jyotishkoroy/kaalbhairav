@@ -1,7 +1,7 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import type { AstroEvidence } from '@/lib/astro/interpretation/evidence'
@@ -39,7 +39,8 @@ export type HumanReadingInput = {
 function renderMemoryBridge(memorySummary?: string): string {
   if (!memorySummary) return ''
   const cleaned = memorySummary.replace(/\s+/g, ' ').trim()
-  return cleaned.length > 160 ? `Previous concern: ${cleaned.slice(0, 157).trimEnd()}...` : `Previous concern: ${cleaned}`
+  if (/previous concern:/i.test(cleaned)) return cleaned.length > 160 ? `${cleaned.slice(0, 157).trimEnd()}...` : cleaned
+  return cleaned.length > 160 ? `Earlier context: ${cleaned.slice(0, 149).trimEnd()}...` : `Earlier context: ${cleaned}`
 }
 
 function extractDatePhrase(question: string): string | undefined {
@@ -59,55 +60,33 @@ function hasAnyText(question: string, phrases: string[]): boolean {
   return phrases.some((phrase) => lower.includes(phrase.toLowerCase()))
 }
 
-function echoQuestionKeyword(question?: string): string {
-  if (!question) return ''
-
-  const lower = question.toLowerCase()
-  const keywords = [
-    'business',
-    'exam',
-    'salary',
-    'promotion',
-    'job',
-    'career',
-    'work',
-    'relationship',
-    'marriage',
-    'money',
-    'sleep',
-    'remedy',
-    'naukri',
-    'কাজ',
-    'काम',
-  ]
-
-  const match = keywords.find((keyword) => lower.includes(keyword))
-  return match ? ` ${match}` : ''
-}
-
 function buildOpening(concern: UserConcern, question?: string): string {
   const datePhrase = question ? extractDatePhrase(question) : undefined
+  const familyPressure = question && /family.*(marriage|career)|(marriage|career).*(family)/i.test(question)
 
   if (concern.topic === 'career') {
+    if (familyPressure) {
+      return 'You are balancing family pressure with career and marriage concerns, so I would keep this grounded in clarity, boundaries, and practical next steps.'
+    }
     return datePhrase
-      ? `You are asking about ${datePhrase} and your career${echoQuestionKeyword(question)}. I would read this as a work-and-progress question first.`
-      : `You are asking about career progress${echoQuestionKeyword(question)}, so I would focus on work, effort, timing, and practical next steps.`
+      ? `You are asking about ${datePhrase} and your career. I would read this as a work-and-progress question first.`
+      : `You are asking about career progress, so I would focus on work, effort, timing, and practical next steps.`
   }
 
   if (concern.topic === 'money') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and money${echoQuestionKeyword(question)}. I would read this as a financial timing question first.`
-      : `You are asking about money${echoQuestionKeyword(question)}, so the useful answer is about stability, planning, and cash-flow discipline.`
+      ? `You are asking about ${datePhrase} and money. I would read this as a financial timing question first.`
+      : `You are asking about money, so the useful answer is about stability, planning, and cash-flow discipline.`
   }
 
   if (concern.topic === 'relationship' || concern.topic === 'marriage') {
     return datePhrase
-      ? `You are asking about ${datePhrase} and your relationship or marriage${echoQuestionKeyword(question)}. I would read this as a timing-and-connection question first.`
-      : `You are asking about a relationship or marriage${echoQuestionKeyword(question)}, so the useful answer is about consistency, clarity, and emotional steadiness.`
+      ? `You are asking about ${datePhrase} and your relationship or marriage. I would read this as a timing-and-connection question first.`
+      : `You are asking about a relationship or marriage, so the useful answer is about consistency, clarity, and emotional steadiness.`
   }
 
   if (concern.topic === 'education') {
-    return `You are asking about education${echoQuestionKeyword(question)}, so the useful answer is about study, preparation, and the right environment.`
+    return `You are asking about education, so the useful answer is about study, preparation, and the right environment.`
   }
 
   if (concern.topic === 'health') {
@@ -120,15 +99,15 @@ function buildOpening(concern: UserConcern, question?: string): string {
 
   if (concern.questionType === 'timing') {
     return datePhrase
-      ? `You are asking about ${datePhrase}${echoQuestionKeyword(question)}, so I will keep this focused on timing and what to prepare for.`
-      : `You are asking about timing${echoQuestionKeyword(question)}, so I will keep this focused on when, how long, and what to prepare for.`
+      ? `You are asking about ${datePhrase}, so I will keep this focused on timing and what to prepare for.`
+      : `You are asking about timing, so I will keep this focused on when, how long, and what to prepare for.`
   }
 
   if (concern.questionType === 'remedy' || concern.topic === 'remedy') {
     return `You are asking for a remedy, so I will keep this safe, practical, and not fear-based.`
   }
 
-  return `You are asking for guidance on a specific situation${echoQuestionKeyword(question)}, so I will keep the answer focused and practical.`
+  return `You are asking for guidance on a specific situation, so I will keep the answer focused and practical.`
 }
 
 function dedupeAdjacentWords(text: string): string {
@@ -153,7 +132,7 @@ function dedupeRepeatedLines(text: string): string {
 function buildChartBasis(concern: UserConcern, question?: string): string {
   const profile = getChartProfileForTopic(concern.subtopic ?? concern.topic)
   if (!profile) {
-    return 'Chart basis: I am using the chart patterns available in the reading, with uncertainty where the evidence is broad.'
+    return 'What I can safely anchor this to: the chart patterns available in the reading, with uncertainty where the evidence is broad.'
   }
 
   const anchors = profile.mustUseAnchors.slice(0, 4).join(', ')
@@ -161,7 +140,7 @@ function buildChartBasis(concern: UserConcern, question?: string): string {
     ? 'Timing is a tendency reading, not a guaranteed event.'
     : 'This is a tendency reading, not a fixed fate claim.'
 
-  return `Chart basis: ${profile.coreLogic} Key anchors: ${anchors}. ${timing}`
+  return `What I can safely anchor this to: ${profile.coreLogic} The main anchors are ${anchors}. ${timing}`
 }
 
 function shouldRenderTopicBlock(topic: string, concern: UserConcern): boolean {
@@ -228,6 +207,15 @@ function buildSpecificityLine(question: string | undefined, concern: UserConcern
   return 'This answer should stay specific to the actual question being asked.'
 }
 
+function buildSafeSleepRemedyAnswer(): string {
+  return [
+    'For sleep, keep the remedy simple, low-cost, and non-fear-based.',
+    'Tonight, try a steady routine: dim screens, avoid late caffeine, take 5 slow breaths, and write down one worry to handle tomorrow.',
+    'A short prayer or mantra can be used as calming support if it feels natural to you, but not as a replacement for medical care.',
+    'If sleep trouble is persistent, severe, or linked with anxiety or physical symptoms, speak with a qualified professional.',
+  ].join('\n\n')
+}
+
 function buildQuestionModeLine(question: string | undefined): string {
   const text = (question ?? '').toLowerCase()
 
@@ -273,6 +261,10 @@ export function generateHumanReading(input: HumanReadingInput): string {
     return renderEmptyEvidenceReading(input.concern)
   }
 
+  if ((input.concern.questionType === 'remedy' || input.concern.topic === 'remedy') && /sleep|insomnia|night routine/i.test(input.question ?? '')) {
+    return lintHumanStyle(buildSafeSleepRemedyAnswer())
+  }
+
   const opening = buildOpening(input.concern, input.question)
   const topicOpening = shouldRenderTopicBlock(input.concern.topic, input.concern)
     ? pickTopicOpening(input.concern.topic)
@@ -295,21 +287,21 @@ export function generateHumanReading(input: HumanReadingInput): string {
     ? 'Dasha note: Saturn is part of the evidence, so responsibility, delay, and disciplined effort matter here.'
     : ''
   const accuracyLine = input.concern.topic === 'health' || input.concern.topic === 'death'
-    ? 'Accuracy: this is supportive reflection only, not diagnosis or lifespan prediction.'
-    : 'Accuracy: partially accurate as a chart-based tendency, not a guaranteed outcome.'
+    ? 'This is supportive reflection only, not diagnosis or lifespan prediction.'
+    : 'This is a chart-based tendency reading, not a guaranteed outcome.'
   const followUpQuestion = input.concern.topic === 'career'
-    ? 'Suggested follow-up: Which part matters most - role fit, promotion timing, visibility, or income?'
+    ? 'If you want, I can narrow this to role fit, promotion timing, visibility, or income.'
     : input.concern.topic === 'money'
-      ? 'Suggested follow-up: Do you want help with income growth, debt, or expense control?'
+      ? 'If you want, I can focus on income growth, debt, or expense control.'
       : input.concern.topic === 'health'
-        ? 'Suggested follow-up: Which symptom, sleep issue, or routine trigger should I narrow next?'
+        ? 'If you want, I can narrow the symptom, sleep issue, or routine trigger.'
         : input.concern.topic === 'marriage' || input.concern.topic === 'relationship'
-          ? 'Suggested follow-up: Do you want timing, compatibility, or communication guidance next?'
+          ? 'If you want, I can focus on timing, compatibility, or communication.'
           : input.concern.topic === 'education'
-            ? 'Suggested follow-up: Do you want exam strategy, study method, or course choice next?'
+            ? 'If you want, I can focus on exam strategy, study method, or course choice.'
               : input.concern.questionType === 'timing'
-                ? 'Suggested follow-up: Which exact window do you want me to anchor - today, tomorrow, 2026, or 2027?'
-                : 'Suggested follow-up: Which sub-area should I narrow next?'
+                ? 'If you want, I can anchor the exact window more tightly around today, tomorrow, 2026, or 2027.'
+                : 'If you want, I can narrow the answer to one smaller part of the question.'
   const closing = renderClosing(input.concern)
 
   const raw = [

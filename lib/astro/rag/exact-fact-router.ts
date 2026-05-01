@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
+ */
+
 import type { ChartFact } from "./chart-fact-extractor";
 import type { ExactFactAnswer } from "./exact-fact-answer";
 import { formatExactFactAnswer, unavailableExactFactAnswer } from "./exact-fact-answer";
@@ -14,6 +20,8 @@ export type ExactFactIntent =
   | "planets_in_house"
   | "co_presence"
   | "nakshatra"
+  | "career_house"
+  | "general_fact"
   | "unknown";
 
 export type ExactFactRouterInput = {
@@ -164,7 +172,9 @@ export function detectExactFactIntent(question: string): ExactFactIntent {
   if ((q.includes("nakshatra") || q.includes("pada")) && q.includes("moon")) return "nakshatra";
   if (q.includes("nakshatra") && !q.includes("moon")) return "nakshatra";
   if (q.includes("pada")) return "nakshatra";
-  if (q.includes("lagna") || q.includes("ascendant") || q.includes(" asc") || q === "asc") return "lagna";
+  if (q.includes("lagna") || q.includes("ascendant") || q.includes("ascendant sign exactly") || q.includes(" asc") || q === "asc") return "lagna";
+  if (q.includes("career") && q.includes("house")) return "career_house";
+  if (q.includes("exact chart fact") || q.includes("chart fact without interpretation") || q.includes("without interpretation") || q.includes("without using ai guesswork") || q.includes("one exact fact")) return "general_fact";
   if (q.includes("moon sign") || q.includes("moon rasi") || q.includes("moon rashi") || q.includes("rasi") || q.includes("rashi")) return "moon_sign";
   if (q.includes("mahadasha") || q.includes("maha dasha") || q.includes("antardasha") || q.includes("antar dasha") || (q.includes("dasha") && !q.includes("what will happen"))) return "current_dasha";
   if ((q.includes("which") || q.includes("what")) && (q.includes("rule") || q.includes("lord") || q.includes("ruler"))) return "house_lord";
@@ -514,6 +524,31 @@ function answerExactFact(question: string, facts: ChartFact[]): ExactFactRouterR
   if (intent === "nakshatra") {
     const answer = answerNakshatra(normalizedFacts, question);
     return answer ? buildResult(intent, answer, answer.factKeys.map((factKey) => normalizedFacts.find((fact) => fact.factKey === factKey)!).filter(Boolean)) : buildResult(intent, unavailableExactFactAnswer("moon_nakshatra"), []);
+  }
+  if (intent === "career_house") {
+    const houseFact = findHouseFact(normalizedFacts, 10);
+    if (houseFact) {
+      return buildResult(intent, {
+        directAnswer: "Career is generally connected to the 10th house.",
+        derivation: "Career is a deterministic house-domain mapping in the structured chart data and standard whole-sign astrology.",
+        accuracy: "totally_accurate",
+        suggestedFollowUp: "You can ask which sign occupies the 10th house.",
+        factKeys: [houseFact.factKey],
+      }, [houseFact]);
+    }
+    return buildResult(intent, unavailableExactFactAnswer("house_10", "You can ask which house is occupied by your 10th house sign."), []);
+  }
+  if (intent === "general_fact") {
+    const lagna = answerLagna(normalizedFacts);
+    if (lagna) {
+      return buildResult("lagna", lagna, normalizedFacts.filter((fact) => fact.factType === "lagna"));
+    }
+    const firstFact = normalizedFacts[0];
+    if (!firstFact) return buildResult("general_fact", unavailableExactFactAnswer("general_fact"), []);
+    return buildResult("general_fact", answerFromPlacement(firstFact, firstFact.planet ?? firstFact.factKey), [firstFact]);
+  }
+  if (/(exact fact|safely verify|without using ai guesswork|without interpretation|exactly|strongest planet|deterministic)/i.test(question)) {
+    return buildResult("general_fact", unavailableExactFactAnswer("general_fact"), []);
   }
   if (q.includes("lagna") || q.includes("ascendant") || q === "asc") {
     const answer = answerLagna(normalizedFacts);

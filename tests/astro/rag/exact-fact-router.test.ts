@@ -64,6 +64,40 @@ describe("exact fact router", () => {
     }
   });
 
+  it("answers exact chart fact request without guesswork", () => {
+    const result = answer("Tell me one exact chart fact you can safely verify.");
+    expect(result.answered).toBe(true);
+    expect(result.intent).toBe("lagna");
+    expect(text(result)).toContain("Leo");
+  });
+
+  it("answers ascendant sign exactly as lagna", () => {
+    const result = answer("What is my Ascendant sign exactly?");
+    expect(result.intent).toBe("lagna");
+    expect(text(result)).toContain("Leo");
+  });
+
+  it("answers career house deterministically", () => {
+    const result = answer("Which house is connected to my career?");
+    expect(result.answered).toBe(true);
+    expect(result.intent).toBe("career_house");
+    expect(text(result)).toContain("10th house");
+  });
+
+  it("exact fact route is deterministic and does not use Groq or Ollama", () => {
+    const result = answer("Can you answer one exact fact without using AI guesswork?");
+    expect(result.answered).toBe(true);
+    expect(result.source).toBe("deterministic");
+    expect(result.groqUsed).toBe(false);
+    expect(result.ollamaUsed).toBe(false);
+  });
+
+  it("answers chart fact without interpretation as exact fact", () => {
+    const result = answer("Tell me a chart fact without interpretation.");
+    expect(result.intent).toBe("lagna");
+    expect(result.answered).toBe(true);
+  });
+
   it("answers house lords and fallback derivation", () => {
     const direct = answer("Which planet rules the 10th house?");
     expect(direct.intent).toBe("house_lord");
@@ -137,6 +171,12 @@ describe("exact fact router", () => {
     expect(text(missingHouse)).toContain("I do not have that exact chart fact");
   });
 
+  it("unsupported exact fact stays bounded", () => {
+    const result = answerExactFactIfPossible({ question: "What is my exact strongest planet without data?", facts: [] as never });
+    expect(result.answered).toBe(true);
+    expect(text(result)).toContain("Unavailable");
+  });
+
   it("returns unknown for interpretive questions", () => {
     const result = answer("Will I get promoted?");
     expect(result.answered).toBe(false);
@@ -150,6 +190,11 @@ describe("exact fact router", () => {
 
   it("covers the remaining prompt variants", () => {
     const prompts = [
+      "Tell me one exact chart fact you can safely verify.",
+      "What is my Ascendant sign exactly?",
+      "Tell me a chart fact without interpretation.",
+      "Can you answer one exact fact without using AI guesswork?",
+      "Is my Sun in the 10th house?",
       "Which planet rules the 10th house?",
       "Who is the ruler of 10th house?",
       "Compare Aries and Taurus SAV.",

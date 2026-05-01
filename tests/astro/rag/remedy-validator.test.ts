@@ -12,6 +12,26 @@ describe("remedy validator", () => {
     expect(result).toHaveLength(0);
   });
 
+  it("passes safe night routine", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "A simple, low-cost bedtime routine can help." }));
+    expect(result).toHaveLength(0);
+  });
+
+  it("passes safe sleep routine with optional support", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "For sleep, keep the remedy simple, low-cost, and non-fear-based. Try a steady routine tonight." }));
+    expect(result).toHaveLength(0);
+  });
+
+  it("passes safe calming practice", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "Hanuman Chalisa is an optional calming practice if helpful." }));
+    expect(result).toHaveLength(0);
+  });
+
+  it("passes remedy without money pressure", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "Use a simple routine and keep it low-cost." }));
+    expect(result).toHaveLength(0);
+  });
+
   it("fails must do puja", () => {
     const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "You must do puja." }));
     expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
@@ -27,6 +47,11 @@ describe("remedy validator", () => {
     expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
   });
 
+  it("fails expensive puja pressure with scary wording", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "You must buy this expensive puja." }));
+    expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
+  });
+
   it("fails cure insomnia language", () => {
     const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "This will cure insomnia." }));
     expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
@@ -34,6 +59,21 @@ describe("remedy validator", () => {
 
   it("fails stop medicine advice", () => {
     const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "Stop medicine now." }));
+    expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
+  });
+
+  it("fails stop treatment advice", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "Stop treatment and use mantra only." }));
+    expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
+  });
+
+  it("fails expensive puja pressure", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "A costly puja is mandatory and you must pay 50000 rupees." }));
+    expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
+  });
+
+  it("fails gemstone fixes everything claim", () => {
+    const result = validateAnswerRemedies(makeInput({ contract: fakeContract({ remedyAllowed: true, requiredSections: ["direct_answer", "safe_remedies"] }), answer: "A blue sapphire will fix all my problems." }));
     expect(result.some((issue) => issue.code === "unsafe_remedy")).toBe(true);
   });
 

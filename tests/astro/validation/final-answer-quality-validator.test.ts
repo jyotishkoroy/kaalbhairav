@@ -47,6 +47,21 @@ describe("final answer quality validator", () => {
   it("blocks raw Suggested follow-up", () => {
     expect(validateFinalAnswerQuality({ answerText: "Suggested follow-up: ask again later.", rawQuestion: "x" }).failures).toContain("metadata_leak")
   })
+  it("blocks Previous concern visible leak", () => {
+    expect(validateFinalAnswerQuality({ answerText: "Previous concern", rawQuestion: "x" }).failures).toContain("memory_contamination")
+  })
+  it("blocks Chart basis visible leak", () => {
+    expect(validateFinalAnswerQuality({ answerText: "Chart basis", rawQuestion: "x" }).failures).toContain("metadata_leak")
+  })
+  it("blocks Key anchors visible leak", () => {
+    expect(validateFinalAnswerQuality({ answerText: "Key anchors", rawQuestion: "x" }).failures).toContain("metadata_leak")
+  })
+  it("blocks Accuracy visible leak", () => {
+    expect(validateFinalAnswerQuality({ answerText: "Accuracy", rawQuestion: "x" }).failures).toContain("metadata_leak")
+  })
+  it("blocks Suggested follow-up visible leak", () => {
+    expect(validateFinalAnswerQuality({ answerText: "Suggested follow-up", rawQuestion: "x" }).failures).toContain("metadata_leak")
+  })
   it("blocks raw metadata", () => {
     expect(validateFinalAnswerQuality({ answerText: "metadata chartAnchorsUsed directV2Route", rawQuestion: "x" }).failures).toContain("metadata_leak")
   })
@@ -158,6 +173,9 @@ describe("final answer quality validator", () => {
   it("passes low-cost sleep routine", () => {
     expect(validateFinalAnswerQuality({ answerText: "A simple calming routine can support sleep, without replacing medical care.", rawQuestion: "How can I sleep better?" }).allowed).toBe(true)
   })
+  it("passes sleep night routine without scary remedies", () => {
+    expect(validateFinalAnswerQuality({ answerText: "For sleep, keep the remedy simple, low-cost, and non-fear-based. Try a steady routine tonight.", rawQuestion: "Give a simple night routine for sleep without scary remedies." }).allowed).toBe(true)
+  })
   it("passes mantra as support wording", () => {
     expect(validateFinalAnswerQuality({ answerText: "A mantra can be used as support, not as a medical replacement.", rawQuestion: "x" }).allowed).toBe(true)
   })
@@ -192,6 +210,9 @@ describe("final answer quality validator", () => {
   })
   it("blocks the repeated memory regression pattern", () => {
     expect(validateFinalAnswerQuality({ answerText: "Previous concern: Previous concern: career guidance.", rawQuestion: "x" }).failures).toContain("memory_contamination")
+  })
+  it("blocks the live quality leak regression pattern", () => {
+    expect(validateFinalAnswerQuality({ answerText: "Previous concern career progress career money money relationship or marriage marriage Chart basis Key anchors Accuracy Suggested follow-up", rawQuestion: "x" }).failures.length).toBeGreaterThan(0)
   })
   it("blocks the internal instruction regression pattern", () => {
     expect(validateFinalAnswerQuality({ answerText: "The answer should stay tied to Sun in Taurus 10th and Moon in Gemini 11th.", rawQuestion: "x" }).failures).toContain("internal_instruction_leak")

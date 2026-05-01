@@ -12,6 +12,10 @@ const INTERNAL_LEAK_PHRASES = [
   "the person may be seeking",
   "the answer should stay tied",
   "keep the answer tied",
+  "the answer should stay",
+  "this should be read",
+  "for career, the chart should be read through",
+  "the chart should be read through",
   "validator policy",
   "internal renderer",
   "evidence policy",
@@ -29,10 +33,15 @@ const METADATA_LEAK_PHRASES = [
   "mode:",
   "primaryintent:",
   "secondaryintents:",
+  "chart basis",
+  "key anchors",
+  "accuracy",
+  "suggested follow-up",
 ]
 
 const MEMORY_LEAK_PHRASES = [
   "previous concern:",
+  "previous concern",
   "preference:",
   "guidance already given:",
   "memory:",
@@ -43,14 +52,17 @@ const MEMORY_LEAK_PHRASES = [
 
 const DUPLICATE_PHRASES = [
   "career progress career",
+  "career progress promotion",
   "career career progress",
   "career progress work",
   "career progress business",
+  "career progress job",
   "relationship or marriage relationship",
   "relationship or marriage marriage",
   "relationship or marriage career",
   "money money",
   "specific situation work",
+  "specific situation career",
 ]
 
 const UNSAFE_CLAIM_PHRASES = [
@@ -77,7 +89,12 @@ const GENERIC_PHRASES = [
 ]
 
 function normalize(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, " ").trim()
+  return text
+    .replace(/\*\*/g, "")
+    .replace(/[_`#>-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
 }
 
 function containsPhrase(text: string, phrase: string): boolean {
@@ -140,9 +157,9 @@ function directFactMissing(answer: string): boolean {
 export function validateFinalAnswerQuality(input: FinalAnswerQualityInput): FinalAnswerQualityResult {
   const failures = new Set<FinalAnswerQualityFailure>()
   const answer = input.answerText ?? ""
-  const normalized = normalize(answer)
 
   if (isEmptyOrMeaningless(answer, isExactFactContext(input))) failures.add("empty_answer")
+  const normalizedAnswer = normalize(answer)
   if (hasAnyPhrase(answer, INTERNAL_LEAK_PHRASES)) failures.add("internal_instruction_leak")
   if (hasAnyPhrase(answer, METADATA_LEAK_PHRASES)) failures.add("metadata_leak")
   if (hasAnyPhrase(answer, MEMORY_LEAK_PHRASES)) failures.add("memory_contamination")
@@ -152,18 +169,18 @@ export function validateFinalAnswerQuality(input: FinalAnswerQualityInput): Fina
   if (genericOnly(answer)) failures.add("generic_boilerplate")
 
   const domain = questionDomain(input.rawQuestion, input.expectedDomain, input.primaryIntent)
-  if (domain === "money" && /career progress|career/i.test(normalized) && !/(salary|income|job income|work income|business revenue|revenue)/i.test(normalized)) {
+  if (domain === "money" && /career progress|career/i.test(normalizedAnswer) && !/(salary|income|job income|work income|business revenue|revenue)/i.test(normalizedAnswer)) {
     failures.add("wrong_domain_answer")
   }
-  if (domain === "relationship" && /career progress|career/i.test(normalized)) failures.add("wrong_domain_answer")
-  if (domain === "sleep" && /(career|finance|financial|money)/i.test(normalized)) failures.add("wrong_domain_answer")
-  if (domain === "foreign_settlement" && /career|promotion/i.test(normalized) && !/abroad|settle|immigration/i.test(normalized)) failures.add("wrong_domain_answer")
+  if (domain === "relationship" && /career progress|career/i.test(normalizedAnswer)) failures.add("wrong_domain_answer")
+  if (domain === "sleep" && /(career|finance|financial|money)/i.test(normalizedAnswer)) failures.add("wrong_domain_answer")
+  if (domain === "foreign_settlement" && /career|promotion/i.test(normalizedAnswer) && !/abroad|settle|immigration/i.test(normalizedAnswer)) failures.add("wrong_domain_answer")
   if (isExactFactContext(input) && directFactMissing(answer)) failures.add("safety_overreplacement")
-  if (isExactFactContext(input) && /will definitely|guaranteed|certainly/i.test(normalized)) failures.add("unsupported_chart_fact")
-  if (isExactFactContext(input) && /(general pattern|practical guidance|next step|stay positive)/i.test(normalized) && !looksLikeDirectExactFact(answer) && !/(cannot verify|deterministic data available)/i.test(normalized)) failures.add("wrong_domain_answer")
-  if (isExactFactContext(input) && /medical, legal, or financial advice/.test(normalized) && !looksLikeDirectExactFact(answer)) failures.add("safety_overreplacement")
+  if (isExactFactContext(input) && /will definitely|guaranteed|certainly/i.test(normalizedAnswer)) failures.add("unsupported_chart_fact")
+  if (isExactFactContext(input) && /(general pattern|practical guidance|next step|stay positive)/i.test(normalizedAnswer) && !looksLikeDirectExactFact(answer) && !/(cannot verify|deterministic data available)/i.test(normalizedAnswer)) failures.add("wrong_domain_answer")
+  if (isExactFactContext(input) && /medical, legal, or financial advice/.test(normalizedAnswer) && !looksLikeDirectExactFact(answer)) failures.add("safety_overreplacement")
   if (input.metadata && typeof input.metadata === "object" && "timing" in input.metadata) {
-    if (/next year|next month|within \d+ (days|weeks|months)|on \d{4}-\d{2}-\d{2}/i.test(normalized) && !/(cannot verify|deterministic data available)/i.test(normalized)) {
+    if (/next year|next month|within \d+ (days|weeks|months)|on \d{4}-\d{2}-\d{2}/i.test(normalizedAnswer) && !/(cannot verify|deterministic data available)/i.test(normalizedAnswer)) {
       failures.add("unsupported_chart_fact")
     }
   }

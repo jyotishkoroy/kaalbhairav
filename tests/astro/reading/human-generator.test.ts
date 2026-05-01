@@ -98,7 +98,7 @@ describe('Human reading generator', () => {
         'Last time, the user asked about career delay and was advised to focus on steady preparation.',
     })
 
-    expect(answer).toContain('Previous concern')
+    expect(answer).toContain('Earlier context')
     expect(answer).toContain('career delay')
   })
 
