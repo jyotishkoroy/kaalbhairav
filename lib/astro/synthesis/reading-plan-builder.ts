@@ -8,7 +8,9 @@ import type { ReadingPlan, ReadingPlanBuilderInput, InternalReadingPlan } from "
 import { applyReadingPlanSafetyPolicy, buildReadingPlanLimitations, determineReadingPlanMode, normalizeReadingPlanTopic, sanitizeReadingPlanText, shouldIncludeRemedies } from "./reading-plan-policy";
 import { decideCompanionMemoryUse } from "../memory/companion-memory-policy";
 import { redactCompanionMemoryForUserFacingText } from "../memory/companion-memory-redactor";
-import { isAstroMemoryRelevanceGateEnabled } from "../config/feature-flags";
+import { getAstroFeatureFlags, isAstroMemoryRelevanceGateEnabled } from "../config/feature-flags";
+import { selectDomainEvidence } from "../evidence/domain-evidence-selector";
+import type { DomainEvidenceAnchor } from "../evidence/evidence-domain-types";
 
 function topicLabel(topic: string): string {
   if (topic === "general") return "general";
@@ -132,6 +134,18 @@ function buildInternalReadingPlan(): InternalReadingPlan {
   };
 }
 
+function toDomainAnchor(anchor: string, index: number): DomainEvidenceAnchor {
+  const text = sanitizeChartAnchor(anchor, 120);
+  const lowered = text.toLowerCase();
+  const domain =
+    /lagna|ascendant|sun|moon|mars|venus|jupiter|saturn|mercury|rahu|ketu/.test(lowered) ? "planetary_placement"
+      : /money|salary|income|wealth|cash|expense|debt|budget/.test(lowered) ? "money"
+      : /business|venture|trade|startup|profit/.test(lowered) ? "business"
+      : /relationship|marriage|partner|spouse|family|education|foreign|remedy|health|sleep|safety|legal/.test(lowered) ? "general"
+      : "general";
+  return { id: `anchor_${index}`, domain, text, deterministic: true, relevanceScore: 1, source: "chart" };
+}
+
 export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
   const question = sanitizeReadingPlanText(input.question, 240);
   const topic = normalizeReadingPlanTopic(input.listening?.topic ?? input.concern?.topic ?? question);
@@ -145,6 +159,15 @@ export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
     source: item.source ?? "chart",
   }));
   const chartAnchors = dedupeArray((input.chartAnchors ?? []).map((anchor) => sanitizeChartAnchor(anchor, 80))).slice(0, 12);
+  const domainAwareEvidenceEnabled = getAstroFeatureFlags().domainAwareEvidenceEnabled;
+  const domainEvidenceSelection = input.structuredIntent && domainAwareEvidenceEnabled
+    ? selectDomainEvidence({
+        intent: input.structuredIntent,
+        availableAnchors: chartAnchors.map(toDomainAnchor),
+        maxAnchors: 12,
+        requireQuestionRelevance: true,
+      })
+    : undefined;
   const plan: ReadingPlan = {
     question,
     topic,
@@ -156,7 +179,7 @@ export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
     },
     chartTruth: {
       evidence,
-      chartAnchors,
+      chartAnchors: domainEvidenceSelection?.selectedAnchors.map((anchor) => anchor.text) ?? chartAnchors,
       limitations: buildReadingPlanLimitations(input),
     },
     livedExperience: buildLivedExperience(topic, question),
@@ -198,6 +221,9 @@ export function buildReadingPlan(input: ReadingPlanBuilderInput): ReadingPlan {
   }
   if (!plan.chartTruth.evidence.length && topic !== "safety") {
     plan.chartTruth.limitations = [...new Set([...plan.chartTruth.limitations, "No direct chart evidence was provided, so the plan must stay cautious and non-committal."])];
+  }
+  if (domainEvidenceSelection?.weakEvidence) {
+    plan.chartTruth.limitations = [...new Set([...plan.chartTruth.limitations, domainEvidenceSelection.relevanceExplanation])];
   }
   if (!input.timingContext?.timingSourceAvailable) {
     plan.chartTruth.limitations = [...new Set([...plan.chartTruth.limitations, "No grounded timing source is available, so date or window claims are prohibited."])];

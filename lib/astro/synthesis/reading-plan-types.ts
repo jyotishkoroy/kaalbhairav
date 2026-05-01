@@ -14,6 +14,7 @@ export type ReadingPlanEvidenceInput = {
 
 export type ReadingPlanBuilderInput = {
   question: string;
+  structuredIntent?: import("../rag/structured-intent-types").StructuredIntent;
   concern?: {
     topic?: string;
     mode?: string;

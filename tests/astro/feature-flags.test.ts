@@ -22,6 +22,7 @@ describe('astro feature flags', () => {
     expect(getAstroFeatureFlags().readingV2Enabled).toBe(false)
     expect(getAstroFeatureFlags().remediesEnabled).toBe(false)
     expect(getAstroFeatureFlags().memoryRelevanceGateEnabled).toBe(false)
+    expect(getAstroFeatureFlags().domainAwareEvidenceEnabled).toBe(false)
     expect(isAstroUserFacingPlanEnabled()).toBe(false)
     expect(isAstroMemoryRelevanceGateEnabled()).toBe(false)
   })
@@ -78,5 +79,17 @@ describe('astro feature flags', () => {
     process.env.ASTRO_MEMORY_RELEVANCE_GATE_ENABLED = value
 
     expect(isAstroMemoryRelevanceGateEnabled()).toBe(expected)
+  })
+
+  it.each([
+    ['true', true],
+    ['1', true],
+    ['false', false],
+    ['0', false],
+    ['maybe', false],
+  ])('parses ASTRO_DOMAIN_AWARE_EVIDENCE_ENABLED %s as %s', (value, expected) => {
+    process.env.ASTRO_DOMAIN_AWARE_EVIDENCE_ENABLED = value
+
+    expect(getAstroFeatureFlags().domainAwareEvidenceEnabled).toBe(expected)
   })
 })

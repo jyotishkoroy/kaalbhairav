@@ -8,6 +8,7 @@ export type AstroFeatureFlags = {
   readingV2Enabled: boolean
   memoryEnabled: boolean
   memoryRelevanceGateEnabled: boolean
+  domainAwareEvidenceEnabled: boolean
   remediesEnabled: boolean
   monthlyEnabled: boolean
   voiceEnabled: boolean
@@ -31,6 +32,7 @@ export function getAstroFeatureFlags(): AstroFeatureFlags {
     readingV2Enabled: readBooleanEnv(process.env.ASTRO_READING_V2_ENABLED),
     memoryEnabled: readBooleanEnv(process.env.ASTRO_MEMORY_ENABLED),
     memoryRelevanceGateEnabled: readBooleanEnv(process.env.ASTRO_MEMORY_RELEVANCE_GATE_ENABLED),
+    domainAwareEvidenceEnabled: readBooleanEnv(process.env.ASTRO_DOMAIN_AWARE_EVIDENCE_ENABLED),
     remediesEnabled: readBooleanEnv(process.env.ASTRO_REMEDIES_ENABLED),
     monthlyEnabled: readBooleanEnv(process.env.ASTRO_MONTHLY_ENABLED),
     voiceEnabled: readBooleanEnv(process.env.ASTRO_VOICE_ENABLED),
