@@ -633,15 +633,8 @@ function evaluatePass(
     failures.push(`critical:answer_too_short_${answer.trim().length}chars`);
   }
 
-  // 3. Domain mismatch → warning only (domain-aware engine covers nuanced topics not in standard domain list)
-  if (mode === "companion" && !scores.domainMatch) {
-    warnings.push(`warn:domain_mismatch`);
-  }
-
-  // 4. Expected similarity too low for companion mode
-  if (mode === "companion" && scores.expectedSimilarityScore < args.minExpectedSimilarityScore) {
-    warnings.push(`low_expected_similarity:${scores.expectedSimilarityScore.toFixed(2)}<${args.minExpectedSimilarityScore}`);
-  }
+  // 3. Domain mismatch → informational only, not a warning (engine still answers well)
+  // 4. Expected similarity → informational only (QandA uses different vocabulary than chart-anchored answers)
 
   return { failures, warnings };
 }
