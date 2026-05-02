@@ -218,6 +218,29 @@ Safety:
 Validation:
 - human-feel script: passed
 - human-feel tests: passed
+Phase: TarayAI Phase 14 Response Validator
+Starting commit: 7ffe7b4
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added a deterministic consultation response validator for future final consultation outputs
+- added validation for invented chart facts, unsupported timing windows, multiple follow-up questions, absolute predictions, death prediction, fear-based language, harsh karma language, unsafe remedies, gemstone recommendations without caution, overconfident remedy claims, medical/legal/financial certainty, irreversible action instructions, exact-fact over-narration, missing practical guidance, emotional acknowledgement warnings, and memory-reset plan checks
+- grounded validation against supplied chart evidence, response-plan evidence summaries, state chart facts, timing judgements, and remedy plans
+- exported the validator from the consultation index and added dedicated regression tests
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted validator tests: passed
+- consultation test suite: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- full tests: passed
+Deployment:
+- skipped
+Next:
+- continue with the next planned phase only if explicitly instructed
 Phase: TarayAI Phase 10 Timing Judgement
 Starting commit: 1c2691d
 Runtime behavior changed: no production route behavior change

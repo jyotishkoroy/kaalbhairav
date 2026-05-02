@@ -56,3 +56,11 @@ export {
   type TimingStatus,
   type TimingWindow,
 } from "./timing-judgement";
+export {
+  countFollowUpQuestions,
+  validateConsultationResponse,
+  type ConsultationResponseValidationInput,
+  type ConsultationValidationFailureCode,
+  type ConsultationValidationResult,
+  type ConsultationValidationWarningCode,
+} from "./consultation-response-validator";
