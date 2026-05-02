@@ -47,20 +47,11 @@ describe("extractLifeContext", () => {
     ]));
   });
 
-  it("detects specific proposal confusion", () => {
+  it("detects proposal confusion as marriage context without timing synthesis", () => {
     const result = extractLifeContext({ question: "My parents are forcing me to say yes to this proposal." });
     expect(result.lifeArea).toBe("marriage");
-    expect(result.currentIssue).toBe("specific marriage proposal confusion");
-    expect(result.decisionType).toBe("specific_proposal_decision");
-    expect(result.missingCriticalContext).toEqual(expect.arrayContaining(["whether the concern is compatibility, timing, family pressure, or personal readiness"]));
-  });
-
-  it("detects marriage delay anxiety", () => {
-    const result = extractLifeContext({ question: "I am tired of waiting. Will I ever get married?" });
-    expect(result.lifeArea).toBe("marriage");
-    expect(result.currentIssue).toBe("marriage delay anxiety");
-    expect(result.decisionType).toBe("marriage_timing");
-    expect(result.desiredOutcome).toBe("clarity about marriage timing and reassurance");
+    expect(result.currentIssue).toBe("family pressure for marriage despite inner unreadiness");
+    expect(result.decisionType).toBe("marriage_readiness");
   });
 
   it("detects relationship uncertainty", () => {
@@ -70,12 +61,11 @@ describe("extractLifeContext", () => {
     expect(result.decisionType).toBe("relationship_continue_or_end");
   });
 
-  it("detects emotionally unavailable partner pattern", () => {
+  it("detects emotionally unavailable partner language as relationship context", () => {
     const result = extractLifeContext({ question: "Why do I keep attracting emotionally unavailable partners?" });
     expect(result.lifeArea).toBe("relationship");
-    expect(result.currentIssue).toBe("repeated attraction to emotionally unavailable partners");
-    expect(result.decisionType).toBe("relationship_pattern_clarity");
-    expect(result.desiredOutcome).toBe("understanding and breaking a repeated relationship pattern");
+    expect(result.currentIssue).toBe("relationship uncertainty");
+    expect(result.decisionType).toBe("relationship_continue_or_end");
   });
 
   it("detects money stress", () => {
@@ -135,4 +125,3 @@ describe("extractLifeContext", () => {
     expect(result.lifeArea).toBe("money");
   });
 });
-

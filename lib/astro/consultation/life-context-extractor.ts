@@ -204,26 +204,12 @@ function inferMarriageContext(result: MutableExtraction, q: string, rawQuestion:
   result.lifeArea = "marriage";
 
   const unreadiness = /\b(not ready|unready|unsure|scared|afraid|wrong decision)\b/.test(q);
-  const specificProposal = /\b(this proposal|specific proposal|specific person|say yes to this proposal|should i marry him|should i marry her|should i marry them)\b/.test(q);
-  const delay = /\b(will i ever get married|marriage delayed|tired of waiting|running out of time)\b/.test(q);
   const parentalPressure =
     /\b(parents?|family)\b/.test(q) &&
     /\b(pressure|pressuring|forcing|forced|insist)\b/.test(q) &&
     /\b(marriage|marry|proposal)\b/.test(q);
 
-  if (specificProposal) {
-    result.currentIssue = "specific marriage proposal confusion";
-    result.decisionType = "specific_proposal_decision";
-    result.desiredOutcome = "clarity and reduced pressure";
-    addFact(result, "User is confused about a specific proposal", "marriage", "high");
-    if (parentalPressure) {
-      addFact(result, "Parents are pressuring user for marriage", "family", "high");
-    }
-    if (unreadiness) {
-      addFact(result, "User does not feel ready for marriage", "marriage", "high");
-    }
-    addMissing(result, "whether the concern is compatibility, timing, family pressure, or personal readiness");
-  } else if (parentalPressure || (/\b(parents?|family)\b/.test(q) && /\b(marriage|marry|proposal)\b/.test(q))) {
+  if (parentalPressure || (/\b(parents?|family)\b/.test(q) && /\b(marriage|marry|proposal)\b/.test(q))) {
     result.currentIssue = "family pressure for marriage despite inner unreadiness";
     result.decisionType = "marriage_readiness";
     result.desiredOutcome = "clarity and reduced pressure";
@@ -233,13 +219,6 @@ function inferMarriageContext(result: MutableExtraction, q: string, rawQuestion:
     if (unreadiness) {
       addFact(result, "User does not feel ready for marriage", "marriage", "high");
     }
-    addMissing(result, "whether this is about a specific proposal or general timing");
-  } else if (delay) {
-    result.currentIssue = "marriage delay anxiety";
-    result.decisionType = "marriage_timing";
-    result.desiredOutcome = "clarity about marriage timing and reassurance";
-    addFact(result, "User is worried about marriage timing", "marriage", "high");
-    addMissing(result, "whether this is about general marriage timing or a specific proposal/person");
   } else {
     result.currentIssue = "marriage concern";
     addFact(result, "User reports a marriage concern", "marriage", "medium");
@@ -255,15 +234,6 @@ function inferMarriageContext(result: MutableExtraction, q: string, rawQuestion:
 
 function inferRelationshipContext(result: MutableExtraction, q: string, rawQuestion: string): void {
   result.lifeArea = "relationship";
-  const pattern = /\b(emotionally unavailable|unavailable people|distant partners|people who do not commit)\b/.test(q);
-  if (pattern) {
-    result.currentIssue = "repeated attraction to emotionally unavailable partners";
-    result.decisionType = "relationship_pattern_clarity";
-    result.desiredOutcome = "understanding and breaking a repeated relationship pattern";
-    addFact(result, "User reports a repeated pattern of emotionally unavailable partners", "relationship", "high");
-    addMissing(result, "whether this pattern is current, repeated, or tied to one specific person");
-    return;
-  }
   result.currentIssue = "relationship uncertainty";
   result.decisionType = "relationship_continue_or_end";
   addFact(result, "User reports relationship uncertainty", "relationship", "medium");
@@ -307,5 +277,5 @@ function inferSpiritualContext(result: MutableExtraction): void {
   result.decisionType = "spiritual_clarity";
   result.desiredOutcome = "inner clarity and steadiness";
   addFact(result, "User reports spiritual confusion", "spirituality", "high");
-  addMissing(result, "whether user wants practical guidance, devotional guidance, or chart-based spiritual timing");
+  addMissing(result, "whether user wants practical guidance, devotional guidance, or chart-based spiritual context");
 }
