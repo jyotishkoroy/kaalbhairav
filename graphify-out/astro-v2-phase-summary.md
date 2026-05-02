@@ -310,3 +310,11 @@ Phase 5 — Practical-constraints Extractor
 - Added tests for long work hours, living with parents, money constraint, debt, low budget, simple prayer, privacy, career instability, quit decision, business risk, high/low risk tolerance, health/fasting constraints, family responsibilities, dependents, remedy-style preferences, malformed input, previous-context fallback, explicit override, exact-fact bypass, and Phase 2/3/4 regressions.
 - No production route behavior changed.
 - No deployment required.
+Phase 7 - Pattern-recognition Synthesis
+- Added deterministic pattern-recognition synthesis that combines chart evidence, life context, emotional state, cultural/family context, and practical constraints into structured consultation patterns.
+- Added supported patterns for career pressure/responsibility, authority conflict, marriage pressure versus readiness, emotionally unavailable partners, decision paralysis, family duty versus personal desire, money retention pressure, fear of visibility, spiritual searching during material instability, and sudden career starts/stops.
+- Added mixed-signal output with promise, blockage, and synthesis when supportive and challenging evidence or context tension both exist.
+- Added probabilistic-language guardrails to avoid deterministic fate claims, guarantees, remedies, timing judgements, medical diagnosis, and unsupported chart facts.
+- Added tests for insufficient evidence, supported patterns, mixed-signal behavior, confidence rules, health-sensitive non-diagnosis, no timing/remedy output, no deterministic language, evidence provenance, malformed input, exact-fact bypass, and Phase 2/3/4/5/6 regressions.
+- No production route behavior changed.
+- No deployment required.

@@ -10,4 +10,5 @@ export * from "./chart-evidence-builder";
 export * from "./cultural-context-extractor";
 export * from "./emotional-state-detector";
 export * from "./life-context-extractor";
+export * from "./pattern-recognition";
 export * from "./practical-constraints-extractor";
