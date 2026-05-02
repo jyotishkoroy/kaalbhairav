@@ -147,6 +147,12 @@ export function compactContractForPrompt(contract: AnswerContract): Record<strin
 
 export function compactContextForPrompt(context: RetrievalContext): Record<string, unknown> {
   return {
+    promptContextText: trimText(context.promptContextText, 6000),
+    promptIncludedRuleIds: compactList(context.promptIncludedRuleIds, 30),
+    promptIncludedValidationCheckIds: compactList(context.promptIncludedValidationCheckIds, 20),
+    promptIncludedExampleIds: compactList(context.promptIncludedExampleIds, 20),
+    structuredRagUsed: Boolean(context.structuredRagUsed),
+    structuredRagFallbackReason: trimText(context.structuredRagFallbackReason, 200),
     chartFacts: compactChartFacts(context),
     reasoningRules: compactObjects(context.reasoningRules, 12, (value) => {
       return {

@@ -18,8 +18,11 @@ import type {
 import { compactRecord, normalizeStringArray, snakeToCamelRecord } from "./retrieval-types";
 import { buildDeterministicQueryExpansion, expandQueryWithLocalModel, sanitizeQueryExpansionTerms } from "./local-query-expander";
 import { fetchBenchmarkExamples } from "./benchmark-repository";
-import { fetchReasoningRules } from "./reasoning-rule-repository";
+import { fetchReasoningRules, fetchStructuredReasoningRuleCandidates } from "./reasoning-rule-repository";
 import { fetchTimingWindows } from "./timing-repository";
+import { buildStructuredRuleRankingContext, inferHousesFromQuestion, inferLifeAreaTagsFromQuestion, inferPlanetsFromQuestion } from "./chart-fact-extractor";
+import { packAstroRagPromptContext } from "./prompt-packer";
+import { selectStructuredReasoningRules } from "./reasoning-rule-selector";
 
 export type FetchChartFactsInput = {
   supabase: SupabaseLikeClient;
@@ -209,6 +212,10 @@ function asErrorMessage(error: unknown): string {
     return String((error as { message: string }).message);
   }
   return "retrieval failed";
+}
+
+function isStructuredRagEnabled(env?: Record<string, string | undefined>): boolean {
+  return env?.ASTRO_STRUCTURED_RAG_ENABLED !== "false";
 }
 
 function mapChartFact(row: Record<string, unknown>): ChartFact {
@@ -403,6 +410,10 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
   });
   const expandedSearchTerms = expansion.expandedSearchTerms;
   const expandedTags = [...new Set([...plan.retrievalTags, ...expandedSearchTerms])].slice(0, 24);
+  const inferredLifeAreaTags = inferLifeAreaTagsFromQuestion(question);
+  const inferredPlanets = inferPlanetsFromQuestion(question);
+  const inferredHouses = inferHousesFromQuestion(question);
+  const structuredEnabled = isStructuredRagEnabled(input.env ?? process.env);
 
   const [facts, rules, benchmarks, sourceNotes, retrievalTags, validationChecks, timing] = await Promise.all([
     safeRepository(
@@ -437,12 +448,82 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
       : Promise.resolve(emptyRepositoryResult<Awaited<ReturnType<typeof fetchTimingWindows>> extends RepositoryResult<infer T> ? T : never>()),
   ]);
 
+  let reasoningRules = rules.data;
+  let structuredRanked: ReturnType<typeof selectStructuredReasoningRules> = [];
+  let structuredUsed = false;
+  let structuredFallbackReason: string | undefined;
+  if (structuredEnabled && String(plan.answerType) !== "exact_fact") {
+    try {
+      const structuredCandidates = await fetchStructuredReasoningRuleCandidates(input.supabase, {
+        domains: plan.reasoningRuleDomains,
+        lifeAreaTags: inferredLifeAreaTags,
+        conditionTags: expandedTags,
+        planets: inferredPlanets,
+        houses: inferredHouses,
+        signs: facts.data.map((fact) => fact.sign).filter((value): value is string => Boolean(value)),
+        sourceReliability: [],
+        requiredTags: plan.retrievalTags,
+        chartFactTags: expandedTags,
+        limit: 8,
+        candidateLimit: 120,
+      });
+      if (structuredCandidates.length) {
+        const rankingContext = buildStructuredRuleRankingContext({
+          userQuestion: question,
+          chartFacts: facts.data,
+          domains: plan.reasoningRuleDomains,
+          exactFactMode: plan.answerType === "exact_fact",
+          safetyBlocked: plan.blockedBySafety,
+        });
+        const ranked = selectStructuredReasoningRules(structuredCandidates, rankingContext, { limit: 8 });
+        if (ranked.length) {
+          structuredRanked = ranked;
+          reasoningRules = ranked.map((item) => ({
+            id: item.rule.ruleId,
+            ruleKey: item.rule.ruleId,
+            domain: plan.domain,
+            title: item.rule.ruleStatement ?? item.rule.promptCompactSummary ?? item.rule.ruleId,
+            description: item.rule.normalizedSourceText ?? item.rule.sourceText ?? "",
+            requiredFactTypes: [],
+            requiredTags: item.rule.requiredTags ? [...item.rule.requiredTags] : [],
+            reasoningTemplate: item.rule.normalizedPromptCompactSummary ?? item.rule.promptCompactSummary ?? "",
+            sourceReference: item.rule.normalizedSourceReference ?? item.rule.sourceReference ?? undefined,
+            sourceReliability: item.rule.normalizedSourceReliability ?? item.rule.sourceReliability ?? undefined,
+            structuredRule: undefined,
+            lifeAreaTags: item.rule.lifeAreaTags ? [...item.rule.lifeAreaTags] : [],
+            conditionTags: item.rule.conditionTags ? [...item.rule.conditionTags] : [],
+            retrievalKeywords: item.rule.retrievalKeywords ? [...item.rule.retrievalKeywords] : [],
+            weight: item.score,
+            safetyNotes: [],
+            enabled: Boolean(item.rule.enabled ?? true),
+            metadata: { rankingReasons: item.rankingReasons },
+          }));
+          structuredUsed = true;
+        } else {
+          structuredFallbackReason = "no_structured_ranked_rules";
+        }
+      } else {
+        structuredFallbackReason = "no_structured_candidates";
+      }
+    } catch (error) {
+      structuredFallbackReason = asErrorMessage(error);
+    }
+  }
+
+  const packedPrompt = structuredUsed
+    ? packAstroRagPromptContext({
+        rankedRules: structuredRanked,
+        validationChecks: validationChecks.data,
+        examples: benchmarks.data,
+      })
+    : undefined;
+
   const safeRemedies = includeRemedies ? buildSafeRemedies(plan) : [];
   const errors = [facts.error, rules.error, benchmarks.error, timing.error].filter(Boolean) as string[];
 
   return {
     chartFacts: facts.data,
-    reasoningRules: rules.data,
+    reasoningRules,
     benchmarkExamples: benchmarks.data,
     sourceNotes: sourceNotes.data,
     retrievalTags: retrievalTags.data,
@@ -454,6 +535,12 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
     expandedSearchTerms,
     requiredEvidenceHints: expansion.requiredEvidenceHints,
     chartAnchorHints: expansion.chartAnchorHints,
+    promptContextText: packedPrompt?.text,
+    promptIncludedRuleIds: packedPrompt?.includedRuleIds,
+    promptIncludedValidationCheckIds: packedPrompt?.includedValidationCheckIds,
+    promptIncludedExampleIds: packedPrompt?.includedExampleIds,
+    structuredRagUsed: structuredUsed,
+    structuredRagFallbackReason: structuredFallbackReason,
     metadata: {
       userId: input.userId,
       profileId: input.profileId ?? null,

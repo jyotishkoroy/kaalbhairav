@@ -44,6 +44,7 @@
     "astro:dump:validate": "node --experimental-strip-types scripts/ingest-astro-dump.ts --validate-only --input dump.jsonl",
     "astro:dump:ingest": "node --experimental-strip-types scripts/ingest-astro-dump.ts --mode existing-db --input dump.jsonl",
     "astro:dump:verify": "node --experimental-strip-types scripts/ingest-astro-dump.ts --mode existing-db --input dump.jsonl --verify-counts",
+    "astro:dump:backfill-normalized": "node --experimental-strip-types scripts/ingest-astro-dump.ts --mode backfill-normalized --input dump.jsonl --verify-counts",
     "check:local-ollama-health": "npx tsx scripts/check-local-ollama-health.ts",
     "validate:astro-rag-rollout": "npx tsx scripts/validate-astro-rag-rollout.ts",
     "parse:astro-benchmarks": "npx tsx scripts/parse-astro-benchmark-md.ts",

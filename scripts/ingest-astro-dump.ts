@@ -10,7 +10,7 @@ export type DumpRecordType = "source_note" | "retrieval_tag" | "rule" | "example
 
 export type DumpImportReport = {
   input: string;
-  mode: "existing-db" | "local";
+  mode: "existing-db" | "local" | "backfill-normalized";
   validateOnly: boolean;
   dryRun: boolean;
   verifyCounts: boolean;
@@ -23,6 +23,8 @@ export type DumpImportReport = {
   errors: Array<{ line: number; code: string; message: string }>;
   missingEnv?: string[];
 };
+
+type DumpImportMode = DumpImportReport["mode"];
 
 type DumpRow = Record<string, unknown> & { record_type?: string };
 
@@ -50,6 +52,133 @@ function trimText(value: unknown, max = 2000): string | null {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return null;
   return text.length > max ? text.slice(0, max) : text;
+}
+
+function normalizeString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value !== "string") return null;
+  const match = value.match(/\d+/);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizePlanetName(value: unknown): string | null {
+  const raw = normalizeString(value);
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  const planetMap: Record<string, string> = {
+    sun: "Sun",
+    surya: "Sun",
+    moon: "Moon",
+    chandra: "Moon",
+    mars: "Mars",
+    mangal: "Mars",
+    kuja: "Mars",
+    mercury: "Mercury",
+    budha: "Mercury",
+    jupiter: "Jupiter",
+    guru: "Jupiter",
+    venus: "Venus",
+    shukra: "Venus",
+    saturn: "Saturn",
+    shani: "Saturn",
+    rahu: "Rahu",
+    ketu: "Ketu",
+  };
+  return planetMap[lower] ?? raw;
+}
+
+function normalizeSignName(value: unknown): string | null {
+  const raw = normalizeString(value);
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  const signMap: Record<string, string> = {
+    aries: "Aries",
+    taurus: "Taurus",
+    gemini: "Gemini",
+    cancer: "Cancer",
+    leo: "Leo",
+    virgo: "Virgo",
+    libra: "Libra",
+    scorpio: "Scorpio",
+    sagittarius: "Sagittarius",
+    capricorn: "Capricorn",
+    aquarius: "Aquarius",
+    pisces: "Pisces",
+    mesha: "Aries",
+    vrishabha: "Taurus",
+    mithuna: "Gemini",
+    karkata: "Cancer",
+    simha: "Leo",
+    kanya: "Virgo",
+    tula: "Libra",
+    vrischika: "Scorpio",
+    dhanu: "Sagittarius",
+    makara: "Capricorn",
+    kumbha: "Aquarius",
+    meena: "Pisces",
+  };
+  return signMap[lower] ?? raw;
+}
+
+function normalizeYogaName(value: unknown, keywords: unknown): string | null {
+  const direct = normalizeString(value);
+  if (direct) return direct;
+  const keywordList = Array.isArray(keywords) ? keywords.filter((item): item is string => typeof item === "string") : [];
+  const yogaKeyword = keywordList.find((keyword) => /\byoga\b/i.test(keyword) || /raja|dhana|gaja|kesari|kemadruma|viparita|neecha|bhanga|mahapurusha/i.test(keyword));
+  return normalizeString(yogaKeyword);
+}
+
+function extractRuleCondition(record: unknown): Record<string, unknown> {
+  if (!record || typeof record !== "object") return {};
+  const maybe = record as Record<string, unknown>;
+  const structuredRule = maybe.structured_rule;
+  if (!structuredRule || typeof structuredRule !== "object") return {};
+  const condition = (structuredRule as Record<string, unknown>).condition;
+  return condition && typeof condition === "object" ? (condition as Record<string, unknown>) : {};
+}
+
+function extractRuleInterpretation(record: unknown): Record<string, unknown> {
+  if (!record || typeof record !== "object") return {};
+  const maybe = record as Record<string, unknown>;
+  const structuredRule = maybe.structured_rule;
+  if (!structuredRule || typeof structuredRule !== "object") return {};
+  const interpretation = (structuredRule as Record<string, unknown>).interpretation;
+  return interpretation && typeof interpretation === "object" ? (interpretation as Record<string, unknown>) : {};
+}
+
+function mapRuleNormalizedColumns(record: Record<string, unknown>) {
+  const condition = extractRuleCondition(record);
+  const interpretation = extractRuleInterpretation(record);
+  return {
+    primary_planet: normalizePlanetName(condition.planet),
+    secondary_planet: normalizePlanetName(condition.conjunction),
+    house: normalizeInteger(condition.house),
+    target_house: normalizeInteger(condition.lordship),
+    sign: normalizeSignName(condition.sign),
+    lordship: normalizeString(condition.lordship),
+    dignity: normalizeString(condition.dignity),
+    aspect_type: normalizeString(condition.aspect),
+    yoga_name: normalizeYogaName((record as Record<string, unknown>).yoga_name, record.retrieval_keywords),
+    divisional_chart: normalizeString(condition.divisional_chart),
+    dasha_condition: normalizeString(condition.dasha_condition),
+    transit_condition: normalizeString(condition.transit_condition),
+    normalized_source_text: normalizeString(record.source_text),
+    normalized_source_reference: normalizeString(record.source_reference),
+    normalized_source_reliability: normalizeString(record.source_reliability),
+    normalized_embedding_text: normalizeString(record.embedding_text),
+    normalized_prompt_compact_summary: normalizeString(record.prompt_compact_summary),
+    normalized_condition: condition,
+    normalized_interpretation: interpretation,
+    normalized_updated_at: new Date().toISOString(),
+  };
 }
 
 function listStrings(value: unknown): string[] {
@@ -160,6 +289,7 @@ export function normalizeDumpRecord(row: DumpRow): { table: string; conflictKey?
           source_reference: normalizeReference(row.source_reference),
           raw_record_type: type,
         },
+        ...mapRuleNormalizedColumns(row),
       },
     };
   }
@@ -252,7 +382,7 @@ export async function verifyAstroDumpCounts(client: SupabaseLike): Promise<Recor
 
 export async function ingestAstroDump(input: {
   filePath: string;
-  mode?: "existing-db" | "local";
+  mode?: DumpImportMode;
   validateOnly?: boolean;
   dryRun?: boolean;
   verifyCounts?: boolean;
@@ -289,7 +419,7 @@ export async function ingestAstroDump(input: {
       if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: parsed.error, message: "malformed jsonl line" });
       continue;
     }
-    const normalized = normalizeDumpRecord(parsed.value);
+    let normalized = normalizeDumpRecord(parsed.value);
     if (!normalized) {
       report.invalidLines += 1;
       if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "unsupported_record", message: "unsupported or incomplete dump record" });
@@ -303,15 +433,28 @@ export async function ingestAstroDump(input: {
       report.skippedCounts.answer_log_schema = (report.skippedCounts.answer_log_schema ?? 0) + 1;
       continue;
     }
+    if (input.mode === "backfill-normalized" && normalized.table !== "astro_reasoning_rules") continue;
+    if (input.mode === "backfill-normalized" && normalized.table === "astro_reasoning_rules") {
+      normalized = {
+        table: normalized.table,
+        conflictKey: normalized.conflictKey,
+        row: {
+          ...normalized.row,
+          rule_key: String(normalized.row.rule_key ?? ""),
+          ...mapRuleNormalizedColumns(parsed.value),
+        },
+      };
+    }
     if (input.validateOnly || input.dryRun || !input.supabase) continue;
-    const bucket = batches.get(normalized.table) ?? [];
-    bucket.push({ conflictKey: normalized.conflictKey, row: normalized.row });
-    batches.set(normalized.table, bucket);
+    const current = normalized as { table: string; conflictKey: string; row: Record<string, unknown> };
+    const bucket = batches.get(current.table) ?? [];
+    bucket.push({ conflictKey: current.conflictKey, row: current.row });
+    batches.set(current.table, bucket);
     if (bucket.length >= WRITE_BATCH_SIZE) {
       const rows = bucket.splice(0, bucket.length).map((item) => item.row);
-      const result = await upsertRows(input.supabase, normalized.table, normalized.conflictKey, rows);
+      const result = await upsertRows(input.supabase, current.table, current.conflictKey, rows);
       if (!result.ok) {
-        report.skippedCounts[normalized.table] = (report.skippedCounts[normalized.table] ?? 0) + 1;
+        report.skippedCounts[current.table] = (report.skippedCounts[current.table] ?? 0) + 1;
         if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "write_error", message: result.error ?? "write failed" });
         continue;
       }
@@ -365,7 +508,7 @@ async function main() {
     console.error("missing --input");
     process.exit(1);
   }
-  const mode = args.mode === "existing-db" ? "existing-db" : "local";
+  const mode = args.mode === "existing-db" || args.mode === "backfill-normalized" ? args.mode : "local";
   const validateOnly = Boolean(args.validateOnly);
   const dryRun = Boolean(args.dryRun);
   const verifyCounts = Boolean(args.verifyCounts);

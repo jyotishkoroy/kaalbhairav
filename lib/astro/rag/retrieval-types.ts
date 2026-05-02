@@ -53,6 +53,23 @@ export type ReasoningRule = {
   reasoningTemplate: string;
   sourceReference?: string;
   sourceReliability?: string;
+  primaryPlanet?: string | null;
+  secondaryPlanet?: string | null;
+  house?: number | null;
+  targetHouse?: number | null;
+  sign?: string | null;
+  lordship?: string | null;
+  dignity?: string | null;
+  aspectType?: string | null;
+  yogaName?: string | null;
+  divisionalChart?: string | null;
+  dashaCondition?: string | null;
+  transitCondition?: string | null;
+  normalizedSourceText?: string | null;
+  normalizedSourceReference?: string | null;
+  normalizedSourceReliability?: string | null;
+  normalizedEmbeddingText?: string | null;
+  normalizedPromptCompactSummary?: string | null;
   structuredRule?: {
     condition?: string;
     interpretation?: string;
@@ -162,6 +179,12 @@ export type RetrievalContext = {
   expandedSearchTerms?: string[];
   requiredEvidenceHints?: string[];
   chartAnchorHints?: string[];
+  promptContextText?: string;
+  promptIncludedRuleIds?: string[];
+  promptIncludedValidationCheckIds?: string[];
+  promptIncludedExampleIds?: string[];
+  structuredRagUsed?: boolean;
+  structuredRagFallbackReason?: string;
   metadata: {
     userId: string;
     profileId: string | null;

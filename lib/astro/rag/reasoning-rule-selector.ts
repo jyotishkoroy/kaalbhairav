@@ -1,3 +1,10 @@
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
+
+import type { AstroRankedReasoningRule, AstroRuleRankingContext, AstroReasoningRule } from "./types";
 import type { ChartFact } from "./chart-fact-extractor";
 import type { RequiredDataPlan } from "./required-data-planner";
 import type { ReasoningRule, RetrievalContext } from "./retrieval-types";
@@ -36,10 +43,43 @@ export type SelectReasoningRulesInput = {
   minScore?: number;
 };
 
+const SOURCE_RELIABILITY_SCORE: Record<string, number> = {
+  primary_classical: 20,
+  classical_translation: 16,
+  traditional_commentary: 12,
+  modern_interpretation: 4,
+};
+
+const DEFAULT_SELECTED_RULE_LIMIT = 8;
+const MIN_SELECTED_RULE_LIMIT = 3;
+const MAX_SELECTED_RULE_LIMIT = 8;
+
 function normalizeKey(value: string | null | undefined): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function hasAnyOverlap(left: readonly string[], right: readonly string[]): boolean {
+  const rightSet = new Set(right.map((value) => value.toLowerCase()));
+  return left.some((value) => rightSet.has(value.toLowerCase()));
+}
+
+function normalizeRuleStatement(rule: { ruleId?: string; ruleStatement?: string | null; promptCompactSummary?: string | null }): string {
+  return (rule.ruleStatement ?? rule.promptCompactSummary ?? rule.ruleId ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function dedupeByRuleStatementOrId(items: AstroRankedReasoningRule[]): AstroRankedReasoningRule[] {
+  const seenIds = new Set<string>();
+  const seenStatements = new Set<string>();
+  const out: AstroRankedReasoningRule[] = [];
+  for (const item of items) {
+    const id = item.rule.ruleId;
+    const statement = normalizeRuleStatement(item.rule);
+    if (seenIds.has(id) || (statement && seenStatements.has(statement))) continue;
+    seenIds.add(id);
+    if (statement) seenStatements.add(statement);
+    out.push(item);
+  }
+  return out;
 }
 
 function trimTemplate(value: string): string {
@@ -94,34 +134,18 @@ function factMatchesRequiredFactType(fact: ChartFact, requiredFactType: string, 
   if (key === "current_dasha") {
     return factType === "dasha" || factKey === "current_mahadasha" || factKey === "current_antardasha";
   }
-  if (key === "sun_placement") {
-    return factType === "planet_placement" && planet === "sun";
-  }
-  if (key === "moon_placement") {
-    return factType === "planet_placement" && planet === "moon";
-  }
-  if (key === "rahu_placement") {
-    return factType === "planet_placement" && planet === "rahu";
-  }
-  if (key === "venus_placement") {
-    return factType === "planet_placement" && planet === "venus";
-  }
-  if (key === "mercury_placement") {
-    return factType === "planet_placement" && planet === "mercury";
-  }
-  if (key === "jupiter_placement") {
-    return factType === "planet_placement" && planet === "jupiter";
-  }
+  if (key === "sun_placement") return factType === "planet_placement" && planet === "sun";
+  if (key === "moon_placement") return factType === "planet_placement" && planet === "moon";
+  if (key === "rahu_placement") return factType === "planet_placement" && planet === "rahu";
+  if (key === "venus_placement") return factType === "planet_placement" && planet === "venus";
+  if (key === "mercury_placement") return factType === "planet_placement" && planet === "mercury";
+  if (key === "jupiter_placement") return factType === "planet_placement" && planet === "jupiter";
   if (/^house_\d+$/.test(key)) {
     const house = Number(key.split("_")[1]);
-    return factType === "house" && factKey === key || fact.house === house || tags.includes(key);
+    return (factType === "house" && factKey === key) || fact.house === house || tags.includes(key);
   }
-  if (/^lord_\d+$/.test(key)) {
-    return factKey === key || factType === "house_lord";
-  }
-  if (key === "lagna") {
-    return factType === "lagna" || factKey === "lagna" || factKey === "ascendant" || factKey === "asc";
-  }
+  if (/^lord_\d+$/.test(key)) return factKey === key || factType === "house_lord";
+  if (key === "lagna") return factType === "lagna" || factKey === "lagna" || factKey === "ascendant" || factKey === "asc";
   if (key === "sun" || key === "moon" || key === "mercury" || key === "venus" || key === "jupiter" || key === "saturn" || key === "rahu" || key === "ketu") {
     return planet === key || factKey === key;
   }
@@ -141,7 +165,6 @@ function scoreRule(rule: ReasoningRule, plan: RequiredDataPlan, context: Retriev
   const matchedTags = new Set<string>();
   const missingFactTypes: string[] = [];
   const missingTags: string[] = [];
-
   let score = 0;
   const domain = normalizeKey(rule.domain);
   const planDomain = normalizeKey(plan.domain);
@@ -197,16 +220,9 @@ function scoreRule(rule: ReasoningRule, plan: RequiredDataPlan, context: Retriev
     score -= 200;
   }
 
-  if (planDomain === "safety" || plan.blockedBySafety) {
-    reasons.push("safety restrictions applied");
-  }
-  if (!requiredFactKeys.length && !rule.requiredFactTypes.length && !rule.requiredTags.length) {
-    reasons.push("low-constraint fallback");
-  }
-
-  if (rule.reasoningTemplate) {
-    reasons.push(trimTemplate(rule.reasoningTemplate));
-  }
+  if (planDomain === "safety" || plan.blockedBySafety) reasons.push("safety restrictions applied");
+  if (!requiredFactKeys.length && !rule.requiredFactTypes.length && !rule.requiredTags.length) reasons.push("low-constraint fallback");
+  if (rule.reasoningTemplate) reasons.push(trimTemplate(rule.reasoningTemplate));
 
   return {
     rule,
@@ -217,6 +233,109 @@ function scoreRule(rule: ReasoningRule, plan: RequiredDataPlan, context: Retriev
     missingTags,
     reasons,
   };
+}
+
+export function scoreRuleAgainstContext(rule: AstroReasoningRule, context: AstroRuleRankingContext): AstroRankedReasoningRule {
+  let score = 0;
+  const rankingReasons: string[] = [];
+  const rejectionReasons: string[] = [];
+  const domain = normalizeKey(String((rule.metadata as Record<string, unknown>).domain ?? rule.ruleId));
+  const sourceReference = rule.sourceReference ?? rule.normalizedSourceReference ?? "";
+
+  if (context.domains.some((candidate) => candidate.toLowerCase() === domain)) {
+    score += 40;
+    rankingReasons.push("domain_match");
+  }
+
+  const rulePlanets = [rule.primaryPlanet, rule.secondaryPlanet].filter(Boolean).map((value) => String(value));
+  if (hasAnyOverlap(rulePlanets, context.planets as readonly string[])) {
+    score += 18;
+    rankingReasons.push("planet_match");
+  }
+  if (rule.house != null && context.houses.includes(rule.house)) {
+    score += 18;
+    rankingReasons.push("house_match");
+  }
+  if (rule.sign && context.signs.some((sign) => sign.toLowerCase() === rule.sign?.toLowerCase())) {
+    score += 12;
+    rankingReasons.push("sign_match");
+  }
+  if (rule.primaryPlanet && rule.house != null && hasAnyOverlap([rule.primaryPlanet], context.planets as readonly string[]) && context.houses.includes(rule.house)) {
+    score += 12;
+    rankingReasons.push("planet_house_specific_match");
+  }
+
+  if (hasAnyOverlap(rule.lifeAreaTags ?? [], context.lifeAreaTags)) {
+    score += 20;
+    rankingReasons.push("life_area_match");
+  }
+
+  if (hasAnyOverlap(rule.conditionTags ?? [], [...context.conditionTags, ...context.chartFactTags])) {
+    score += 15;
+    rankingReasons.push("condition_tag_match");
+  }
+
+  const reliability = (rule.normalizedSourceReliability ?? rule.sourceReliability ?? "").toLowerCase();
+  if (reliability && SOURCE_RELIABILITY_SCORE[reliability]) {
+    score += SOURCE_RELIABILITY_SCORE[reliability];
+    rankingReasons.push(`source_${reliability}`);
+  }
+
+  const specificityFields = [
+    rule.primaryPlanet,
+    rule.house,
+    rule.sign,
+    rule.lordship,
+    rule.dignity,
+    rule.aspectType,
+    rule.yogaName,
+    rule.divisionalChart,
+    rule.dashaCondition,
+    rule.transitCondition,
+  ];
+  score += Math.min(specificityFields.filter((value) => value != null && String(value).trim()).length * 2, 16);
+
+  if (rule.primaryPlanet && context.planets.length && !hasAnyOverlap([rule.primaryPlanet], context.planets)) {
+    score -= 10;
+    rejectionReasons.push("planet_mismatch_soft");
+  }
+  if (rule.house != null && context.houses.length && !context.houses.includes(rule.house)) {
+    score -= 10;
+    rejectionReasons.push("house_mismatch_soft");
+  }
+  if (context.exactFactMode && !(domain === "exact_fact" || domain === "safety")) {
+    score -= 80;
+    rejectionReasons.push("exact_fact_mode_penalty");
+  }
+  if (context.safetyBlocked && !(domain === "safety" || hasAnyOverlap(rule.conditionTags ?? [], ["safety", "validation"]))) {
+    score -= 100;
+    rejectionReasons.push("safety_block_penalty");
+  }
+  if (normalizeKey(sourceReference) === "exact_reference_unknown") {
+    score -= 3;
+    rankingReasons.push("exact_reference_unknown_minor_penalty");
+  }
+
+  return {
+    rule,
+    score,
+    rankingReasons,
+    rejectionReasons,
+  };
+}
+
+export function selectStructuredReasoningRules(
+  candidates: readonly AstroReasoningRule[],
+  context: AstroRuleRankingContext,
+  options?: { limit?: number },
+): AstroRankedReasoningRule[] {
+  const limit = Math.min(Math.max(options?.limit ?? DEFAULT_SELECTED_RULE_LIMIT, MIN_SELECTED_RULE_LIMIT), MAX_SELECTED_RULE_LIMIT);
+  return dedupeByRuleStatementOrId(
+    candidates
+      .map((rule) => scoreRuleAgainstContext(rule, context))
+      .filter((ranked) => ranked.score > 0)
+      .sort((a, b) => b.score - a.score),
+  ).slice(0, limit);
 }
 
 export function selectReasoningRules(input?: SelectReasoningRulesInput): ReasoningRuleSelection {
@@ -231,13 +350,9 @@ export function selectReasoningRules(input?: SelectReasoningRulesInput): Reasoni
   const warnings = [...(context.metadata.partial ? ["Retrieval context was partial; reasoning path may be incomplete."] : [])];
   const candidates = [...(context.reasoningRules ?? [])];
   const scored = candidates.map((rule) => scoreRule(rule, plan, context));
-  const selectedRules = scored.filter((match) => match.score >= minScore).sort((a, b) =>
-    b.score - a.score || b.rule.weight - a.rule.weight || a.rule.domain.localeCompare(b.rule.domain) || a.rule.ruleKey.localeCompare(b.rule.ruleKey),
-  ).slice(0, maxRules);
+  const selectedRules = scored.filter((match) => match.score >= minScore).sort((a, b) => b.score - a.score || b.rule.weight - a.rule.weight || a.rule.domain.localeCompare(b.rule.domain) || a.rule.ruleKey.localeCompare(b.rule.ruleKey)).slice(0, maxRules);
   const selectedIds = selectedRules.map((match) => match.rule.id);
-  const rejectedRules = scored
-    .filter((match) => !selectedIds.includes(match.rule.id))
-    .sort((a, b) => b.score - a.score || b.rule.weight - a.rule.weight || a.rule.domain.localeCompare(b.rule.domain) || a.rule.ruleKey.localeCompare(b.rule.ruleKey));
+  const rejectedRules = scored.filter((match) => !selectedIds.includes(match.rule.id)).sort((a, b) => b.score - a.score || b.rule.weight - a.rule.weight || a.rule.domain.localeCompare(b.rule.domain) || a.rule.ruleKey.localeCompare(b.rule.ruleKey));
 
   if (!selectedRules.length && normalizeKey(plan.answerType) !== "exact_fact") {
     warnings.push("No reasoning rules matched the retrieved context.");

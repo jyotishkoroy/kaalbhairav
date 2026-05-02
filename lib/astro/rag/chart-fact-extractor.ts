@@ -1,3 +1,11 @@
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
+
+import type { AstroRuleRankingContext } from "./types";
+
 export type ChartFact = {
   userId?: string;
   profileId?: string | null;
@@ -54,6 +62,76 @@ const PLANET_NAMES = [
   "Ascendant",
   "Lagna",
 ] as const;
+
+export const LIFE_AREA_QUERY_KEYWORDS: Record<string, string[]> = {
+  marriage: ["marriage", "spouse", "wife", "husband", "partner", "relationship", "love"],
+  relationship: ["relationship", "love", "partner", "marriage", "dating"],
+  career: ["career", "job", "work", "profession", "business", "status"],
+  finance: ["money", "wealth", "income", "finance", "debt", "gains"],
+  education: ["education", "study", "exam", "learning"],
+  children: ["children", "child", "pregnancy", "progeny"],
+  health: ["health", "disease", "illness", "mental", "anxiety"],
+  spirituality: ["spiritual", "dharma", "karma", "remedy", "mantra"],
+  property: ["property", "home", "vehicle", "land"],
+  travel: ["foreign", "travel", "abroad", "settlement"],
+};
+
+export function inferLifeAreaTagsFromQuestion(question: string): string[] {
+  const lower = question.toLowerCase();
+  const tags: string[] = [];
+  for (const [tag, keywords] of Object.entries(LIFE_AREA_QUERY_KEYWORDS)) {
+    if (keywords.some((keyword) => lower.includes(keyword))) tags.push(tag);
+  }
+  return Array.from(new Set(tags));
+}
+
+export function inferPlanetsFromQuestion(question: string): string[] {
+  const lower = question.toLowerCase();
+  const aliases: Record<string, string> = {
+    sun: "Sun",
+    surya: "Sun",
+    moon: "Moon",
+    chandra: "Moon",
+    mars: "Mars",
+    mangal: "Mars",
+    kuja: "Mars",
+    mercury: "Mercury",
+    budha: "Mercury",
+    jupiter: "Jupiter",
+    guru: "Jupiter",
+    venus: "Venus",
+    shukra: "Venus",
+    saturn: "Saturn",
+    shani: "Saturn",
+    rahu: "Rahu",
+    ketu: "Ketu",
+  };
+  return Array.from(new Set(Object.entries(aliases).filter(([alias]) => lower.includes(alias)).map(([, planet]) => planet)));
+}
+
+export function inferHousesFromQuestion(question: string): number[] {
+  const lower = question.toLowerCase();
+  const houses = new Set<number>();
+  const digitMatches = lower.matchAll(/\b(1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th|11th|12th|[1-9]|1[0-2])\s+house\b/g);
+  for (const match of digitMatches) {
+    const value = match[1].replace(/\D/g, "");
+    const parsed = Number.parseInt(value, 10);
+    if (parsed >= 1 && parsed <= 12) houses.add(parsed);
+  }
+  if (/\blagna\b|\bascendant\b|\bfirst house\b/.test(lower)) houses.add(1);
+  if (/\bsecond house\b/.test(lower)) houses.add(2);
+  if (/\bthird house\b/.test(lower)) houses.add(3);
+  if (/\bfourth house\b/.test(lower)) houses.add(4);
+  if (/\bfifth house\b/.test(lower)) houses.add(5);
+  if (/\bsixth house\b/.test(lower)) houses.add(6);
+  if (/\bseventh house\b/.test(lower)) houses.add(7);
+  if (/\beighth house\b/.test(lower)) houses.add(8);
+  if (/\bninth house\b/.test(lower)) houses.add(9);
+  if (/\btenth house\b/.test(lower)) houses.add(10);
+  if (/\beleventh house\b/.test(lower)) houses.add(11);
+  if (/\btwelfth house\b/.test(lower)) houses.add(12);
+  return Array.from(houses);
+}
 
 const HOUSE_DOMAIN_TAGS: Record<number, string[]> = {
   1: ["self", "body"],
@@ -751,4 +829,39 @@ export function extractChartFactsFromVersion(chartJson: unknown, options: Extrac
   return [...facts.values()]
     .map((fact) => injectDefaults(fact, options))
     .sort((left, right) => `${left.factType}::${left.factKey}`.localeCompare(`${right.factType}::${right.factKey}`));
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+export function buildStructuredRuleRankingContext(input: {
+  userQuestion: string;
+  chartFacts?: readonly ChartFact[];
+  domains?: readonly string[];
+  exactFactMode?: boolean;
+  safetyBlocked?: boolean;
+}): AstroRuleRankingContext {
+  const chartFacts = input.chartFacts ?? [];
+  return {
+    userQuestion: input.userQuestion,
+    domains: input.domains ?? [],
+    lifeAreaTags: uniqueStrings([
+      ...inferLifeAreaTagsFromQuestion(input.userQuestion),
+      ...chartFacts.flatMap((fact) => fact.tags ?? []),
+    ]),
+    conditionTags: uniqueStrings(chartFacts.flatMap((fact) => fact.tags ?? [])),
+    chartFactTags: uniqueStrings(chartFacts.flatMap((fact) => fact.tags ?? [])),
+    planets: uniqueStrings([
+      ...inferPlanetsFromQuestion(input.userQuestion),
+      ...chartFacts.map((fact) => fact.planet ?? "").filter(Boolean),
+    ]),
+    houses: Array.from(new Set([
+      ...inferHousesFromQuestion(input.userQuestion),
+      ...chartFacts.map((fact) => fact.house ?? 0).filter((value) => Number.isInteger(value) && value >= 1 && value <= 12) as number[],
+    ])),
+    signs: uniqueStrings(chartFacts.map((fact) => fact.sign ?? "").filter(Boolean)),
+    exactFactMode: input.exactFactMode,
+    safetyBlocked: input.safetyBlocked,
+  };
 }
