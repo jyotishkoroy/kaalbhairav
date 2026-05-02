@@ -1,3 +1,26 @@
+Phase: TarayAI Phase 2 Life-context Extractor
+Starting commit: 5b6ce80
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added deterministic life-context extraction for career, marriage, relationship, money, family, health, spirituality, and general concerns
+- added extracted facts and missing-critical-context output
+- integrated non-exact-fact consultation state creation with life-context extraction while preserving exact-fact bypass
+- added targeted tests for career blockage, promotion anxiety, job switch, business transition, marriage pressure, proposal confusion, marriage delay, relationship uncertainty, unavailable partner pattern, money stress, family duty, health anxiety, spiritual confusion, malformed input, previous-context fallback, explicit override, and exact-fact bypass
+Validation:
+- targeted consultation tests: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
+Deployment:
+- skipped
+Next:
+- Phase 3 emotional-state detector
+<!-- Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy. -->
 Phase: Post-Phase-8 cleanup and seed-bank validation fix
 Starting commit: 2ea662e
 Runtime behavior changed: no

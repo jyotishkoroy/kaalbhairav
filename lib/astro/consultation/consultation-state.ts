@@ -17,6 +17,7 @@ import type {
   RemedyPlan,
   TimingJudgement,
 } from "./consultation-types";
+import { extractLifeContext } from "./life-context-extractor";
 
 export type ConsultationInput = {
   readonly sessionId?: string;
@@ -137,13 +138,24 @@ export function createEmptyConsultationState(input: ConsultationInput): Consulta
   const bootstrap = isExactFactIntent(intent.primary)
     ? {}
     : inferBootstrapConsultationContext(userQuestion);
+  const lifeContext = isExactFactIntent(intent.primary)
+    ? undefined
+    : extractLifeContext({ question: userQuestion });
 
   return {
     sessionId: normalizeSessionId(input.sessionId),
     userQuestion,
     intent,
     chartFacts: input.chartFacts,
-    lifeStory: bootstrap.lifeStory ?? createDefaultLifeStory(),
+    lifeStory: lifeContext
+      ? {
+          currentIssue: lifeContext.currentIssue ?? bootstrap.lifeStory?.currentIssue,
+          lifeArea: lifeContext.lifeArea ?? bootstrap.lifeStory?.lifeArea,
+          currentSituation: lifeContext.currentSituation ?? bootstrap.lifeStory?.currentSituation,
+          desiredOutcome: lifeContext.desiredOutcome ?? bootstrap.lifeStory?.desiredOutcome,
+          decisionType: lifeContext.decisionType ?? bootstrap.lifeStory?.decisionType,
+        }
+      : bootstrap.lifeStory ?? createDefaultLifeStory(),
     emotionalState: bootstrap.emotionalState ?? createDefaultEmotionalState(),
     culturalFamilyContext:
       bootstrap.culturalFamilyContext ?? createDefaultCulturalFamilyContext(),

@@ -6,3 +6,4 @@
 
 export * from "./consultation-types";
 export * from "./consultation-state";
+export * from "./life-context-extractor";

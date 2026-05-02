@@ -20,7 +20,7 @@ describe("createEmptyConsultationState", () => {
     );
     expect(state.intent.primary).not.toBe("exact_fact");
     expect(state.lifeStory.lifeArea).toBe("marriage");
-    expect(state.lifeStory.currentIssue).toBe("marriage pressure while career feels unstable");
+    expect(state.lifeStory.currentIssue).toBe("family pressure for marriage despite inner unreadiness");
     expect(state.lifeStory.decisionType).toBe("marriage_readiness");
     expect(state.emotionalState.primary).toBe("fear");
     expect(state.emotionalState.intensity).toBe("high");
@@ -136,5 +136,26 @@ describe("createEmptyConsultationState", () => {
     expect(state.intent.primary).toBe("remedy");
     expect(state.followUp.allowed).toBe(true);
     expect(state.remedyPlan).toBeUndefined();
+  });
+
+  it("uses the life-context extractor for marriage pressure cases", () => {
+    const state = createEmptyConsultationState({
+      userQuestion: "My parents are pressuring me for marriage but I am not ready.",
+    });
+
+    expect(state.lifeStory.lifeArea).toBe("marriage");
+    expect(state.lifeStory.currentIssue).toBe("family pressure for marriage despite inner unreadiness");
+    expect(state.lifeStory.decisionType).toBe("marriage_readiness");
+    expect(state.lifeStory.desiredOutcome).toBe("clarity and reduced pressure");
+  });
+
+  it("keeps exact-fact state empty even with extractable context", () => {
+    const state = createEmptyConsultationState({
+      userQuestion: "What is my Lagna?",
+    });
+
+    expect(state.intent.primary).toBe("exact_fact");
+    expect(state.lifeStory).toEqual({});
+    expect(state.followUp.allowed).toBe(false);
   });
 });
