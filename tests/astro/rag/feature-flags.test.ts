@@ -14,6 +14,7 @@ describe("getAstroRagFlags", () => {
     const flags = getAstroRagFlags({});
 
     expect(flags.ragEnabled).toBe(false);
+    expect(flags.routingEnabled).toBe(false);
     expect(flags.readingPlanEnabled).toBe(false);
     expect(flags.reasoningGraphEnabled).toBe(false);
     expect(flags.listeningAnalyzerEnabled).toBe(false);
@@ -38,6 +39,7 @@ describe("getAstroRagFlags", () => {
   it("enables selected safe values explicitly", () => {
     const flags = getAstroRagFlags({
       ASTRO_RAG_ENABLED: "true",
+      ASTRO_RAG_ROUTING_ENABLED: "true",
       ASTRO_READING_PLAN_ENABLED: "true",
       ASTRO_REASONING_GRAPH_ENABLED: "true",
       ASTRO_LISTENING_ANALYZER_ENABLED: "true",
@@ -57,6 +59,7 @@ describe("getAstroRagFlags", () => {
     });
 
     expect(flags.ragEnabled).toBe(true);
+    expect(flags.routingEnabled).toBe(true);
     expect(flags.readingPlanEnabled).toBe(true);
     expect(flags.reasoningGraphEnabled).toBe(true);
     expect(flags.listeningAnalyzerEnabled).toBe(true);

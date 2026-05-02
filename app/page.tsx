@@ -1,41 +1,34 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
-import Link from 'next/link'
+import Link from "next/link";
 
 const BRAND = {
   name: "TARAYAI",
   subtitle: "VEDIC ASTROLOGY",
 };
 
-const ROUTES = {
-  home: "/",
-  chart: "/astro",
-  insights: "/news",
-  contact: "/settings",
-  kundali: "/astro",
-  dailyPanchang: "/astro",
-  askTheGuru: "/astro",
-  compatibility: "/astro",
-  remedies: "/still",
-  askAnything: "/astro",
-} as const;
-
 const TOP_NAV = [
-  { label: "CHART", href: ROUTES.chart },
-  { label: "INSIGHTS", href: ROUTES.insights },
-  { label: "CONTACT", href: ROUTES.contact },
+  { label: "CHART", href: "/astro" },
+  { label: "INSIGHTS", href: "/news" },
+  { label: "SETTINGS", href: "/settings" },
 ] as const;
 
 const SEEKING_ITEMS = [
-  { label: "KUNDALI", href: ROUTES.kundali },
-  { label: "DAILY PANCHANG", href: ROUTES.dailyPanchang },
-  { label: "ASK THE GURU", href: ROUTES.askTheGuru },
-  { label: "COMPATIBILITY", href: ROUTES.compatibility },
-  { label: "REMEDIES", href: ROUTES.remedies },
+  { label: "KUNDALI", href: "/astro" },
+  { label: "DAILY PANCHANG", href: "/astro" },
+  { label: "ASK THE GURU", href: "/astro" },
+  { label: "COMPATIBILITY", href: "/astro" },
+  { label: "REMEDIES", href: "/still" },
+] as const;
+
+const FOOTER_LINKS = [
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
+  { label: "Settings", href: "/settings" },
 ] as const;
 
 const HERO = {
@@ -43,6 +36,8 @@ const HERO = {
   lines: ["DISCOVER", "YOUR", "INNER SKY"],
   prompt: "ASK ME ANYTHING...",
 };
+
+const RAYS = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330] as const;
 
 const ORBS = [
   { left: "6%", top: "22%", size: 2, delay: "0s", duration: "11s" },
@@ -61,8 +56,6 @@ const ORBS = [
   { left: "96%", top: "42%", size: 3, delay: "-5s", duration: "14s" },
 ] as const;
 
-const ASTRO_WHEEL_RAYS = Array.from({ length: 12 }, (_, index) => index * 30);
-
 function AstrologyWheel() {
   return (
     <svg
@@ -76,18 +69,16 @@ function AstrologyWheel() {
       <circle cx="260" cy="260" r="112" />
       <circle cx="260" cy="260" r="44" />
 
-      {ASTRO_WHEEL_RAYS.map((angle) => {
-        return (
-          <line
-            key={`ray-${angle}`}
-            x1="260"
-            y1="76"
-            x2="260"
-            y2="118"
-            transform={`rotate(${angle} 260 260)`}
-          />
-        );
-      })}
+      {RAYS.map((angle) => (
+        <line
+          key={angle}
+          x1="260"
+          y1="76"
+          x2="260"
+          y2="118"
+          transform={`rotate(${angle} 260 260)`}
+        />
+      ))}
 
       <path d="M260 64L365 416L90 170H430L155 416L260 64Z" />
       <path d="M260 112L390 342H130L260 112Z" />
@@ -98,16 +89,16 @@ function AstrologyWheel() {
       <circle className="astro-dot" cx="372" cy="162" r="5" />
       <circle className="astro-dot dim" cx="148" cy="348" r="3" />
       <circle className="astro-dot dim" cx="398" cy="314" r="3" />
-      </svg>
+    </svg>
   );
 }
 
 function ParticleField() {
   return (
     <div className="particle-field" aria-hidden="true">
-      {ORBS.map((orb, index) => (
+      {ORBS.map((orb) => (
         <span
-          key={`orb-${index}`}
+          key={`${orb.left}-${orb.top}`}
           className="orb"
           style={{
             left: orb.left,
@@ -170,7 +161,7 @@ function SeekingMenu() {
         ))}
       </nav>
 
-      <Link className="ask-pill" href={ROUTES.askAnything}>
+      <Link className="ask-pill" href="/astro">
         {HERO.prompt}
       </Link>
     </aside>
@@ -180,7 +171,7 @@ function SeekingMenu() {
 function BrandMark() {
   return (
     <header className="brand-mark">
-      <Link href={ROUTES.home} aria-label="Tarayai home">
+      <Link href="/" aria-label="Tarayai home">
         {BRAND.name}
       </Link>
       <p>{BRAND.subtitle}</p>
@@ -213,6 +204,21 @@ function HeroCard() {
         <div />
       </div>
     </section>
+  );
+}
+
+function FooterLinks() {
+  return (
+    <footer className="home-footer">
+      <nav aria-label="Footer links">
+        {FOOTER_LINKS.map((link) => (
+          <Link key={link.href} href={link.href}>
+            {link.label}
+          </Link>
+        ))}
+      </nav>
+      <p>Jai Maa Tara</p>
+    </footer>
   );
 }
 
@@ -752,6 +758,40 @@ export default function HomePage() {
           animation-delay: -7s;
         }
 
+        .home-footer {
+          position: absolute;
+          left: 50%;
+          bottom: 26px;
+          z-index: 12;
+          transform: translateX(-50%);
+          display: grid;
+          justify-items: center;
+          gap: 9px;
+          color: rgba(245, 242, 236, 0.32);
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-size: 0.75rem;
+        }
+
+        .home-footer nav {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+        }
+
+        .home-footer a {
+          color: rgba(245, 242, 236, 0.36);
+          transition: color 180ms ease;
+        }
+
+        .home-footer a:hover {
+          color: rgba(245, 242, 236, 0.78);
+        }
+
+        .home-footer p {
+          margin: 0;
+          color: rgba(245, 242, 236, 0.24);
+        }
+
         @keyframes deepBreath {
           from {
             transform: scale(1) translate3d(0, 0, 0);
@@ -795,15 +835,9 @@ export default function HomePage() {
         @keyframes spineFloat {
           from {
             opacity: 0.36;
-            filter:
-              drop-shadow(0 0 14px rgba(168, 140, 255, 0.14))
-              drop-shadow(0 0 18px rgba(255, 157, 46, 0.08));
           }
           to {
             opacity: 0.7;
-            filter:
-              drop-shadow(0 0 24px rgba(168, 140, 255, 0.28))
-              drop-shadow(0 0 38px rgba(255, 157, 46, 0.16));
           }
         }
 
@@ -867,7 +901,7 @@ export default function HomePage() {
             min-height: 100svh;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 28px 18px 36px;
+            padding: 28px 18px 104px;
             display: grid;
             gap: 28px;
           }
@@ -876,7 +910,8 @@ export default function HomePage() {
           .top-nav,
           .seeking-menu,
           .hero-stage,
-          .glass-panels {
+          .glass-panels,
+          .home-footer {
             position: relative;
             inset: auto;
             transform: none;
@@ -955,6 +990,12 @@ export default function HomePage() {
             display: none;
           }
 
+          .home-footer {
+            order: 6;
+            justify-self: center;
+            margin-top: 18px;
+          }
+
           .dust-one {
             left: -18%;
             bottom: 4%;
@@ -969,7 +1010,7 @@ export default function HomePage() {
 
         @media (max-width: 520px) {
           .tarayai-home {
-            padding: 22px 16px 32px;
+            padding: 22px 16px 96px;
           }
 
           .top-nav {
@@ -994,6 +1035,10 @@ export default function HomePage() {
             width: 88%;
             height: 88%;
           }
+
+          .home-footer nav {
+            gap: 14px;
+          }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1016,6 +1061,7 @@ export default function HomePage() {
       <SeekingMenu />
       <HeroCard />
       <GlassPanels />
+      <FooterLinks />
     </main>
   );
 }

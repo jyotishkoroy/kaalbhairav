@@ -21,6 +21,7 @@ import {
   type RagReadingOrchestratorResult,
 } from "@/lib/astro/rag/rag-reading-orchestrator";
 import { getAstroRagFlags } from "@/lib/astro/rag/feature-flags";
+import { routeAstroRagRequest } from "@/lib/astro/rag/rag-routing";
 import type { ChartEvidence } from "@/lib/astro/consultation/chart-evidence-builder";
 import { generateReadingV2 } from "@/lib/astro/reading/reading-orchestrator-v2";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
@@ -169,7 +170,13 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
     headerDebugTrace: request.headers.get("x-tarayai-debug-trace"),
   });
   const flags = (deps.flags ?? getAstroRagFlags)(process.env);
-  const ragBranchEnabled = shouldUseRagReadingRoute(flags, question);
+  const routeDecision = routeAstroRagRequest({
+    question,
+    userId: context.userId,
+    flags,
+    routingEnabled: Boolean(flags.routingEnabled),
+  });
+  const ragBranchEnabled = routeDecision.kind === "rag" && shouldUseRagReadingRoute(flags, question);
   const ragInput: Partial<RagReadingOrchestratorInput> = { question, userId: context.userId, profileId: context.profileId ?? undefined, chartVersionId: context.chartVersionId ?? undefined, env: process.env, explicitUserDates: Array.isArray((body as Record<string, unknown>).explicitUserDates) ? ((body as Record<string, unknown>).explicitUserDates as NonNullable<RagReadingOrchestratorInput["explicitUserDates"]>) : undefined, memorySummary: readString(metadata?.memorySummary) };
   try {
     if (ragBranchEnabled) {

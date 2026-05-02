@@ -12,6 +12,7 @@
 
 export type AstroRagFlags = {
   ragEnabled: boolean;
+  routingEnabled?: boolean;
   questionFrameParserEnabled?: boolean;
   structuredIntentRoutingEnabled?: boolean;
   readingPlanEnabled?: boolean;
@@ -86,6 +87,7 @@ function readMemoryMaxItems(value: string | undefined, defaultValue: number): nu
 export function getAstroRagFlags(env: Record<string, string | undefined> = process.env): AstroRagFlags {
   return {
     ragEnabled: readBool(env.ASTRO_RAG_ENABLED, false),
+    routingEnabled: readBool(env.ASTRO_RAG_ROUTING_ENABLED, false),
     questionFrameParserEnabled: readBool(env.ASTRO_QUESTION_FRAME_PARSER_ENABLED, false),
     structuredIntentRoutingEnabled: readBool(env.ASTRO_STRUCTURED_ROUTING_ENABLED, false),
     readingPlanEnabled: readBool(env.ASTRO_READING_PLAN_ENABLED, false),
