@@ -50,7 +50,8 @@ const DEATH_PATTERNS = [
 ];
 
 const MEDICAL_DIAGNOSIS_PATTERNS = [
-  /\b(do i have|am i (bipolar|depressed|anxious|schizophrenic|autistic|adhd))\b/i,
+  /\bdo i have (cancer|tumor|disease|illness|disorder|diabetes|infection|condition|bipolar|adhd|autism|schizophrenia)\b/i,
+  /\bam i (bipolar|depressed|anxious|schizophrenic|autistic|adhd)\b/i,
 ];
 
 function isSafetyBlocked(question: string): boolean {
