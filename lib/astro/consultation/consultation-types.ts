@@ -24,6 +24,19 @@ export type ConsultationLifeArea =
 
 export type ConsultationConfidence = "low" | "medium" | "high";
 
+export type ChartEvidenceDomain =
+  | "career"
+  | "marriage"
+  | "relationship"
+  | "money"
+  | "health"
+  | "family"
+  | "general";
+
+export type ChartEvidenceSource = "rashi" | "navamsa" | "dasha" | "transit" | "derived_rule";
+
+export type ChartEvidenceFactorPolarity = "supportive" | "challenging" | "neutral";
+
 export type ConsultationEmotionalPrimary =
   | "fear"
   | "anxiety"

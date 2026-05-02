@@ -6,6 +6,7 @@
 
 export * from "./consultation-types";
 export * from "./consultation-state";
+export * from "./chart-evidence-builder";
 export * from "./cultural-context-extractor";
 export * from "./emotional-state-detector";
 export * from "./life-context-extractor";

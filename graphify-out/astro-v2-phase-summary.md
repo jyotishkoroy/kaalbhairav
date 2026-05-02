@@ -198,6 +198,15 @@ Validation bank:
 - covers 15 categories
 - adds deterministic evaluator
 - adds CI-safe check script
+Phase 6 — Chart Facts to Domain-specific Evidence
+- Added a deterministic chart-evidence builder that maps supplied chart, dasha, transit, and chartFacts inputs into domain-specific supportive, challenging, and neutral evidence.
+- Added domain filtering for career, marriage, relationship, money, health, family, and general consultation contexts.
+- Added source inference for rashi, navamsa, dasha, transit, and derived-rule facts without calculating new astrology.
+- Added birth-time sensitivity marking for divisional, degree, cusp, pratyantardasha, D9/Navamsa, D10/Dashamsha, and Darakaraka-sensitive evidence.
+- Added guardrails so the builder does not invent placements, dashas, aspects, transits, yogas, degrees, remedies, timing judgements, or health diagnosis.
+- Added tests for empty input, domain relevance, polarity handling, source inference, birth-time sensitivity, no-invention behavior, no-remedy output, health reflective framing, object/ChartFactSet inputs, deduplication, malformed facts, and Phase 2/3/4/5 regressions.
+- No production route behavior changed.
+- No deployment required.
 - adds optional local AI mode behind ASTRO_USE_LOCAL_CRITIC_FOR_TESTS=true
 - writes generated reports to artifacts
 Safety:
