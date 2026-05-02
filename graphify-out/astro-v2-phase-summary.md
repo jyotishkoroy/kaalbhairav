@@ -16,6 +16,28 @@ Validation:
 - full tests: pending
 Deployment:
 - skipped
+Phase: TarayAI Phase 15 Consultation Test Bank
+Starting commit: 428ce95
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added a deterministic 300-scenario consultation test bank across exact facts, career blockage, promotion anxiety, job quit decisions, business transition, marriage delay, parental pressure, specific proposal, relationship confusion, emotionally unavailable partners, money stress, family duty conflict, health-sensitive questions, Sade Sati fear, remedy requests, skeptical users, high-anxiety users, and birth-time-sensitive predictions
+- added test-bank fixtures and scoring/report helpers for fact accuracy, grounded chart reasoning, life context, emotional tone, cultural context, practical constraints, timing judgement, remedy safety, non-fear language, hallucination resistance, follow-up quality, memory reset, and human consultation feel
+- added table-driven tests for extractor quality, follow-up policy, remedy proportionality, timing judgement, synthetic final answer shape, production-like orchestration, validator checks, and memory reset
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted consultation test bank: passed
+- consultation test suite: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- full tests: passed
+Deployment:
+- skipped
+Next:
+- continue with Phase 16 only if explicitly instructed
 Next:
 - Phase 3 emotional-state detector
 Phase: TarayAI Phase 3 Emotional-state Detector
