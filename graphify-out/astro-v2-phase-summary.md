@@ -218,6 +218,32 @@ Safety:
 Validation:
 - human-feel script: passed
 - human-feel tests: passed
+Phase: TarayAI Phase 10 Timing Judgement
+Starting commit: 1c2691d
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added a deterministic timing-judgement module that interprets only supplied dasha, transit, chart-evidence, life-context, emotional-state, and practical-constraint inputs
+- added timing statuses for supportive, mixed, heavy, unstable, clarifying, delayed, and preparatory periods
+- added recommended actions for proceed, prepare, wait, review, avoid_impulsive_decision, and seek_more_information with conservative safety rules
+- added time-window handling that only preserves supplied valid ISO-like dates or supplied labels and never invents concrete windows
+- added conservative birth-time-sensitivity and confidence handling for pratyantardasha, degree, cusp, D9/Navamsa, D10/Dashamsha, and supplied sensitive timing facts
+- added guardrails against timing guarantees, invented dates, remedies, medical/legal/financial certainty, and irreversible-action instructions
+- added tests for empty input, supportive/mixed/heavy/unstable/clarifying/delayed/preparatory statuses, constraints, anxiety, health and money safety, supplied and invalid windows, birth-time sensitivity, chart-evidence timing extraction, no-remedy output, no deterministic predictions, malformed facts, exact-fact bypass, and Phase 2 through Phase 9 regressions
+- no production route behavior changed
+- no deployment required
+Validation:
+- timing judgement tests: passed
+- consultation regression tests: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- full tests: passed
+Deployment:
+- skipped
+Next:
+- Phase 11 remedy proportionality
 Phase: TarayAI Phase 9 Ephemeral Memory Reset After Final Answer
 Starting commit: f6a2f24
 Runtime behavior changed: no production route behavior change

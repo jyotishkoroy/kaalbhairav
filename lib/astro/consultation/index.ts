@@ -14,3 +14,12 @@ export * from "./follow-up-policy";
 export * from "./life-context-extractor";
 export * from "./pattern-recognition";
 export * from "./practical-constraints-extractor";
+export {
+  containsForbiddenTimingOutput,
+  judgeTiming,
+  type TimingFact,
+  type TimingJudgementInput,
+  type TimingRecommendedAction,
+  type TimingStatus,
+  type TimingWindow,
+} from "./timing-judgement";
