@@ -28,6 +28,12 @@ export * from "./emotional-state-detector";
 export * from "./follow-up-policy";
 export * from "./life-context-extractor";
 export * from "./pattern-recognition";
+export {
+  runConsultationOrchestration,
+  type ConsultationOrchestratorInput,
+  type ConsultationOrchestratorMode,
+  type ConsultationOrchestratorResult,
+} from "./consultation-orchestrator";
 export * from "./practical-constraints-extractor";
 export { buildConsultationResponsePlan } from "./response-plan-builder";
 export {
