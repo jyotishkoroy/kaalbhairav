@@ -4,7 +4,22 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
-export * from "./consultation-types";
+export type {
+  ChartEvidenceDomain,
+  ChartEvidenceFactorPolarity,
+  ChartEvidenceSource,
+  ConsultationChartFactSet,
+  ConsultationConfidence,
+  ConsultationEmotionalPrimary,
+  ConsultationIntentPrimary,
+  ConsultationLifeArea,
+  ConsultationReligiousComfort,
+  ConsultationRiskTolerance,
+  ConsultationToneNeeded,
+  PatternRecognitionResult,
+  RemedyPlan,
+  TimingJudgement,
+} from "./consultation-types";
 export * from "./consultation-state";
 export * from "./ephemeral-consultation-memory";
 export * from "./chart-evidence-builder";
@@ -14,6 +29,7 @@ export * from "./follow-up-policy";
 export * from "./life-context-extractor";
 export * from "./pattern-recognition";
 export * from "./practical-constraints-extractor";
+export { buildConsultationResponsePlan } from "./response-plan-builder";
 export {
   buildProportionateRemedyPlan,
   createNoRemedyPlan,
