@@ -63,6 +63,23 @@ export {
   type TimingWindow,
 } from "./timing-judgement";
 export {
+  CONSULTATION_FEATURE_FLAG_NAMES,
+  CONSULTATION_ROLLBACK_ORDER,
+  DEFAULT_CONSULTATION_FEATURE_FLAG_DEFAULTS,
+  buildConsultationRolloutReadiness,
+  getConsultationFallbackMode,
+  parseConsultationFlagValue,
+  resolveConsultationFeatureFlagValues,
+  resolveConsultationFeatureFlags,
+  type ConsultationFeatureFallbackMode,
+  type ConsultationFeatureFlagDefaults,
+  type ConsultationFeatureFlagName,
+  type ConsultationFeatureFlagsInput,
+  type ConsultationFeatureFlagValue,
+  type ConsultationRolloutReadiness,
+  type ResolvedConsultationFeatureFlags,
+} from "./consultation-feature-flags";
+export {
   countFollowUpQuestions,
   validateConsultationResponse,
   type ConsultationResponseValidationInput,

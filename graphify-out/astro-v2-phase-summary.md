@@ -1,3 +1,26 @@
+Phase: TarayAI Phase 17 Add Feature Flags and Rollout Controls
+Starting commit: f5510a8
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added deterministic consultation feature flag module with safe defaults, env parsing, dependency-aware rollout resolution, rollout readiness output, reverse rollback order, and fallback mode helpers
+- kept exact-fact bypass always available and independent from consultation flags
+- exported the new feature-flag helpers from the consultation barrel for future safe rollout integration
+- added focused tests for parsing, defaults, dependency disabling, exact-fact safety, readiness, rollback order, fallback mode, and consultation regressions
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted feature flag tests: passed
+- consultation test suite: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- full tests: passed
+Deployment:
+- skipped
+Next:
+- continue with Phase 18 only if explicitly instructed
 Phase: TarayAI Phase 2 Life-context Extractor
 Starting commit: 5b6ce80
 Runtime behavior changed: no production route behavior change
