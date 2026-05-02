@@ -15,6 +15,17 @@ export * from "./life-context-extractor";
 export * from "./pattern-recognition";
 export * from "./practical-constraints-extractor";
 export {
+  buildProportionateRemedyPlan,
+  createNoRemedyPlan,
+  sanitizeRemedyPlan,
+  type RemedyCost,
+  type RemedyItem,
+  type RemedyLevel,
+  type RemedyLevelMeaning,
+  type RemedyProportionalityInput,
+  type RemedyType,
+} from "./remedy-proportionality";
+export {
   containsForbiddenTimingOutput,
   judgeTiming,
   type TimingFact,
