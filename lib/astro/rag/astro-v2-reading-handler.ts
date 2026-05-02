@@ -143,7 +143,7 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
       meta: responseMeta,
     });
   }
-  if (consultationResult.shouldUseFallback || (consultationResult.answer && isGenericFallbackAnswer(consultationResult.answer))) {
+  if (consultationResult.shouldUseFallback || !consultationResult.answer || isGenericFallbackAnswer(consultationResult.answer)) {
     const inferredMode = inferQuestionMode(question);
     if (inferredMode === "companion") {
       const domainResult = buildDomainAwareCompanionAnswer({ question, mode: "companion" });
