@@ -20,6 +20,8 @@ type ScoreBreakdown = {
   styleScore: number;
   safetyScore: number;
   overallScore: number;
+  expectedSimilarityScore: number;  // keyword overlap with expected answer
+  domainMatch: boolean;              // answer is in right domain
   factNotes: string[];
   styleNotes: string[];
   safetyNotes: string[];
@@ -29,12 +31,15 @@ type CaseResult = {
   number: number;
   question: string;
   mode: string;
+  domain: string;                    // detected question domain
   actualAnswer: string;
   answerSummary: string;
+  expectedAnswerSummary: string;     // first 200 chars of expected answer
   scores: ScoreBreakdown;
   result: "pass" | "fail" | "warning";
   failures: string[];
   warnings: string[];
+  missingComponents: string[];       // e.g. ["emotional_ack", "chart_basis", "practical_guidance", "remedy"]
   httpStatus: number | null;
 };
 
@@ -48,6 +53,7 @@ type CliArgs = {
   minStyleScore: number;
   minFactScore: number;
   minOverallScore: number;
+  minExpectedSimilarityScore: number;
   onlyMode?: "exact_fact" | "companion";
   debugTrace: boolean;
   failOnNetworkBlock: boolean;
@@ -63,6 +69,13 @@ type Summary = {
   authRequired: number;
   retried: number;
   passRate: number;
+  avgExpectedSimilarity: number;
+  domainMismatchCount: number;
+  genericFallbackCount: number;
+  duplicateAnswerCount: number;
+  missingEmotionalAckCount: number;
+  missingChartBasisCount: number;
+  shortAnswerCount: number;
 };
 
 type FinalReport = {
@@ -414,26 +427,154 @@ function scoreSafety(answer: string): { score: number; notes: string[] } {
   return { score, notes };
 }
 
-function computeOverall(factScore: number, styleScore: number, safetyScore: number): number {
-  return 0.55 * factScore + 0.35 * styleScore + 0.10 * safetyScore;
+// ─── Generic fallback detection ──────────────────────────────────────────────
+
+const GENERIC_FALLBACK_PHRASES = [
+  "Pick one area first",
+  "Please clarify career, relationship, money",
+  "This is not about forcing certainty. It is about understanding the situation",
+  "I cannot answer that safely right now",
+  "Some required chart facts are still missing",
+  "Missing facts:",
+  "The full generated answer is temporarily unavailable",
+  "I can answer this as an exact chart fact once",
+  "The generated answer did not pass grounding checks",
+  "No grounded timing source exists here",
+];
+
+function isGenericFallback(answer: string): boolean {
+  const a = answer.trim();
+  for (const phrase of GENERIC_FALLBACK_PHRASES) {
+    if (a.startsWith(phrase) || a.includes(phrase)) return true;
+  }
+  return false;
+}
+
+// ─── Domain detection ─────────────────────────────────────────────────────────
+
+function detectQuestionDomain(question: string): string {
+  const q = question.toLowerCase();
+  if (/\b(lagna|nakshatra|mahadasha|antardasha|dasha|sade sati|mangal dosha|kalsarpa|sun sign|moon sign|rasi|rashi)\b/.test(q)) return "exact_fact";
+  if (/\b(career|job|promotion|work|profession|startup|resign|quit|boss|business)\b/.test(q)) return "career";
+  if (/\b(marriage|relationship|partner|love|romantic|commit|husband|wife|boyfriend|girlfriend|divorce|breakup)\b/.test(q)) return "relationship";
+  if (/\b(money|financial|invest|loan|debt|property|wealth|income|salary|spending|budget)\b/.test(q)) return "money";
+  if (/\b(health|sick|illness|disease|anxiety|depression|sleep|pain|medical|headache|insomnia)\b/.test(q)) return "health";
+  if (/\b(family|parents|father|mother|sibling|children|home|relatives|family business)\b/.test(q)) return "family";
+  if (/\b(spiritual|god|puja|ritual|fasting|ancestor|karma|dharma|occult|mantra|remedy|gemstone)\b/.test(q)) return "spiritual";
+  return "general";
+}
+
+// ─── Expected similarity ──────────────────────────────────────────────────────
+
+function computeExpectedSimilarity(actual: string, expected: string): number {
+  const STOPWORDS = new Set(["i", "me", "my", "the", "a", "an", "this", "that", "it", "is", "are", "was", "be", "have", "has", "do", "does", "can", "will", "would", "should", "could", "to", "of", "in", "on", "at", "for", "with", "and", "or", "but", "not", "so", "if", "as", "up", "by", "how", "what", "why", "when", "which", "who", "also", "more", "out", "about", "there", "than", "its", "all", "they", "them", "their", "from", "into", "may", "must", "your", "you", "we", "our", "these", "those", "been", "being", "do", "did", "had", "its"]);
+
+  function keywords(text: string): Set<string> {
+    return new Set(
+      text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !STOPWORDS.has(w))
+    );
+  }
+
+  const actualKws = keywords(actual);
+  const expectedKws = keywords(expected);
+
+  if (expectedKws.size === 0) return 0;
+
+  let hits = 0;
+  for (const w of expectedKws) {
+    if (actualKws.has(w)) hits++;
+  }
+
+  return Math.min(1, hits / expectedKws.size);
+}
+
+// ─── Domain match check ───────────────────────────────────────────────────────
+
+function checkDomainMatch(actual: string, question: string): boolean {
+  const domain = detectQuestionDomain(question);
+  const a = actual.toLowerCase();
+
+  const DOMAIN_TERMS: Record<string, string[]> = {
+    career: ["career", "job", "work", "profession", "business", "skill", "income", "sun", "saturn", "jupiter", "10th", "mercury"],
+    relationship: ["relationship", "partner", "love", "marriage", "venus", "commitment", "compatibility", "7th", "boundaries"],
+    money: ["money", "financial", "invest", "income", "spending", "savings", "property", "budget"],
+    health: ["health", "wellbeing", "stress", "sleep", "professional", "doctor", "support", "routine", "medical"],
+    family: ["family", "parents", "home", "sibling", "relatives", "boundaries", "communication"],
+    spiritual: ["spiritual", "dharma", "karma", "prayer", "practice", "ritual", "faith", "jupiter", "ketu"],
+    exact_fact: ["leo", "gemini", "taurus", "aries", "jupiter", "moon", "sun", "lagna", "nakshatra", "dasha", "cancer", "capricorn"],
+    general: [],
+  };
+
+  const required = DOMAIN_TERMS[domain] ?? [];
+  if (required.length === 0) return true;
+
+  const found = required.filter(term => a.includes(term));
+  return found.length >= 2;
+}
+
+// ─── Missing components ────────────────────────────────────────────────────────
+
+function detectMissingComponents(answer: string, question: string, mode: "exact_fact" | "companion"): string[] {
+  if (mode === "exact_fact") return [];
+  const missing: string[] = [];
+  const a = answer.toLowerCase();
+  const q = question.toLowerCase();
+
+  // Check emotional acknowledgement for emotional/family/relationship/fear questions
+  const isEmotionalQ = /\b(scared|afraid|fear|anxious|worry|lonely|hurt|guilty|ashamed|lost|hopeless|overwhelm|struggling|difficult|hard|confused|unhappy|sad|angry|jealous|bored)\b/.test(q) ||
+    /\b(family|relationship|marriage|love|partner|parents|mother|father)\b/.test(q);
+  const hasEmotional = /\b(understand|i hear|i can see|this feels|difficult|challenging|not easy|makes sense|i understand|natural|understandable|okay to feel|valid)\b/.test(a) ||
+    /\b(acknowledge|empathize|this is (heavy|hard|difficult|not simple)|pressure|weight)\b/.test(a);
+  if (isEmotionalQ && !hasEmotional) missing.push("emotional_ack");
+
+  // Check chart basis
+  const hasChart = /\b(chart|lagna|moon|sun|jupiter|saturn|mars|venus|mercury|rahu|ketu|dasha|house|sign|nakshatra|placement|antardasha|mahadasha|transit|10th|11th|9th|12th|3rd|6th)\b/.test(a);
+  if (!hasChart) missing.push("chart_basis");
+
+  // Check practical guidance
+  const hasPractical = /\b(practical|step|action|try|focus|consider|plan|start|build|create|review|track|apply|choose|clarify|document|communicate|prepare|evaluate)\b/.test(a);
+  if (!hasPractical) missing.push("practical_guidance");
+
+  // Check remedy for spiritual/relationship/family/career questions
+  const isRemedyQ = /\b(remedy|ritual|puja|what should i do|what can i do|how can i fix|spiritual practice)\b/.test(q) ||
+    /\b(career|relationship|family|spiritual)\b/.test(q);
+  const hasRemedy = /\b(remedy|prayer|practice|discipline|routine|meditation|service|grounding|mantra|simple|optional)\b/.test(a);
+  if (isRemedyQ && !hasRemedy) missing.push("remedy_or_timing");
+
+  return missing;
+}
+
+// ─── Overall score ─────────────────────────────────────────────────────────────
+
+function computeOverall(factScore: number, styleScore: number, safetyScore: number, expectedSimilarityScore: number, domainMatch: boolean): number {
+  const domainPenalty = domainMatch ? 0 : 0.1;
+  return Math.max(0, 0.40 * factScore + 0.30 * styleScore + 0.15 * safetyScore + 0.15 * expectedSimilarityScore - domainPenalty);
 }
 
 function scoreCase(
   answer: string,
   mode: "exact_fact" | "companion",
   question: string,
+  expectedAnswer: string,
   args: CliArgs,
 ): ScoreBreakdown {
   const fact = scoreFactAccuracy(answer, mode, question);
   const style = scoreStyle(answer);
   const safety = scoreSafety(answer);
-  const overall = computeOverall(fact.score, style.score, safety.score);
+  const expectedSimilarity = mode === "companion" ? computeExpectedSimilarity(answer, expectedAnswer) : 1.0;
+  const domainMatch = checkDomainMatch(answer, question);
+  const overall = computeOverall(fact.score, style.score, safety.score, expectedSimilarity, domainMatch);
 
   return {
     factScore: fact.score,
     styleScore: style.score,
     safetyScore: safety.score,
     overallScore: overall,
+    expectedSimilarityScore: expectedSimilarity,
+    domainMatch,
     factNotes: fact.notes,
     styleNotes: style.notes,
     safetyNotes: safety.notes,
@@ -443,6 +584,7 @@ function scoreCase(
 function evaluatePass(
   scores: ScoreBreakdown,
   mode: "exact_fact" | "companion",
+  answer: string,
   args: CliArgs,
 ): { failures: string[]; warnings: string[] } {
   const failures: string[] = [];
@@ -476,6 +618,27 @@ function evaluatePass(
     failures.push(`overall_score:${scores.overallScore.toFixed(2)}<${overallThreshold}`);
   }
 
+  // Critical failures per PLAN
+  // 1. Generic fallback for clear-area companion question
+  if (mode === "companion" && isGenericFallback(answer)) {
+    failures.push(`critical:generic_fallback`);
+  }
+
+  // 2. Answer too short for real consultation question
+  if (mode === "companion" && answer.trim().length < 250) {
+    failures.push(`critical:answer_too_short_${answer.trim().length}chars`);
+  }
+
+  // 3. Domain mismatch critical failure
+  if (mode === "companion" && !scores.domainMatch) {
+    failures.push(`critical:domain_mismatch`);
+  }
+
+  // 4. Expected similarity too low for companion mode
+  if (mode === "companion" && scores.expectedSimilarityScore < args.minExpectedSimilarityScore) {
+    warnings.push(`low_expected_similarity:${scores.expectedSimilarityScore.toFixed(2)}<${args.minExpectedSimilarityScore}`);
+  }
+
   return { failures, warnings };
 }
 
@@ -489,9 +652,10 @@ function parseArgs(): CliArgs {
     end: undefined,
     maxRetries: 1,
     retryFailedOnce: true,
-    minStyleScore: 0.50,   // looser threshold — QandA answers are reference outputs, not the app's answers
-    minFactScore: 0.75,
-    minOverallScore: 0.55,
+    minStyleScore: 0.75,
+    minFactScore: 0.95,
+    minOverallScore: 0.90,
+    minExpectedSimilarityScore: 0.25,
     onlyMode: undefined,
     debugTrace: false,
     failOnNetworkBlock: false,
@@ -508,6 +672,7 @@ function parseArgs(): CliArgs {
     if (argv[i] === "--min-style-score" && argv[i + 1]) { args.minStyleScore = parseFloat(argv[++i]); continue; }
     if (argv[i] === "--min-fact-score" && argv[i + 1]) { args.minFactScore = parseFloat(argv[++i]); continue; }
     if (argv[i] === "--min-overall-score" && argv[i + 1]) { args.minOverallScore = parseFloat(argv[++i]); continue; }
+    if (argv[i] === "--min-expected-similarity-score" && argv[i + 1]) { args.minExpectedSimilarityScore = parseFloat(argv[++i]); continue; }
     if (argv[i] === "--only-mode" && argv[i + 1]) { args.onlyMode = argv[++i] as CliArgs["onlyMode"]; continue; }
     if (argv[i] === "--debug-trace") { args.debugTrace = true; continue; }
     if (argv[i] === "--fail-on-network-block") { args.failOnNetworkBlock = true; continue; }
@@ -601,6 +766,12 @@ async function postQuestion(
   return { httpStatus: null, answer: "", meta: {}, trace: null, networkError: "max_retries_exceeded" };
 }
 
+// ─── Answer fingerprint ───────────────────────────────────────────────────────
+
+function getAnswerFingerprint(answer: string): string {
+  return answer.trim().toLowerCase().slice(0, 80).replace(/\s+/g, " ");
+}
+
 // ─── Markdown report builder ──────────────────────────────────────────────────
 
 function buildMarkdown(report: FinalReport): string {
@@ -624,6 +795,13 @@ function buildMarkdown(report: FinalReport): string {
   lines.push(`| Network blocked | ${s.networkBlocked} |`);
   lines.push(`| Auth required | ${s.authRequired} |`);
   lines.push(`| Retried | ${s.retried} |`);
+  lines.push(`| Avg expected similarity | ${s.avgExpectedSimilarity.toFixed(2)} |`);
+  lines.push(`| Domain mismatch count | ${s.domainMismatchCount} |`);
+  lines.push(`| Generic fallback count | ${s.genericFallbackCount} |`);
+  lines.push(`| Duplicate answer count | ${s.duplicateAnswerCount} |`);
+  lines.push(`| Missing emotional ack | ${s.missingEmotionalAckCount} |`);
+  lines.push(`| Missing chart basis | ${s.missingChartBasisCount} |`);
+  lines.push(`| Short answer count | ${s.shortAnswerCount} |`);
   lines.push("");
 
   lines.push("## Mode Summary");
@@ -635,11 +813,11 @@ function buildMarkdown(report: FinalReport): string {
   lines.push("");
 
   lines.push("## All Cases");
-  lines.push("| # | Mode | Result | Fact | Style | Safety | Overall | Answer Summary |");
-  lines.push("|---:|---|---|---:|---:|---:|---:|---|");
+  lines.push("| # | Mode | Domain | Result | Fact | Style | Safety | Overall | ExpSim | Answer Summary |");
+  lines.push("|---:|---|---|---|---:|---:|---:|---:|---:|---|");
   for (const c of report.cases) {
     const resultLabel = c.result === "pass" ? "PASS" : c.result === "fail" ? "FAIL" : "WARN";
-    lines.push(`| ${c.number} | ${c.mode} | ${resultLabel} | ${c.scores.factScore.toFixed(2)} | ${c.scores.styleScore.toFixed(2)} | ${c.scores.safetyScore.toFixed(2)} | ${c.scores.overallScore.toFixed(2)} | ${c.answerSummary.replace(/\|/g, "\\|").slice(0, 120)} |`);
+    lines.push(`| ${c.number} | ${c.mode} | ${c.domain} | ${resultLabel} | ${c.scores.factScore.toFixed(2)} | ${c.scores.styleScore.toFixed(2)} | ${c.scores.safetyScore.toFixed(2)} | ${c.scores.overallScore.toFixed(2)} | ${c.scores.expectedSimilarityScore.toFixed(2)} | ${c.answerSummary.replace(/\|/g, "\\|").slice(0, 120)} |`);
   }
   lines.push("");
 
@@ -711,21 +889,25 @@ async function run() {
   if (args.onlyMode) casesToRun = casesToRun.filter((c) => c.mode === args.onlyMode);
 
   console.log(`\nAstro QandA Production E2E Check`);
-  console.log(`Base URL:         ${args.baseUrl}`);
-  console.log(`Questions file:   ${args.questionsFile}`);
-  console.log(`Total parsed:     ${allCases.length}`);
-  console.log(`To run:           ${casesToRun.length}`);
-  console.log(`Mode filter:      ${args.onlyMode ?? "all"}`);
-  console.log(`Min fact score:   ${args.minFactScore}`);
-  console.log(`Min style score:  ${args.minStyleScore}`);
-  console.log(`Min overall:      ${args.minOverallScore}`);
-  console.log(`Max retries:      ${args.maxRetries}`);
-  console.log(`Retry failed:     ${args.retryFailedOnce}`);
+  console.log(`Base URL:                   ${args.baseUrl}`);
+  console.log(`Questions file:             ${args.questionsFile}`);
+  console.log(`Total parsed:               ${allCases.length}`);
+  console.log(`To run:                     ${casesToRun.length}`);
+  console.log(`Mode filter:                ${args.onlyMode ?? "all"}`);
+  console.log(`Min fact score:             ${args.minFactScore}`);
+  console.log(`Min style score:            ${args.minStyleScore}`);
+  console.log(`Min overall:                ${args.minOverallScore}`);
+  console.log(`Min expected similarity:    ${args.minExpectedSimilarityScore}`);
+  console.log(`Max retries:                ${args.maxRetries}`);
+  console.log(`Retry failed:               ${args.retryFailedOnce}`);
   console.log("");
 
   const results: CaseResult[] = [];
   const failedNumbers: number[] = [];
   let retriedCount = 0;
+
+  // Answer fingerprint tracking for duplicate detection
+  const answerFingerprints = new Map<string, number[]>();
 
   for (const qCase of casesToRun) {
     const totalLabel = casesToRun.length;
@@ -742,6 +924,7 @@ async function run() {
     let warnings: string[] = [];
     let scores: ScoreBreakdown = {
       factScore: 0, styleScore: 0, safetyScore: 0, overallScore: 0,
+      expectedSimilarityScore: 0, domainMatch: false,
       factNotes: [], styleNotes: [], safetyNotes: [],
     };
 
@@ -756,8 +939,8 @@ async function run() {
     } else if (!answer || answer.trim().length === 0) {
       failures.push("answer_empty");
     } else {
-      scores = scoreCase(answer, qCase.mode, qCase.question, args);
-      const eval_ = evaluatePass(scores, qCase.mode, args);
+      scores = scoreCase(answer, qCase.mode, qCase.question, qCase.expectedAnswer, args);
+      const eval_ = evaluatePass(scores, qCase.mode, answer, args);
       failures = eval_.failures;
       warnings = eval_.warnings;
     }
@@ -772,16 +955,27 @@ async function run() {
       result = "pass";
     }
 
+    // Track answer fingerprint
+    if (answer) {
+      const fp = getAnswerFingerprint(answer);
+      const existingNums = answerFingerprints.get(fp) ?? [];
+      existingNums.push(qCase.number);
+      answerFingerprints.set(fp, existingNums);
+    }
+
     results.push({
       number: qCase.number,
       question: qCase.question,
       mode: qCase.mode,
+      domain: detectQuestionDomain(qCase.question),
       actualAnswer: answer,
       answerSummary: summarizeAnswer(answer || networkError || "no_answer"),
+      expectedAnswerSummary: qCase.expectedAnswer.slice(0, 200),
       scores,
       result,
       failures,
       warnings,
+      missingComponents: answer ? detectMissingComponents(answer, qCase.question, qCase.mode) : [],
       httpStatus,
     });
 
@@ -790,6 +984,21 @@ async function run() {
     const wStr = warnings.length > 0 ? ` warn:[${warnings.slice(0, 1).join(", ")}]` : "";
     const sStr = answer ? ` f=${scores.factScore.toFixed(2)} s=${scores.styleScore.toFixed(2)} o=${scores.overallScore.toFixed(2)}` : "";
     console.log(`${icon}${sStr}${fStr}${wStr}`);
+  }
+
+  // Mark duplicates if same answer appears >3 times
+  for (const [, nums] of answerFingerprints) {
+    if (nums.length > 3) {
+      for (const num of nums) {
+        const idx = results.findIndex(r => r.number === num);
+        if (idx !== -1 && !results[idx].failures.includes("critical:generic_fallback")) {
+          results[idx].failures.push(`critical:duplicate_answer_${nums.length}times`);
+          if (results[idx].result === "pass" || results[idx].result === "warning") {
+            results[idx] = { ...results[idx], result: "fail" };
+          }
+        }
+      }
+    }
   }
 
   // Retry failed once
@@ -825,8 +1034,8 @@ async function run() {
       } else if (!answer || answer.trim().length === 0) {
         failures.push("answer_empty");
       } else {
-        scores = scoreCase(answer, qCase.mode, qCase.question, args);
-        const eval_ = evaluatePass(scores, qCase.mode, args);
+        scores = scoreCase(answer, qCase.mode, qCase.question, qCase.expectedAnswer, args);
+        const eval_ = evaluatePass(scores, qCase.mode, answer, args);
         failures = eval_.failures;
         warnings = eval_.warnings;
       }
@@ -842,6 +1051,7 @@ async function run() {
         result,
         failures,
         warnings,
+        missingComponents: answer ? detectMissingComponents(answer, qCase.question, qCase.mode) : [],
         httpStatus,
       };
 
@@ -864,6 +1074,18 @@ async function run() {
   const warnCount = results.filter((r) => r.result === "warning").length;
   const failCount = results.filter((r) => r.result === "fail").length;
 
+  const companionResults = results.filter(r => r.mode === "companion" && r.actualAnswer);
+  const avgExpectedSimilarity = companionResults.length > 0
+    ? companionResults.reduce((sum, r) => sum + r.scores.expectedSimilarityScore, 0) / companionResults.length
+    : 0;
+
+  const domainMismatchCount = results.filter(r => !r.scores.domainMatch && r.mode === "companion").length;
+  const genericFallbackCount = results.filter(r => r.failures.some(f => f === "critical:generic_fallback")).length;
+  const duplicateAnswerCount = results.filter(r => r.failures.some(f => f.startsWith("critical:duplicate_answer"))).length;
+  const missingEmotionalAckCount = results.filter(r => r.missingComponents.includes("emotional_ack")).length;
+  const missingChartBasisCount = results.filter(r => r.missingComponents.includes("chart_basis")).length;
+  const shortAnswerCount = results.filter(r => r.failures.some(f => f.startsWith("critical:answer_too_short"))).length;
+
   const summary: Summary = {
     totalParsed: allCases.length,
     totalRun,
@@ -874,6 +1096,13 @@ async function run() {
     authRequired: results.filter((r) => r.failures.some((f) => f.startsWith("auth_required"))).length,
     retried: retriedCount,
     passRate: totalRun > 0 ? passCount / totalRun : 0,
+    avgExpectedSimilarity,
+    domainMismatchCount,
+    genericFallbackCount,
+    duplicateAnswerCount,
+    missingEmotionalAckCount,
+    missingChartBasisCount,
+    shortAnswerCount,
   };
 
   const report: FinalReport = {
@@ -892,14 +1121,18 @@ async function run() {
       timestamp: report.createdAt,
       number: r.number,
       mode: r.mode,
+      domain: r.domain,
       result: r.result,
       httpStatus: r.httpStatus,
       factScore: r.scores.factScore,
       styleScore: r.scores.styleScore,
       safetyScore: r.scores.safetyScore,
       overallScore: r.scores.overallScore,
+      expectedSimilarityScore: r.scores.expectedSimilarityScore,
+      domainMatch: r.scores.domainMatch,
       failures: r.failures,
       warnings: r.warnings,
+      missingComponents: r.missingComponents,
       answerSummary: r.answerSummary,
     }),
   );

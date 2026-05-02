@@ -24,6 +24,7 @@ import { getAstroRagFlags } from "@/lib/astro/rag/feature-flags";
 import type { ChartEvidence } from "@/lib/astro/consultation/chart-evidence-builder";
 import { generateReadingV2 } from "@/lib/astro/reading/reading-orchestrator-v2";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
+import { buildDomainAwareCompanionAnswer } from "@/lib/astro/rag/domain-aware-companion-answer";
 
 type AstroV2ReadingRequestBody = {
   question?: unknown;
@@ -71,6 +72,29 @@ function parseConsultationChartEvidence(value: unknown) {
 function normalizeRagRouteResponse(result: RagReadingOrchestratorResult, existingMeta: Record<string, unknown> | undefined): AstroV2ReadingResponse { const answer = typeof result.answer === "string" ? result.answer.trim() : ""; const safeMeta: Record<string, unknown> = { ...(normalizeMeta(existingMeta) ?? {}), ...(normalizeMeta(result.meta) ?? {}), rag: { status: result.status, exactFactAnswered: result.meta.exactFactAnswered, safetyBlocked: result.meta.safetyBlocked, followupAsked: result.meta.followupAsked, fallbackUsed: result.meta.fallbackUsed, }, }; return { answer, followUpQuestion: result.followUpQuestion, followUpAnswer: result.followUpAnswer, sections: normalizeSections(result.sections), meta: safeMeta }; }
 function shouldFallbackToOldV2FromRagResult(result: RagReadingOrchestratorResult | undefined): boolean { if (!result) return true; if (typeof result.answer !== "string" || !result.answer.trim()) return true; if (result.meta?.engine === "fallback" && result.status === "fallback") return true; return false; }
 
+const COMPANION_MODE_PATTERNS = [
+  /\bwhy (do|does|am|is|are|did|can|can't|cannot|should|would)\b/i,
+  /\bhow (do|does|can|should|would|to)\b/i,
+  /\bwhat (does|should|can|is|are|if)\b/i,
+  /\b(feel|feeling|felt)\b/i,
+  /\b(scared|afraid|worried|anxious|nervous|sad|angry|frustrated|confused|lost|stuck|overwhelmed|hopeless|helpless)\b/i,
+  /\b(should i|can i|will i|am i|is it|does it)\b/i,
+  /\b(relationship|partner|family|career|job|money|health|future|life|decision|choice)\b/i,
+  /\b(help|advice|guidance|insight|understand|explain|tell me)\b/i,
+];
+const EXACT_FACT_PATTERNS = [
+  /\b(lagna|ascendant|rashi|nakshatra|dasha|antardasha|house|planet|degree|transit|mahadasha)\b/i,
+  /\b(what is my (lagna|ascendant|moon sign|sun sign|rashi|nakshatra))\b/i,
+  /\b(which (house|planet|sign))\b/i,
+  /\b(current (dasha|antardasha|mahadasha|period))\b/i,
+];
+function inferQuestionMode(question: string): "companion" | "exact_fact" {
+  const q = question.trim();
+  for (const p of EXACT_FACT_PATTERNS) { if (p.test(q)) return "exact_fact"; }
+  for (const p of COMPANION_MODE_PATTERNS) { if (p.test(q)) return "companion"; }
+  return "companion";
+}
+
 export async function handleAstroV2ReadingRequest(request: Request, deps: Partial<AstroV2ReadingDependencies> = {}): Promise<Response> {
   let body: AstroV2ReadingRequestBody;
   try { body = (await request.json()) as AstroV2ReadingRequestBody; } catch { return NextResponse.json({ error: "Invalid JSON request body." }, { status: 400 }); }
@@ -100,6 +124,24 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
       answer: consultationResult.answer,
       meta: responseMeta,
     });
+  }
+  if (consultationResult.shouldUseFallback) {
+    const inferredMode = inferQuestionMode(question);
+    if (inferredMode === "companion") {
+      const domainResult = buildDomainAwareCompanionAnswer({ question, mode: "companion" });
+      if (domainResult?.answer && domainResult.answer.trim().length > 100) {
+        return NextResponse.json({
+          answer: domainResult.answer,
+          meta: {
+            source: "astro-v2-page",
+            directV2Route: true,
+            engine: "domain_aware_companion",
+            domain: domainResult.domain,
+            ...metadata,
+          },
+        });
+      }
+    }
   }
   const trace = createAstroE2ETrace();
   const exposeTrace = shouldExposeAstroE2ETrace({
