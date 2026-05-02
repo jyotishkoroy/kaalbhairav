@@ -40,6 +40,28 @@ Deployment:
 - skipped
 Next:
 - repo-wide validation and Phase 3 commit
+Phase: TarayAI Phase 4 Cultural/family-context Extractor
+Starting commit: 19411fa
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added deterministic cultural/family-context extraction for family involvement, parental pressure, arranged-marriage context, family-reputation pressure, financial dependents, religious comfort, and decision autonomy
+- added conservative non-stereotyping rules so marriage alone does not imply arranged marriage, parents alone do not imply pressure, and astrology interest does not imply ritual comfort
+- integrated non-exact-fact consultation state creation with cultural/family context while preserving exact-fact bypass
+- added tests for forced proposal, supportive parents, parental pressure, arranged match, family reputation, financial dependents, living with parents without pressure, religious comfort levels, family duty, in-laws, malformed input, non-stereotyping, previous-context fallback, explicit override, and Phase 2/3 regressions
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted consultation tests: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
+Deployment:
+- skipped
+Next:
+- repo-wide validation and Phase 4 commit
 <!-- Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
 commercially use, train models on, scrape, or create derivative works from this
 repository or any part of it without prior written permission from Jyotishko Roy. -->

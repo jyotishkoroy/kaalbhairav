@@ -17,6 +17,7 @@ import type {
   RemedyPlan,
   TimingJudgement,
 } from "./consultation-types";
+import { extractCulturalFamilyContext } from "./cultural-context-extractor";
 import { detectEmotionalState } from "./emotional-state-detector";
 import { extractLifeContext } from "./life-context-extractor";
 
@@ -142,6 +143,9 @@ export function createEmptyConsultationState(input: ConsultationInput): Consulta
   const lifeContext = isExactFactIntent(intent.primary)
     ? undefined
     : extractLifeContext({ question: userQuestion });
+  const culturalContext = isExactFactIntent(intent.primary)
+    ? undefined
+    : extractCulturalFamilyContext({ question: userQuestion });
   const emotionalContext = isExactFactIntent(intent.primary)
     ? undefined
     : detectEmotionalState({ question: userQuestion });
@@ -167,8 +171,15 @@ export function createEmptyConsultationState(input: ConsultationInput): Consulta
           toneNeeded: emotionalContext.toneNeeded,
         }
       : bootstrap.emotionalState ?? createDefaultEmotionalState(),
-    culturalFamilyContext:
-      bootstrap.culturalFamilyContext ?? createDefaultCulturalFamilyContext(),
+    culturalFamilyContext: culturalContext
+      ? {
+          parentalPressure: culturalContext.parentalPressure,
+          familyInvolved: culturalContext.familyInvolved,
+          arrangedMarriageContext: culturalContext.arrangedMarriageContext,
+          financialDependents: culturalContext.financialDependents,
+          religiousComfort: culturalContext.religiousComfort,
+        }
+      : bootstrap.culturalFamilyContext ?? createDefaultCulturalFamilyContext(),
     practicalConstraints:
       bootstrap.practicalConstraints ?? createDefaultPracticalConstraints(),
     followUp: createDefaultFollowUpState(intent),
