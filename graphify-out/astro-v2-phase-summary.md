@@ -318,3 +318,9 @@ Phase 7 - Pattern-recognition Synthesis
 - Added tests for insufficient evidence, supported patterns, mixed-signal behavior, confidence rules, health-sensitive non-diagnosis, no timing/remedy output, no deterministic language, evidence provenance, malformed input, exact-fact bypass, and Phase 2/3/4/5/6 regressions.
 - No production route behavior changed.
 - No deployment required.
+Phase 8 — One-follow-up Policy
+- Added a deterministic follow-up policy that chooses zero or one follow-up before the final consultation answer.
+- Enforced exact-fact bypass, already-asked blocking, grouped birth-data requests, major-decision clarifications, material meaning-change clarifications, and answer-before-question behavior for high emotional intensity.
+- Added validation to block multiple questions, compound discovery prompts, and broad "tell me everything" requests while allowing selected-axis questions and the grouped birth-data request.
+- Added tests covering exact-fact, already-asked, missing birth data, marriage timing versus proposal, specific proposal, job switch, business transition, relationship axis, health context, money risk, family conflict, emotional distress, validation guardrails, priority rules, state bypass, and Phase 2 through Phase 7 regressions.
+- No production route behavior changed.
