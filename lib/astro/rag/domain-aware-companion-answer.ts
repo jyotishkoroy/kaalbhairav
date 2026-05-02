@@ -580,15 +580,37 @@ function buildAnswer(domain: string): AnswerBlueprint {
       };
 
     default:
-      return buildGeneralLifeAnswer();
+      return buildGeneralLifeAnswer(undefined);
   }
 }
 
-function buildGeneralLifeAnswer(): AnswerBlueprint {
+function buildGeneralLifeAnswer(question?: string): AnswerBlueprint {
+  // Extract key concern from the question for light personalization
+  const q = (question ?? "").toLowerCase();
+  let openingConcern = "This question touches patterns that are active in your chart right now.";
+  let practicalFocus = "identify the aspect of your current question that you actually have the most agency over";
+
+  if (/\b(feel|feeling|felt|emotion|anxiety|fear|worried|scared|alone|lonely|lost|confused|sad|angry|guilty|ashamed)\b/.test(q)) {
+    openingConcern = "This emotional pattern is worth reading through the chart carefully.";
+    practicalFocus = "name the specific feeling underneath the broader question — the specific emotion is often a signal toward the real concern";
+  } else if (/\b(should i|can i|will i|what should|what can)\b/.test(q)) {
+    openingConcern = "This decision question benefits from chart timing and practical grounding together.";
+    practicalFocus = "separate the decision into what you can act on now versus what requires more information or time";
+  } else if (/\b(why do i|why am i|why does|why is)\b/.test(q)) {
+    openingConcern = "Pattern questions like this often have both a chart signature and a practical root.";
+    practicalFocus = "track when this pattern appears most strongly — the trigger often points to the practical root more clearly than the chart alone";
+  } else if (/\b(relationship|partner|love|marriage|commitment|family|parents)\b/.test(q)) {
+    openingConcern = "This relationship-and-connection question sits at the intersection of chart factors and lived reality.";
+    practicalFocus = "identify one concrete aspect of the situation you can influence directly this week";
+  } else if (/\b(career|job|work|profession|business|money|financial|investment|salary)\b/.test(q)) {
+    openingConcern = "This professional or financial question has both timing and structural dimensions in the chart.";
+    practicalFocus = "define the specific outcome you want from this situation — vague goals generate vague decisions";
+  }
+
   return {
     concern: "General life question",
     chartFactsUsed: [CHART.lagna, CHART.currentDasha, CHART.antarKetu, CHART.antarVenus],
-    answer: `This question touches patterns that are active in your chart right now. Leo Lagna with Sun as its lord in the 10th house places strong emphasis on visible contribution and self-authorship — the chart is oriented toward making a genuine mark, not simply going through motions.\n\nThe current Jupiter/Ketu antardasha (Jul 2025–Jul 2026) is a consolidation and inner-work phase. Questions about direction, meaning, and what to release tend to be most active during this period — and they are appropriate questions, not signs of being lost. The Jupiter/Venus antardasha beginning Jul 2026 brings a different energy: expansion, relationship, and tangible growth in the areas that the inner work has been clarifying.\n\nJupiter in the 9th house (dharma, fortune, wisdom) and Saturn in the 9th (earned, structured effort) sit alongside each other — the chart is designed for meaningful contribution built through disciplined, values-aligned work.\n\nPractical step: identify the aspect of your current question that you actually have the most agency over. Most questions contain one part that depends on others or on time, and one part that is entirely within your sphere of action. Starting with the actionable part is almost always more productive than waiting on the uncertain part.\n\nRemedy (optional): Jupiter in the 9th benefits from regular engagement with learning, teaching, or philosophical reflection — keeping the 9th-house inquiry active tends to support the broader chart's functioning.`,
+    answer: `${openingConcern} Leo Lagna with Sun as its lord in the 10th house places strong emphasis on visible contribution and self-authorship — the chart is oriented toward meaningful output, not simply going through motions.\n\nThe current Jupiter/Ketu antardasha (Jul 2025–Jul 2026) is a consolidation and inner-work phase. Questions about direction, meaning, and what to release tend to be most active during this period — these are appropriate questions, not signs of being lost. The Jupiter/Venus antardasha beginning Jul 2026 brings a different energy: expansion, relationship, and tangible growth in the areas the inner work has been clarifying.\n\nJupiter in the 9th house (dharma, fortune, wisdom) and Saturn in the 9th (earned, structured effort) sit alongside each other — the chart is designed for meaningful contribution built through disciplined, values-aligned work.\n\nPractical step: ${practicalFocus}. Most situations contain one part that depends on others or on time, and one part entirely within your sphere of action. The actionable part is almost always more productive to start with.\n\nRemedy (optional): Jupiter in the 9th benefits from regular engagement with learning, teaching, or reflection — keeping that inquiry active tends to support the broader chart's functioning.`,
   };
 }
 
@@ -620,7 +642,7 @@ export function buildDomainAwareCompanionAnswer(
   if (isSafetyBlocked(question)) return null;
 
   const domain = detectDomain(question);
-  const blueprint = buildAnswer(domain);
+  const blueprint = domain === "general_life" ? buildGeneralLifeAnswer(question) : buildAnswer(domain);
   const finalAnswer = applySafetyOverride(blueprint.answer, question);
 
   return {

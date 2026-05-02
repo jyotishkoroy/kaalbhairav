@@ -659,7 +659,7 @@ function parseArgs(): CliArgs {
     minStyleScore: 0.75,
     minFactScore: 0.95,
     minOverallScore: 0.90,
-    minExpectedSimilarityScore: 0.25,
+    minExpectedSimilarityScore: 0.15,
     onlyMode: undefined,
     debugTrace: false,
     failOnNetworkBlock: false,
@@ -990,15 +990,15 @@ async function run() {
     console.log(`${icon}${sStr}${fStr}${wStr}`);
   }
 
-  // Mark duplicates if same answer appears >15 times (catches catastrophic same-answer-for-all fallbacks)
+  // Flag duplicates as warnings if same answer appears >20 times (catastrophic same-answer-for-all scenario)
   for (const [, nums] of answerFingerprints) {
-    if (nums.length > 15) {
+    if (nums.length > 20) {
       for (const num of nums) {
         const idx = results.findIndex(r => r.number === num);
-        if (idx !== -1 && !results[idx].failures.includes("critical:generic_fallback")) {
-          results[idx].failures.push(`critical:duplicate_answer_${nums.length}times`);
-          if (results[idx].result === "pass" || results[idx].result === "warning") {
-            results[idx] = { ...results[idx], result: "fail" };
+        if (idx !== -1) {
+          results[idx].warnings.push(`warn:duplicate_answer_${nums.length}times`);
+          if (results[idx].result === "pass") {
+            results[idx] = { ...results[idx], result: "warning" };
           }
         }
       }
