@@ -38,6 +38,29 @@ Deployment:
 - skipped
 Next:
 - continue with Phase 16 only if explicitly instructed
+Phase: TarayAI Phase 16 Standardize Final Consultation Answer Format
+Starting commit: 44ae20c
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added deterministic final consultation answer composer for exact_fact_only, ask_follow_up, answer_now, and insufficient_context output paths
+- standardized final answer structure across emotional acknowledgement, direct answer, chart basis, life-pattern interpretation, timing judgement, practical guidance, proportionate remedy, and optional one-follow-up question
+- kept chart basis, timing, and remedy text strictly grounded in supplied structured inputs and ran the Phase 14 validator before returning results
+- added focused tests for exact-fact concision, follow-up limits, answer shape, timing-window safety, remedy safety, validator pass/fail behavior, non-invention, and Phase 2 through Phase 15 regressions
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted final consultation answer tests: passed
+- consultation test suite: passed
+- typecheck: passed
+- lint: passed
+- build: passed
+- full tests: passed
+Deployment:
+- skipped
+Next:
+- continue with Phase 17 only if explicitly instructed
 Next:
 - Phase 3 emotional-state detector
 Phase: TarayAI Phase 3 Emotional-state Detector

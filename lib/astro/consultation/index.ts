@@ -35,6 +35,12 @@ export {
   type ConsultationOrchestratorResult,
 } from "./consultation-orchestrator";
 export * from "./practical-constraints-extractor";
+export {
+  composeFinalConsultationAnswer,
+  type FinalConsultationAnswerInput,
+  type FinalConsultationAnswerMode,
+  type FinalConsultationAnswerResult,
+} from "./final-consultation-answer";
 export { buildConsultationResponsePlan } from "./response-plan-builder";
 export {
   buildProportionateRemedyPlan,
