@@ -13,6 +13,7 @@ export type DumpImportReport = {
   mode: "existing-db" | "local";
   validateOnly: boolean;
   dryRun: boolean;
+  verifyCounts: boolean;
   totalLines: number;
   validLines: number;
   invalidLines: number;
@@ -27,11 +28,23 @@ type DumpRow = Record<string, unknown> & { record_type?: string };
 
 type SupabaseLike = {
   from: (table: string) => {
-    upsert: (rows: Record<string, unknown>, options?: { onConflict?: string }) => Promise<{ data: unknown; error: { message?: string } | null }>;
+    upsert: (rows: Record<string, unknown>[], options?: { onConflict?: string }) => Promise<{ data: unknown; error: { message?: string } | null }>;
+    select?: (columns?: string, options?: { count?: "exact" | "planned" | "estimated"; head?: boolean }) => {
+      order?: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => unknown;
+      limit?: (count: number) => Promise<{ data: unknown; error: { message?: string } | null; count?: number | null }>;
+    };
   };
 };
 
 const RECORD_TYPES: DumpRecordType[] = ["source_note", "retrieval_tag", "rule", "example", "validation_check", "answer_log_schema"];
+const WRITE_BATCH_SIZE = 200;
+const COUNT_TABLES = [
+  "astro_reasoning_rules",
+  "astro_benchmark_examples",
+  "astro_source_notes",
+  "astro_retrieval_tags",
+  "astro_validation_checks",
+] as const;
 
 function trimText(value: unknown, max = 2000): string | null {
   const text = typeof value === "string" ? value.trim() : "";
@@ -214,10 +227,27 @@ export function normalizeDumpRecord(row: DumpRow): { table: string; conflictKey?
   };
 }
 
-async function upsertRow(client: SupabaseLike, table: string, conflictKey: string, row: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
-  const result = await client.from(table).upsert(row, { onConflict: conflictKey });
+function isWritableRecord(normalized: { table: string; conflictKey?: string; row: Record<string, unknown> }): normalized is { table: string; conflictKey: string; row: Record<string, unknown> } {
+  return Boolean(normalized.table && normalized.conflictKey);
+}
+
+async function upsertRows(client: SupabaseLike, table: string, conflictKey: string, rows: Record<string, unknown>[]): Promise<{ ok: boolean; error?: string }> {
+  const result = await client.from(table).upsert(rows, { onConflict: conflictKey });
   if (result.error) return { ok: false, error: result.error.message ?? "write failed" };
   return { ok: true };
+}
+
+export async function verifyAstroDumpCounts(client: SupabaseLike): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  for (const table of COUNT_TABLES) {
+    const query = client.from(table).select?.("*", { count: "exact", head: true });
+    const countResult = query && typeof query.limit === "function" ? await query.limit(1) : null;
+    if (!countResult || countResult.error) {
+      throw new Error(`failed to verify count for ${table}${countResult?.error?.message ? `: ${countResult.error.message}` : ""}`);
+    }
+    counts[table] = typeof countResult.count === "number" ? countResult.count : 0;
+  }
+  return counts;
 }
 
 export async function ingestAstroDump(input: {
@@ -225,6 +255,7 @@ export async function ingestAstroDump(input: {
   mode?: "existing-db" | "local";
   validateOnly?: boolean;
   dryRun?: boolean;
+  verifyCounts?: boolean;
   limit?: number;
   supabase?: SupabaseLike;
 }): Promise<DumpImportReport> {
@@ -233,6 +264,7 @@ export async function ingestAstroDump(input: {
     mode: input.mode ?? "local",
     validateOnly: input.validateOnly ?? false,
     dryRun: input.dryRun ?? false,
+    verifyCounts: input.verifyCounts ?? false,
     totalLines: 0,
     validLines: 0,
     invalidLines: 0,
@@ -244,6 +276,7 @@ export async function ingestAstroDump(input: {
   const stream = fs.createReadStream(input.filePath, { encoding: "utf8" });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
   let processed = 0;
+  const batches = new Map<string, Array<{ conflictKey: string; row: Record<string, unknown> }>>();
 
   for await (const line of rl) {
     report.totalLines += 1;
@@ -266,14 +299,45 @@ export async function ingestAstroDump(input: {
     const type = normalizeRecordType(parsed.value.record_type ?? parsed.value.type) as DumpRecordType;
     report.recordCounts[type] = (report.recordCounts[type] ?? 0) + 1;
     processed += 1;
-    if (!normalized.table || !normalized.conflictKey || input.validateOnly || input.dryRun || !input.supabase) continue;
-    const result = await upsertRow(input.supabase, normalized.table, normalized.conflictKey, normalized.row);
-    if (!result.ok) {
-      report.skippedCounts[normalized.table] = (report.skippedCounts[normalized.table] ?? 0) + 1;
-      if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "write_error", message: result.error ?? "write failed" });
+    if (!isWritableRecord(normalized)) {
+      report.skippedCounts.answer_log_schema = (report.skippedCounts.answer_log_schema ?? 0) + 1;
       continue;
     }
-    report.writtenCounts[normalized.table] = (report.writtenCounts[normalized.table] ?? 0) + 1;
+    if (input.validateOnly || input.dryRun || !input.supabase) continue;
+    const bucket = batches.get(normalized.table) ?? [];
+    bucket.push({ conflictKey: normalized.conflictKey, row: normalized.row });
+    batches.set(normalized.table, bucket);
+    if (bucket.length >= WRITE_BATCH_SIZE) {
+      const rows = bucket.splice(0, bucket.length).map((item) => item.row);
+      const result = await upsertRows(input.supabase, normalized.table, normalized.conflictKey, rows);
+      if (!result.ok) {
+        report.skippedCounts[normalized.table] = (report.skippedCounts[normalized.table] ?? 0) + 1;
+        if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "write_error", message: result.error ?? "write failed" });
+        continue;
+      }
+      report.writtenCounts[normalized.table] = (report.writtenCounts[normalized.table] ?? 0) + rows.length;
+    }
+  }
+
+  if (!input.validateOnly && !input.dryRun && input.supabase) {
+    for (const [table, pending] of batches.entries()) {
+      if (!pending.length) continue;
+      const conflictKey = pending[0]?.conflictKey;
+      if (!conflictKey) continue;
+      const rows = pending.map((item) => item.row);
+      const result = await upsertRows(input.supabase, table, conflictKey, rows);
+      if (!result.ok) {
+        report.skippedCounts[table] = (report.skippedCounts[table] ?? 0) + 1;
+        if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "write_error", message: result.error ?? "write failed" });
+        continue;
+      }
+      report.writtenCounts[table] = (report.writtenCounts[table] ?? 0) + rows.length;
+    }
+  }
+
+  if (input.verifyCounts && input.supabase) {
+    const counts = await verifyAstroDumpCounts(input.supabase);
+    (report as Record<string, unknown>).verifiedCounts = counts;
   }
 
   return report;
@@ -286,6 +350,7 @@ function parseArgs(argv: string[]) {
     if (value === "--input") args.input = argv[++i];
     else if (value === "--validate-only") args.validateOnly = true;
     else if (value === "--dry-run") args.dryRun = true;
+    else if (value === "--verify-counts") args.verifyCounts = true;
     else if (value === "--limit") args.limit = Number(argv[++i]);
     else if (value === "--report") args.report = argv[++i];
     else if (value === "--mode") args.mode = argv[++i];
@@ -303,12 +368,13 @@ async function main() {
   const mode = args.mode === "existing-db" ? "existing-db" : "local";
   const validateOnly = Boolean(args.validateOnly);
   const dryRun = Boolean(args.dryRun);
+  const verifyCounts = Boolean(args.verifyCounts);
   let supabase: SupabaseLike | undefined;
   const missingEnv: string[] = [];
-  if (!validateOnly && !dryRun && mode === "existing-db") {
+  if ((!validateOnly || verifyCounts) && !dryRun && mode === "existing-db") {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE ?? process.env.SUPABASE_SERVICE_KEY;
-    if (!url) missingEnv.push("SUPABASE_URL");
+    if (!url) missingEnv.push("NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL");
     if (!key) missingEnv.push("SUPABASE_SERVICE_ROLE_KEY");
     if (!missingEnv.length) supabase = createClient(url as string, key as string, { auth: { persistSession: false } }) as never;
   }
@@ -317,6 +383,7 @@ async function main() {
     mode,
     validateOnly,
     dryRun,
+    verifyCounts,
     limit: typeof args.limit === "number" ? args.limit : undefined,
     supabase,
   });

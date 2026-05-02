@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ingestAstroDump, normalizeDumpRecord, parseDumpLine } from "../../../scripts/ingest-astro-dump";
+import { ingestAstroDump, normalizeDumpRecord, parseDumpLine, verifyAstroDumpCounts } from "../../../scripts/ingest-astro-dump";
 import { retrieveAstroRagContext } from "../../../lib/astro/rag/retrieval-service";
 
 function fixturePath() {
@@ -37,6 +37,34 @@ describe("astro dump ingestion", () => {
     expect(report.validLines).toBe(7);
     expect(report.recordCounts.rule).toBe(2);
     expect(report.recordCounts.validation_check).toBe(1);
+    expect(report.skippedCounts.answer_log_schema).toBe(1);
+  });
+
+  it("supports verify-counts mode", async () => {
+    const calls: string[] = [];
+    const supabase = {
+      from(table: string) {
+        calls.push(table);
+        return {
+          select() {
+            return {
+              limit() {
+                return Promise.resolve({ data: [], error: null, count: 0 });
+              },
+            };
+          },
+        };
+      },
+    };
+    const counts = await verifyAstroDumpCounts(supabase as never);
+    expect(calls).toEqual([
+      "astro_reasoning_rules",
+      "astro_benchmark_examples",
+      "astro_source_notes",
+      "astro_retrieval_tags",
+      "astro_validation_checks",
+    ]);
+    expect(counts.astro_reasoning_rules).toBe(0);
   });
 
   it("keeps exact facts isolated from dump knowledge", async () => {
