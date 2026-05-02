@@ -208,3 +208,22 @@ Generated artifacts:
 - not committed
 Next:
 - final rollout decision / enablement plan
+Phase: ConsultationState foundation
+Starting commit: pending
+Runtime behavior changed: no
+UI changed: no
+DB changed: no
+Summary:
+- added typed consultation state foundation for a single consultation cycle
+- added consultation type definitions and deterministic state factory
+- added targeted tests for defaults, exact-fact bypass, bootstrap inference, chart fact pass-through, normalization, and edge cases
+- no production route behavior changed
+Validation:
+- phase-specific consultation state tests: pending
+- typecheck: pending
+- lint: pending
+- build: pending
+Deployment:
+- skipped
+Next:
+- later phases will add richer extractors and response planning
