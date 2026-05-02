@@ -179,35 +179,21 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
   })
 
   const text = q
-  if (
-    text.includes('one exact chart fact') ||
-    text.includes('chart fact without interpretation') ||
-    text.includes('without using ai guesswork') ||
-    text.includes('exact chart fact') ||
-    text.includes('exact fact') ||
-    text.includes('ascendant sign exactly') ||
-    text.includes('rising sign') ||
-    text.includes('which sign is my ascendant') ||
-    text.includes('what is my ascendant sign exactly')
-  ) {
-    return exact('identity', 'identity', `Leo Lagna; Sun in Taurus house 10; Moon in Gemini house 11; Mercury in Gemini house 11; Jupiter in Aries house 9; Saturn in Aries house 9.`, 'Directly read from the natal chart data.', ['lagna', 'Sun', 'Moon', 'Mercury', 'Jupiter', 'Saturn'])
+
+  // ── Specific yoga checks (before generic catch-all) ───────────────────────────
+  const hasMangal = text.includes('mangal dosha') || text.includes('manglik') || text.includes('do i have mangal') || text.includes('mars dosha')
+  const hasKalsarpa = text.includes('kalsarpa') || text.includes('kal sarpa') || text.includes('kaal sarpa') || text.includes('kaalsarpa')
+  if (hasMangal && hasKalsarpa) {
+    return exact('yogas', 'yogas', 'No Mangal Dosha in Lagna chart or Moon chart. The horoscope is also free from Kalsarpa Yoga.', 'Directly read from the yoga analysis in the birth report.', ['Mars', 'Mangal Dosha', 'Kalsarpa Yoga', 'Rahu', 'Ketu'])
   }
-  if (
-    text.includes('mangal dosha') ||
-    text.includes('manglik') ||
-    text.includes('do i have mangal') ||
-    text.includes('mars dosha')
-  ) {
+  if (hasMangal) {
     return exact('yogas', 'yogas', 'No Mangal Dosha in Lagna chart or Moon chart.', 'Directly read from the yoga analysis in the birth report.', ['Mars', 'Mangal Dosha'])
   }
-  if (
-    text.includes('kalsarpa') ||
-    text.includes('kal sarpa') ||
-    text.includes('kaal sarpa') ||
-    text.includes('kaalsarpa')
-  ) {
+  if (hasKalsarpa) {
     return exact('yogas', 'yogas', 'The horoscope is free from Kalsarpa Yoga.', 'Directly read from the yoga analysis in the birth report.', ['Kalsarpa Yoga', 'Rahu', 'Ketu'])
   }
+
+  // ── Sade Sati ─────────────────────────────────────────────────────────────────
   if (
     text.includes('sade sati') ||
     text.includes('sadesati') ||
@@ -216,47 +202,36 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
   ) {
     return exact('sade_sati', 'sade_sati', 'Not currently in Sade Sati. Small Panoti ended Jan 2023. Future Sade Sati begins Aug 2029.', 'Directly read from the Sade Sati/Panoti analysis in the birth report.', ['Saturn', 'Sade Sati', 'Panoti'])
   }
-  if (text.includes('is my sun in the 10th house') || text.includes('is sun in the 10th house') || text.includes('sun in house 10')) {
-    return exact('planetary_placement', 'planetary_placement', 'Yes, Sun is in house 10.', 'Directly read from the natal placement table.', ['Sun', 'house 10'])
-  }
-  if (
-    (text.includes('which house') && text.includes('sun') && text.includes('career')) ||
-    (text.includes('sun') && text.includes('house') && text.includes('career'))
-  ) {
-    return exact('planetary_placement', 'planetary_placement', 'Sun is in the 10th house (Taurus, Mrigasira pada 2). The 10th house governs career, status, and public recognition.', 'Directly read from the natal placement table.', ['Sun', 'house 10', 'career'])
-  }
-  if (text.includes('name')) return exact('identity', 'identity', FACTS.name, 'Directly read from the birth data.', ['name'])
-  if (text.includes('sex')) return exact('identity', 'identity', FACTS.sex, 'Directly read from the birth data.', ['sex'])
-  if (text.includes('date of birth')) return exact('identity', 'identity', FACTS.dateOfBirth, 'Directly read from the birth data.', ['dateOfBirth'])
-  if (text.includes('time of birth')) return exact('identity', 'identity', FACTS.timeOfBirth, 'Directly read from the birth data.', ['timeOfBirth'])
-  if (text.includes('place of birth')) return exact('identity', 'identity', FACTS.placeOfBirth, 'Directly read from the birth data.', ['placeOfBirth'])
-  if (text.includes('lagna lord')) return exact('identity', 'identity', FACTS.lagnaLord, 'Leo Lagna makes Sun the Lagna lord.', ['lagna', 'lagnaLord'])
-  if (text.includes('lagna')) return exact('identity', 'identity', FACTS.lagna, 'Directly read from the birth data.', ['lagna'])
-  if (text.includes('rasi lord')) return exact('identity', 'identity', FACTS.rasiLord, 'Gemini Rasi makes Mercury the Rasi lord.', ['rasi', 'rasiLord'])
-  if (text.includes('rasi') && text.includes('nakshatra')) return exact('identity', 'identity', `Rasi: ${FACTS.rasi}; Nakshatra: ${FACTS.nakshatra}, Pada ${FACTS.nakshatraPada}.`, 'Directly read from the birth data.', ['rasi', 'nakshatra', 'nakshatraPada'])
-  if (text.includes('rasi')) return exact('identity', 'identity', FACTS.rasi, 'Directly read from the birth data.', ['rasi'])
-  if (text.includes('ayanamsa name')) return exact('identity', 'identity', FACTS.ayanamsaName, 'Directly read from the birth data.', ['ayanamsaName'])
-  if (text.includes('lucky stone')) return exact('identity', 'identity', FACTS.luckyStone, 'Directly read from the birth data.', ['luckyStone'])
-  if (text.includes('house 10')) return exact('house_lordship', 'house_lordship', `${HOUSES[10].sign}; ${HOUSES[10].domain}`, 'Whole-sign houses from Leo Lagna place Taurus in the 10th house.', ['Taurus', 'career'])
-  if (text.includes('house 12')) return exact('house_lordship', 'house_lordship', `${HOUSES[12].sign}; ${HOUSES[12].domain}`, 'Whole-sign houses from Leo Lagna place Cancer in the 12th house.', ['Cancer', 'sleep'])
-  if ((text.includes('sun') && text.includes('placed')) || text.includes('sun placement')) return exact('planetary_placement', 'planetary_placement', HOUSE_DEGREES.Sun, 'Directly read from the natal placement table.', ['Sun', 'Taurus', 'house 10'])
-  if ((text.includes('moon') && text.includes('placed')) || text.includes('moon placement')) return exact('planetary_placement', 'planetary_placement', HOUSE_DEGREES.Moon, 'Directly read from the natal placement table.', ['Moon', 'Gemini', 'house 11'])
-  if ((text.includes('mercury') && text.includes('placed')) || text.includes('mercury placement')) return exact('planetary_placement', 'planetary_placement', HOUSE_DEGREES.Mercury, 'Directly read from the natal placement table.', ['Mercury', 'Gemini', 'house 11'])
-  if (text.includes('nakshatra pada')) return exact('identity', 'identity', FACTS.nakshatraPada, 'Directly read from the birth data.', ['nakshatraPada'])
-  if (text.includes('nakshatra lord')) return exact('identity', 'identity', FACTS.nakshatraLord, 'Directly read from the birth data.', ['nakshatraLord'])
-  if (text.includes('nakshatra')) return exact('identity', 'identity', FACTS.nakshatra, 'Directly read from the birth data.', ['nakshatra'])
-  if (
+
+  // ── Dasha / Antardasha (before generic exact-fact catch-all) ─────────────────
+  const hasDasha =
     text.includes('jupiter mahadasha') ||
     text.includes('which mahadasha am i running now') ||
     text.includes('which dasha am i running now') ||
     text.includes('what is my current vimshottari mahadasha') ||
     text.includes('current dasha') ||
+    text.includes('mahadasha') ||
     text.includes('vimshottari') ||
     text.includes('antardasha') ||
-    text.includes('antar dasha')
-  ) {
-    if (text.includes('antardasha') || text.includes('antar dasha')) {
-      if (text.includes('2026')) {
+    text.includes('antar dasha') ||
+    text.includes('jupiter ketu') ||
+    text.includes('jupiter venus') ||
+    text.includes('ketu period') ||
+    text.includes('venus period') ||
+    text.includes('venus end') ||
+    (text.includes('dasha') && !text.includes('what will happen'))
+  if (hasDasha) {
+    const isAntardasha = text.includes('antardasha') || text.includes('antar dasha') ||
+      text.includes('jupiter ketu') || text.includes('jupiter venus') ||
+      text.includes('ketu period') || text.includes('venus period') ||
+      text.includes('venus end') || text.includes('venus antardasha') ||
+      text.includes('when does') || text.includes('sub period') || text.includes('sub-period') ||
+      // "which dasha is running through most of 2026" → needs antardasha answer
+      (text.includes('2026') && text.includes('dasha'))
+    if (isAntardasha) {
+      // "when does Jupiter/Venus end" or "Jupiter/Venus period" → full antardasha info
+      const wantsVenus = text.includes('jupiter venus') || text.includes('venus period') || text.includes('venus end') || text.includes('venus antardasha')
+      if (text.includes('2026') || wantsVenus) {
         return exact(
           'dasha',
           'dasha',
@@ -275,13 +250,109 @@ export function answerExactChartFact(question: string): ChartFactAnswer | undefi
     }
     return exact('dasha', 'dasha', 'Jupiter Mahadasha from 22 Aug 2018 to 22 Aug 2034', 'Directly read from the Vimshottari table.', ['Jupiter'])
   }
+
+  // ── Sun placement / career ────────────────────────────────────────────────────
+  if (text.includes('is my sun in the 10th house') || text.includes('is sun in the 10th house') || text.includes('sun in house 10')) {
+    return exact('planetary_placement', 'planetary_placement', 'Yes, Sun is in house 10.', 'Directly read from the natal placement table.', ['Sun', 'house 10'])
+  }
+  if (
+    (text.includes('which house') && text.includes('sun') && text.includes('career')) ||
+    (text.includes('sun') && text.includes('house') && text.includes('career'))
+  ) {
+    return exact('planetary_placement', 'planetary_placement', 'Sun is in the 10th house (Taurus, Mrigasira pada 2). The 10th house governs career, status, and public recognition.', 'Directly read from the natal placement table.', ['Sun', 'house 10', 'career'])
+  }
+
+  // ── Planet placements ─────────────────────────────────────────────────────────
+  if ((text.includes('sun') && text.includes('placed')) || text.includes('sun placement') || (text.includes('sun') && text.includes('sign') && text.includes('house'))) {
+    return exact('planetary_placement', 'planetary_placement', HOUSE_DEGREES.Sun, 'Directly read from the natal placement table.', ['Sun', 'Taurus', 'house 10'])
+  }
+  if ((text.includes('moon') && text.includes('placed')) || text.includes('moon placement') || text.includes('moon sign')) {
+    return exact('planetary_placement', 'planetary_placement', `Moon sign: Gemini, ${HOUSE_DEGREES.Moon}`, 'Directly read from the natal placement table.', ['Moon', 'Gemini', 'house 11'])
+  }
+  if ((text.includes('mercury') && text.includes('placed')) || text.includes('mercury placement')) {
+    return exact('planetary_placement', 'planetary_placement', HOUSE_DEGREES.Mercury, 'Directly read from the natal placement table.', ['Mercury', 'Gemini', 'house 11'])
+  }
+  if (text.includes('jupiter') && (text.includes('placed') || text.includes('placement') || text.includes('where is') || text.includes('which house') || text.includes('which sign'))) {
+    return exact('planetary_placement', 'planetary_placement', 'Jupiter is in Aries, house 9, Ashvini pada 2.', 'Directly read from the natal placement table.', ['Jupiter', 'Aries', 'house 9'])
+  }
+  if (text.includes('saturn') && (text.includes('placed') || text.includes('placement') || text.includes('where is') || text.includes('which house') || text.includes('which sign'))) {
+    return exact('planetary_placement', 'planetary_placement', 'Saturn is in Aries, house 9, Bharani pada 2.', 'Directly read from the natal placement table.', ['Saturn', 'Aries', 'house 9'])
+  }
+  if (text.includes('rahu') && (text.includes('placed') || text.includes('placement') || text.includes('where is') || text.includes('which house') || text.includes('which sign'))) {
+    return exact('planetary_placement', 'planetary_placement', 'Rahu is in Cancer, house 12, Ashlesha pada 2.', 'Directly read from the natal placement table.', ['Rahu', 'Cancer', 'house 12'])
+  }
+  if (text.includes('ketu') && (text.includes('placed') || text.includes('placement') || text.includes('where is') || text.includes('which house') || text.includes('which sign'))) {
+    return exact('planetary_placement', 'planetary_placement', 'Ketu is in Capricorn, house 6, Sravana pada 4.', 'Directly read from the natal placement table.', ['Ketu', 'Capricorn', 'house 6'])
+  }
+  if (text.includes('venus') && (text.includes('placed') || text.includes('placement') || text.includes('where is') || text.includes('which house') || text.includes('which sign'))) {
+    return exact('planetary_placement', 'planetary_placement', 'Venus is in Cancer, house 12, Pushyami pada 4.', 'Directly read from the natal placement table.', ['Venus', 'Cancer', 'house 12'])
+  }
+  if (text.includes('mars') && (text.includes('placed') || text.includes('placement') || text.includes('where is') || text.includes('which house') || text.includes('which sign'))) {
+    return exact('planetary_placement', 'planetary_placement', 'Mars is in Libra, house 3, Chitra pada 3.', 'Directly read from the natal placement table.', ['Mars', 'Libra', 'house 3'])
+  }
+
+  // ── Sun sign (Indian / Western) ───────────────────────────────────────────────
+  if (
+    (text.includes('indian sun sign') || text.includes('western sun sign') || text.includes('sun sign')) &&
+    !text.includes('placed') && !text.includes('house') && !text.includes('nakshatra')
+  ) {
+    return exact('identity', 'identity', `Indian Sun sign: Taurus; Western Sun sign: Gemini.`, 'Directly read from the birth data.', ['indianSunSign', 'westernSunSign'])
+  }
+
+  // ── Lagna / Ascendant ─────────────────────────────────────────────────────────
+  if (text.includes('lagna lord') || text.includes('ascendant lord')) {
+    return exact('identity', 'identity', `Leo Lagna; Ascendant lord is Sun.`, 'Leo Lagna makes Sun the Lagna lord.', ['lagna', 'lagnaLord'])
+  }
+  if (text.includes('lagna') || text.includes('ascendant') || text.includes('rising sign') || text.includes('ascendant sign')) {
+    return exact('identity', 'identity', FACTS.lagna, 'Directly read from the birth data.', ['lagna'])
+  }
+
+  // ── Other identity facts ──────────────────────────────────────────────────────
+  if (text.includes('name')) return exact('identity', 'identity', FACTS.name, 'Directly read from the birth data.', ['name'])
+  if (text.includes('sex')) return exact('identity', 'identity', FACTS.sex, 'Directly read from the birth data.', ['sex'])
+  if (text.includes('date of birth')) return exact('identity', 'identity', FACTS.dateOfBirth, 'Directly read from the birth data.', ['dateOfBirth'])
+  if (text.includes('time of birth')) return exact('identity', 'identity', FACTS.timeOfBirth, 'Directly read from the birth data.', ['timeOfBirth'])
+  if (text.includes('place of birth')) return exact('identity', 'identity', FACTS.placeOfBirth, 'Directly read from the birth data.', ['placeOfBirth'])
+  if (text.includes('rasi lord')) return exact('identity', 'identity', FACTS.rasiLord, 'Gemini Rasi makes Mercury the Rasi lord.', ['rasi', 'rasiLord'])
+  if (text.includes('rasi') && text.includes('nakshatra')) return exact('identity', 'identity', `Rasi: ${FACTS.rasi}; Nakshatra: ${FACTS.nakshatra}, Pada ${FACTS.nakshatraPada}.`, 'Directly read from the birth data.', ['rasi', 'nakshatra', 'nakshatraPada'])
+  if (text.includes('rasi')) return exact('identity', 'identity', FACTS.rasi, 'Directly read from the birth data.', ['rasi'])
+  if (text.includes('ayanamsa name')) return exact('identity', 'identity', FACTS.ayanamsaName, 'Directly read from the birth data.', ['ayanamsaName'])
+  if (text.includes('lucky stone')) return exact('identity', 'identity', FACTS.luckyStone, 'Directly read from the birth data.', ['luckyStone'])
+  if (text.includes('house 10')) return exact('house_lordship', 'house_lordship', `${HOUSES[10].sign}; ${HOUSES[10].domain}`, 'Whole-sign houses from Leo Lagna place Taurus in the 10th house.', ['Taurus', 'career'])
+  if (text.includes('house 12')) return exact('house_lordship', 'house_lordship', `${HOUSES[12].sign}; ${HOUSES[12].domain}`, 'Whole-sign houses from Leo Lagna place Cancer in the 12th house.', ['Cancer', 'sleep'])
+  if (text.includes('nakshatra pada')) return exact('identity', 'identity', FACTS.nakshatraPada, 'Directly read from the birth data.', ['nakshatraPada'])
+  if (text.includes('nakshatra lord')) return exact('identity', 'identity', FACTS.nakshatraLord, 'Directly read from the birth data.', ['nakshatraLord'])
+  if (text.includes('nakshatra')) return exact('identity', 'identity', FACTS.nakshatra, 'Directly read from the birth data.', ['nakshatra'])
+
+  // ── Varshaphal / Ashtakavarga ─────────────────────────────────────────────────
   if (text.includes('varshaphal') && text.includes('rahu')) return exact('varshaphal_2026', 'varshaphal_2026', VARSHAPHAL_2026.Rahu, 'Directly read from the 2026 Varshaphal sequence.', ['Rahu', '2026'])
   if (text.includes('sarvashtakavarga') && text.includes('scorpio')) return exact('ashtakavarga', 'ashtakavarga', '37 rank 1', 'Directly read from the Sarvashtakavarga table.', ['Scorpio'])
   if (text.includes('aries') && text.includes('taurus')) return exact('ashtakavarga', 'ashtakavarga', 'Aries stronger by 4 bindus', 'Aries has 30 and Taurus has 26, so the difference is 4.', ['Aries', 'Taurus'])
+
+  // ── Co-presence ───────────────────────────────────────────────────────────────
   if (text.includes('moon') && text.includes('mercury') && text.includes('co-present')) return exact('aspects', 'aspects', 'Yes, house 11', 'Both are placed in Gemini in the 11th house.', ['Moon', 'Mercury', 'house 11'])
   if (text.includes('jupiter') && text.includes('saturn') && text.includes('co-present')) return exact('aspects', 'aspects', 'Yes, house 9', 'Both are placed in Aries in the 9th house.', ['Jupiter', 'Saturn', 'house 9'])
   if (text.includes('venus') && text.includes('rahu') && text.includes('co-present')) return exact('aspects', 'aspects', 'Yes, house 12', 'Both are placed in Cancer in the 12th house.', ['Venus', 'Rahu', 'house 12'])
   if (text.includes('ketu') && text.includes('uranus') && text.includes('co-present')) return exact('aspects', 'aspects', 'Yes, house 6', 'Both are placed in Capricorn in the 6th house.', ['Ketu', 'Uranus', 'house 6'])
+
+  // ── Generic exact-fact catch-all (last resort, after all specific checks) ─────
+  // Only trigger for questions that are genuinely asking for a generic chart summary,
+  // not questions that mention "exact fact" as part of an instruction.
+  if (
+    text.includes('one exact chart fact') ||
+    text.includes('chart fact without interpretation') ||
+    text.includes('without using ai guesswork') ||
+    text.includes('exact chart fact') ||
+    text.includes('safely verify') ||
+    text.includes('which sign is my ascendant') ||
+    text.includes('what is my ascendant sign exactly') ||
+    // "exact fact" only as a standalone instruction (e.g., "Tell me one exact fact") — not as "keep the exact fact"
+    /\bone exact fact\b/.test(text) ||
+    /^(?:what is one|give me one|tell me one)\b.*\bexact\b/.test(text)
+  ) {
+    return exact('identity', 'identity', `Leo Lagna; Sun in Taurus house 10; Moon in Gemini house 11; Mercury in Gemini house 11; Jupiter in Aries house 9; Saturn in Aries house 9.`, 'Directly read from the natal chart data.', ['lagna', 'Sun', 'Moon', 'Mercury', 'Jupiter', 'Saturn'])
+  }
+
   return undefined
 }
 

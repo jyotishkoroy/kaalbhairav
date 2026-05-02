@@ -104,7 +104,14 @@ export function isLongHorizonPremiumPrediction(
 ): boolean {
   const normalized = normalizeQuestion(question)
 
+  // If question explicitly asks beyond 3-year free limit, override planet-name exclusion
+  const isBeyond3YearLimit =
+    /beyond the (3|three)[\s-]year free limit/i.test(normalized) ||
+    /beyond (3|three) year/i.test(normalized) ||
+    /after the (3|three)[\s-]year/i.test(normalized)
+
   if (
+    !isBeyond3YearLimit &&
     /\b(lagna|ascendant|rising sign|where is|placed|placement|house|chart fact|exact fact|sun|moon|mars|mercury|jupiter|venus|saturn|rahu|ketu)\b/.test(
       normalized,
     )
@@ -113,12 +120,18 @@ export function isLongHorizonPremiumPrediction(
   }
 
   const isPredictionRequest =
-    /\b(predict|prediction|future|what will happen|will i|when will|exact date|specific date|date for|timeline|timing)\b/.test(
+    isBeyond3YearLimit ||
+    /\b(predict|prediction|future|what will happen|will i|when will|exact date|specific date|date for|timeline|timing|result|outcome)\b/.test(
       normalized,
     )
 
   if (!isPredictionRequest) {
     return false
+  }
+
+  // If explicitly beyond 3-year free limit (even with planet names), return immediately
+  if (isBeyond3YearLimit) {
+    return true
   }
 
   if (/\bmore than 3 years\b/.test(normalized) || /\bafter 3 years\b/.test(normalized)) {

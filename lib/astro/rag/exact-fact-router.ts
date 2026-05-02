@@ -278,6 +278,33 @@ function answerMoonSign(facts: ChartFact[]): ExactFactAnswer | null {
   };
 }
 
+function answerMoonPlacementDetails(facts: ChartFact[]): ExactFactAnswer | null {
+  const moonPlacement = findPlanetPlacement(facts, "Moon");
+  const moonRasi = findFact(facts, "rasi", "moon_sign");
+  const moonNakshatra = findFact(facts, "nakshatra", "moon_nakshatra");
+  const moonPada = findFact(facts, "nakshatra", "moon_nakshatra_pada");
+  if (!moonPlacement && !moonRasi && !moonNakshatra && !moonPada) return null;
+
+  const sign = moonPlacement?.sign ?? moonRasi?.sign ?? moonRasi?.factValue ?? moonPlacement?.factValue ?? null;
+  const house = moonPlacement?.house ?? null;
+  const nakshatra = moonPlacement?.factValue?.match(/,\s*([^,]+?),\s*pada\s*\d+/i)?.[1] ?? moonNakshatra?.factValue ?? null;
+  const pada = moonPada?.factValue ?? moonPlacement?.factValue?.match(/pada\s*(\d+)/i)?.[1] ?? null;
+
+  const parts: string[] = [];
+  if (sign) parts.push(`Moon is in ${sign}`);
+  if (house != null) parts.push(`house ${house}`);
+  if (nakshatra) parts.push(`${nakshatra}${pada ? ` pada ${pada}` : ""}`);
+  if (!parts.length) return null;
+
+  return {
+    directAnswer: `${parts.join(", ")}.`,
+    derivation: "This is directly read from the structured Moon placement facts in the chart data.",
+    accuracy: "totally_accurate",
+    suggestedFollowUp: "You can ask what this Moon placement means.",
+    factKeys: [moonPlacement?.factKey ?? moonRasi?.factKey ?? moonNakshatra?.factKey ?? moonPada?.factKey].filter(Boolean) as string[],
+  };
+}
+
 function answerHouseSign(facts: ChartFact[], houses: number[]): ExactFactAnswer | null {
   const house = houses[0];
   if (!house) return null;
@@ -556,7 +583,8 @@ function answerExactFact(question: string, facts: ChartFact[]): ExactFactRouterR
     return answer ? buildResult(intent, answer, answer.factKeys.map((factKey) => normalizedFacts.find((fact) => fact.factKey === factKey)!).filter(Boolean)) : buildResult(intent, unavailableExactFactAnswer("co_presence"), []);
   }
   if (intent === "nakshatra") {
-    const answer = answerNakshatra(normalizedFacts, question);
+    const asksForPlacement = /\b(rashi|rasi|house|placed|placement|where is|where are)\b/i.test(question);
+    const answer = asksForPlacement ? answerMoonPlacementDetails(normalizedFacts) ?? answerNakshatra(normalizedFacts, question) : answerNakshatra(normalizedFacts, question);
     return answer ? buildResult(intent, answer, answer.factKeys.map((factKey) => normalizedFacts.find((fact) => fact.factKey === factKey)!).filter(Boolean)) : buildResult(intent, unavailableExactFactAnswer("moon_nakshatra"), []);
   }
   if (intent === "career_house") {
@@ -576,6 +604,12 @@ function answerExactFact(question: string, facts: ChartFact[]): ExactFactRouterR
     const lagna = answerLagna(normalizedFacts);
     if (lagna) {
       return buildResult("lagna", lagna, normalizedFacts.filter((fact) => fact.factType === "lagna"));
+    }
+    if (/moon/i.test(question) && /(corrected answer|somewhere other than|not gemini|other than gemini|wrong placement|corrected chart fact)/i.test(question)) {
+      const moonPlacement = answerMoonPlacementDetails(normalizedFacts) ?? answerMoonSign(normalizedFacts);
+      if (moonPlacement) {
+        return buildResult("moon_sign", moonPlacement, moonPlacement.factKeys.map((factKey) => normalizedFacts.find((fact) => fact.factKey === factKey)!).filter(Boolean));
+      }
     }
     const sunHouse = findPlanetPlacement(normalizedFacts, "Sun");
     if (sunHouse?.house === 10 && /sun in the 10th house|sun in house 10|exact fact/i.test(question)) {

@@ -77,9 +77,8 @@ describe("Reading V2 regression behavior", () => {
       mode: "practical_guidance",
     });
     const answer = result.answer ?? "";
-    const meta = result.meta ?? {};
 
-    expect(meta.safetyRiskNames ?? []).toContain("medical");
+    expect(result.meta?.safetyRiskNames ?? []).toContain("medical");
     expect(answer.toLowerCase()).toContain("qualified doctor");
   });
 
@@ -90,7 +89,6 @@ describe("Reading V2 regression behavior", () => {
       mode: "practical_guidance",
     });
     const answer = result.answer ?? "";
-    const meta = result.meta ?? {};
 
     expect(answer.toLowerCase()).toContain("death");
     expect(answer.toLowerCase()).not.toMatch(/you will die on|death date/);

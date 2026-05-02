@@ -10,6 +10,7 @@ import { answerExactFactIfPossible, detectExactFactIntent } from "../../../lib/a
 const baseFacts = [
   { factType: "lagna", factKey: "lagna", factValue: "Leo", sign: "Leo", source: "chart_json", confidence: "deterministic", tags: ["lagna"], metadata: {} },
   { factType: "rasi", factKey: "moon_sign", factValue: "Gemini", sign: "Gemini", source: "chart_json", confidence: "deterministic", tags: ["moon"], metadata: {} },
+  { factType: "planet_placement", factKey: "moon", factValue: "Moon in Gemini 04-24-17, Mrigasira pada 4, house 11", planet: "Moon", house: 11, sign: "Gemini", degreeNumeric: 4.4, source: "chart_json", confidence: "deterministic", tags: ["moon", "house_11"], metadata: {} },
   { factType: "nakshatra", factKey: "moon_nakshatra", factValue: "Mrigasira", source: "chart_json", confidence: "deterministic", tags: ["moon", "nakshatra"], metadata: {} },
   { factType: "planet_placement", factKey: "sun", factValue: "Sun in Taurus 28-51-52, Mrigasira pada 2, house 10", planet: "Sun", house: 10, sign: "Taurus", degreeNumeric: 28.86, source: "chart_json", confidence: "deterministic", tags: ["sun", "house_10"], metadata: {} },
   { factType: "house", factKey: "house_10", factValue: "Taurus", sign: "Taurus", house: 10, source: "chart_json", confidence: "deterministic", tags: ["house_10"], metadata: {} },
@@ -64,6 +65,21 @@ describe("exact fact router", () => {
       expect(result.intent).toBe(intent);
       expect(text(result)).toContain(expected);
     }
+  });
+
+  it("returns the full Moon placement when the question asks for rashi, house and nakshatra together", () => {
+    const result = answer("Give Moon's exact rashi, house and nakshatra, and avoid interpretation unless asked.");
+    expect(result.answered).toBe(true);
+    expect(result.intent).toBe("nakshatra");
+    expect(text(result)).toContain("Gemini");
+    expect(text(result)).toContain("house 11");
+    expect(text(result)).toContain("Mrigasira");
+  });
+
+  it("treats correction-style Moon questions as Moon-sign verification", () => {
+    const result = answer("If the model says Moon is somewhere other than Gemini, what should the corrected answer be?");
+    expect(result.answered).toBe(true);
+    expect(text(result)).toContain("Gemini");
   });
 
   it("keeps long-horizon dasha predictions and emotional prompts out of the exact-fact dasha bucket", () => {
