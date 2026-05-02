@@ -218,6 +218,29 @@ Safety:
 Validation:
 - human-feel script: passed
 - human-feel tests: passed
+Phase: TarayAI Phase 9 Ephemeral Memory Reset After Final Answer
+Starting commit: f6a2f24
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added deterministic ephemeral consultation memory store with idle, collecting_context, follow_up_asked, and final_answer_ready states
+- added helpers to begin a consultation, mark a follow-up as asked, merge one follow-up answer into the active temporary state, mark final answer readiness, clear one session, clear all sessions, and check active state
+- kept reset scoped to temporary consultation memory only, without owning or mutating permanent profile facts such as birth date, birth time, birthplace, or preferred astrology system
+- added tests for session normalization, begin/replace behavior, session isolation, follow-up tracking, answer merging, final-answer readiness, reset, clearAll, exact-fact non-contamination after reset, active-cycle-only follow-up usage, immutability, singleton helpers, malformed sessions, no persistent storage, and Phase 2 through Phase 8 regressions
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted consultation tests: passed
+- consultation regression tests: passed
+- typecheck: passed
+- lint: passed
+- full tests: passed
+- build: passed
+Deployment:
+- skipped
+Next:
+- Phase 10 orchestrator integration can consume the ephemeral memory helpers later
 - companion UI tests: passed
 - memory tests: passed
 - critic/synthesis/reading plan/listening tests: passed
