@@ -210,9 +210,15 @@ describe("career retrieval", () => {
       astro_chart_facts: [{ data: rows, error: null }],
       astro_reasoning_rules: [{ data: [{ id: "1", rule_key: "career", domain: "career", title: "Career", description: "d", required_fact_types: [], required_tags: ["career"], reasoning_template: "t", weight: 1, safety_notes: [], enabled: true, metadata: {} }], error: null }],
       astro_benchmark_examples: [{ data: [], error: null }],
+      astro_source_notes: [{ data: [{ source_id: "s1", source_name: "Source", source_type: "text", reliability_level: "high", recommended_usage: "use", limitations: null, citation_guidance: null, metadata: {} }], error: null }],
+      astro_retrieval_tags: [{ data: [{ tag_id: "t1", tag_name: "career", tag_category: "life_area", description: "career", synonyms: ["job"], related_tags: ["house_10"], metadata: {} }], error: null }],
+      astro_validation_checks: [{ data: [{ check_id: "c1", check_category: "safety", check_statement: "No death prediction.", failure_pattern: "death", correction_instruction: "Refuse." }], error: null }],
     });
     const result = await retrieveAstroRagContext({ supabase, userId: "user-1", plan: makePlan(), includeTiming: false });
     expect(result.reasoningRules[0].domain).toBe("career");
+    expect(result.sourceNotes?.[0].sourceId).toBe("s1");
+    expect(result.retrievalTags?.[0].tagName).toBe("career");
+    expect(result.validationChecks?.[0].checkId).toBe("c1");
   });
 
   it("includes career benchmark examples", async () => {

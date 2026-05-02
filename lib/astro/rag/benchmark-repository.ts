@@ -35,6 +35,18 @@ function mapExample(row: Record<string, unknown>): BenchmarkExample {
     readingStyle: camel.readingStyle == null ? null : String(camel.readingStyle),
     followUpQuestion: camel.followUpQuestion == null ? null : String(camel.followUpQuestion),
     tags: normalizeStringArray(camel.tags),
+    linkedRuleIds: normalizeStringArray(camel.linkedRuleIds),
+    exampleType: camel.exampleType == null ? null : String(camel.exampleType),
+    userQuestion: camel.userQuestion == null ? null : String(camel.userQuestion),
+    chartConditionSummary: camel.chartConditionSummary == null ? null : String(camel.chartConditionSummary),
+    retrievedRules: Array.isArray(camel.retrievedRules) ? normalizeStringArray(camel.retrievedRules) : null,
+    goodAnswerExample: camel.goodAnswerExample == null ? null : String(camel.goodAnswerExample),
+    badAnswerExample: camel.badAnswerExample == null ? null : String(camel.badAnswerExample),
+    whyGoodAnswerIsGood: camel.whyGoodAnswerIsGood == null ? null : String(camel.whyGoodAnswerIsGood),
+    whyBadAnswerIsBad: camel.whyBadAnswerIsBad == null ? null : String(camel.whyBadAnswerIsBad),
+    lifeAreaTags: normalizeStringArray(camel.lifeAreaTags),
+    conditionTags: normalizeStringArray(camel.conditionTags),
+    safetyNotes: normalizeStringArray(camel.safetyNotes),
     metadata: compactRecord(camel.metadata),
     enabled: Boolean(camel.enabled),
   };
@@ -45,7 +57,7 @@ export async function fetchBenchmarkExamples(input: FetchBenchmarkExamplesInput)
   try {
     let query = input.supabase
       .from<BenchmarkExample>("astro_benchmark_examples")
-      .select("id, example_key, domain, question, answer, reasoning, accuracy_class, reading_style, follow_up_question, tags, metadata, enabled")
+      .select("id, example_key, domain, question, answer, reasoning, accuracy_class, reading_style, follow_up_question, tags, linked_rule_ids, example_type, user_question, chart_condition_summary, retrieved_rules, good_answer_example, bad_answer_example, why_good_answer_is_good, why_bad_answer_is_bad, life_area_tags, condition_tags, safety_notes, metadata, enabled")
       .eq("enabled", true);
 
     if (input.domains.length) {

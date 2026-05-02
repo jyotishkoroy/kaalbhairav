@@ -54,6 +54,8 @@ describe("fetchReasoningRules", () => {
     await fetchReasoningRules({ supabase: { from } as never, domains: [], tags: [] });
     expect((query.state as Record<string, unknown>).selectColumns).toContain("required_fact_types");
     expect((query.state as Record<string, unknown>).selectColumns).toContain("reasoning_template");
+    expect((query.state as Record<string, unknown>).selectColumns).toContain("source_reference");
+    expect((query.state as Record<string, unknown>).selectColumns).toContain("structured_rule");
   });
 
   it("filters enabled true", async () => {

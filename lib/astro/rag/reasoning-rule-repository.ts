@@ -28,6 +28,12 @@ function mapRule(row: Record<string, unknown>): ReasoningRule {
     requiredFactTypes: normalizeStringArray(camel.requiredFactTypes),
     requiredTags: normalizeStringArray(camel.requiredTags),
     reasoningTemplate: String(camel.reasoningTemplate ?? ""),
+    sourceReference: camel.sourceReference == null ? undefined : String(camel.sourceReference),
+    sourceReliability: camel.sourceReliability == null ? undefined : String(camel.sourceReliability),
+    structuredRule: camel.structuredRule && typeof camel.structuredRule === "object" ? compactRecord(camel.structuredRule) as ReasoningRule["structuredRule"] : undefined,
+    lifeAreaTags: normalizeStringArray(camel.lifeAreaTags),
+    conditionTags: normalizeStringArray(camel.conditionTags),
+    retrievalKeywords: normalizeStringArray(camel.retrievalKeywords),
     weight: Number.isFinite(Number(camel.weight)) ? Number(camel.weight) : 0,
     safetyNotes: normalizeStringArray(camel.safetyNotes),
     enabled: Boolean(camel.enabled),
@@ -40,7 +46,7 @@ export async function fetchReasoningRules(input: FetchReasoningRulesInput): Prom
   try {
     let query = input.supabase
       .from<ReasoningRule>("astro_reasoning_rules")
-      .select("id, rule_key, domain, title, description, required_fact_types, required_tags, reasoning_template, weight, safety_notes, enabled, metadata")
+      .select("id, rule_key, domain, title, description, required_fact_types, required_tags, reasoning_template, source_reference, source_reliability, structured_rule, life_area_tags, condition_tags, retrieval_keywords, weight, safety_notes, enabled, metadata")
       .eq("enabled", true);
 
     if (input.domains.length) {

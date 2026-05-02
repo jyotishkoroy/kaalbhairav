@@ -51,6 +51,15 @@ export type ReasoningRule = {
   requiredFactTypes: string[];
   requiredTags: string[];
   reasoningTemplate: string;
+  sourceReference?: string;
+  sourceReliability?: string;
+  structuredRule?: {
+    condition?: string;
+    interpretation?: string;
+  };
+  lifeAreaTags?: string[];
+  conditionTags?: string[];
+  retrievalKeywords?: string[];
   weight: number;
   safetyNotes: string[];
   enabled: boolean;
@@ -68,8 +77,50 @@ export type BenchmarkExample = {
   readingStyle: string | null;
   followUpQuestion: string | null;
   tags: string[];
+  linkedRuleIds?: string[];
+  exampleType?: string | null;
+  userQuestion?: string | null;
+  chartConditionSummary?: string | null;
+  retrievedRules?: string[] | null;
+  goodAnswerExample?: string | null;
+  badAnswerExample?: string | null;
+  whyGoodAnswerIsGood?: string | null;
+  whyBadAnswerIsBad?: string | null;
+  lifeAreaTags?: string[];
+  conditionTags?: string[];
+  safetyNotes?: string[];
   metadata: Record<string, unknown>;
   enabled: boolean;
+};
+
+export type SourceNote = {
+  sourceId: string;
+  sourceName: string;
+  sourceType: string;
+  reliabilityLevel: string | null;
+  recommendedUsage: string | null;
+  limitations: string | null;
+  citationGuidance: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type RetrievalTag = {
+  tagId: string;
+  tagName: string;
+  tagCategory: string | null;
+  description: string | null;
+  synonyms: string[];
+  relatedTags: string[];
+  metadata: Record<string, unknown>;
+};
+
+export type ValidationCheck = {
+  checkId: string;
+  checkCategory: string | null;
+  checkStatement: string;
+  failurePattern: string | null;
+  correctionInstruction: string | null;
+  metadata: Record<string, unknown>;
 };
 
 export type TimingWindow = {
@@ -101,6 +152,9 @@ export type RetrievalContext = {
   chartFacts: ChartFact[];
   reasoningRules: ReasoningRule[];
   benchmarkExamples: BenchmarkExample[];
+  sourceNotes?: SourceNote[];
+  retrievalTags?: RetrievalTag[];
+  validationChecks?: ValidationCheck[];
   timingWindows: TimingWindow[];
   safeRemedies: SafeRemedy[];
   memorySummary?: string;
@@ -128,6 +182,7 @@ export type RetrievalServiceInput = {
   plan: RequiredDataPlan;
   limit?: number;
   includeBenchmarks?: boolean;
+  includeKnowledge?: boolean;
   includeTiming?: boolean;
   includeRemedies?: boolean;
   memorySummary?: string;

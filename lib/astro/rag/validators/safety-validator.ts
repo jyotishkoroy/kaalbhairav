@@ -22,6 +22,22 @@ function unsafeHit(answer: string, phrases: string[], negatedPhrases: string[] =
   return uniqueStrings(hits);
 }
 
+function applyValidationChecks(answer: string, checks: Array<{ checkStatement?: string; failurePattern?: string | null; correctionInstruction?: string | null }>): string[] {
+  const violations: string[] = [];
+  for (const check of checks) {
+    const statement = String(check.checkStatement ?? "").trim();
+    const failurePattern = String(check.failurePattern ?? "").trim();
+    if (failurePattern && new RegExp(failurePattern, "i").test(answer)) {
+      violations.push(statement || failurePattern);
+      continue;
+    }
+    if (!failurePattern && statement && textIncludesLoose(answer, statement)) {
+      violations.push(statement);
+    }
+  }
+  return uniqueStrings(violations);
+}
+
 function isSafeDisclaimer(answer: string, phrases: string[]): boolean {
   const text = answer.toLowerCase();
   return phrases.some((phrase) => textIncludesLoose(text, phrase));
@@ -151,6 +167,12 @@ export function validateAnswerSafety(input: AnswerValidationInput): {
         issues.push(buildIssue("contract_violation", "error", "Safety restriction contradicted.", restriction));
       }
     }
+  }
+
+  const validationChecks = applyValidationChecks(answer, (input.context as { validationChecks?: Array<{ checkStatement?: string; failurePattern?: string | null; correctionInstruction?: string | null }> }).validationChecks ?? []);
+  for (const violation of validationChecks) {
+    issues.push(buildIssue("contract_violation", "error", "Validation check failed.", violation));
+    unsafeClaims.push(violation);
   }
 
   if (contract.answerMode === "safety") {

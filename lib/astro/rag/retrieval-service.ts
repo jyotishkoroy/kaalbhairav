@@ -63,6 +63,87 @@ function buildQueryExpansionMeta(
   };
 }
 
+function mapSourceNote(row: Record<string, unknown>) {
+  const camel = snakeToCamelRecord(row);
+  return {
+    sourceId: String(camel.sourceId ?? ""),
+    sourceName: String(camel.sourceName ?? ""),
+    sourceType: String(camel.sourceType ?? ""),
+    reliabilityLevel: camel.reliabilityLevel == null ? null : String(camel.reliabilityLevel),
+    recommendedUsage: camel.recommendedUsage == null ? null : String(camel.recommendedUsage),
+    limitations: camel.limitations == null ? null : String(camel.limitations),
+    citationGuidance: camel.citationGuidance == null ? null : String(camel.citationGuidance),
+    metadata: compactRecord(camel.metadata),
+  };
+}
+
+function mapRetrievalTag(row: Record<string, unknown>) {
+  const camel = snakeToCamelRecord(row);
+  return {
+    tagId: String(camel.tagId ?? ""),
+    tagName: String(camel.tagName ?? ""),
+    tagCategory: camel.tagCategory == null ? null : String(camel.tagCategory),
+    description: camel.description == null ? null : String(camel.description),
+    synonyms: normalizeStringArray(camel.synonyms),
+    relatedTags: normalizeStringArray(camel.relatedTags),
+    metadata: compactRecord(camel.metadata),
+  };
+}
+
+function mapValidationCheck(row: Record<string, unknown>) {
+  const camel = snakeToCamelRecord(row);
+  return {
+    checkId: String(camel.checkId ?? ""),
+    checkCategory: camel.checkCategory == null ? null : String(camel.checkCategory),
+    checkStatement: String(camel.checkStatement ?? ""),
+    failurePattern: camel.failurePattern == null ? null : String(camel.failurePattern),
+    correctionInstruction: camel.correctionInstruction == null ? null : String(camel.correctionInstruction),
+    metadata: compactRecord(camel.metadata),
+  };
+}
+
+async function fetchSourceNotes(input: { supabase: SupabaseLikeClient; limit?: number }) {
+  try {
+    const result = (await input.supabase
+      .from("astro_source_notes")
+      .select("source_id, source_name, source_type, reliability_level, recommended_usage, limitations, citation_guidance, metadata")
+      .limit(input.limit ?? 64)) as SupabaseQueryResult<Record<string, unknown>>;
+    if (result.error) return { ok: false, data: [], error: asErrorMessage(result.error) };
+    const rows = Array.isArray(result.data) ? result.data.filter((row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row)) : [];
+    return { ok: true, data: rows.map(mapSourceNote) };
+  } catch (error) {
+    return { ok: false, data: [], error: asErrorMessage(error) };
+  }
+}
+
+async function fetchRetrievalTags(input: { supabase: SupabaseLikeClient; limit?: number }) {
+  try {
+    const result = (await input.supabase
+      .from("astro_retrieval_tags")
+      .select("tag_id, tag_name, tag_category, description, synonyms, related_tags, metadata")
+      .limit(input.limit ?? 64)) as SupabaseQueryResult<Record<string, unknown>>;
+    if (result.error) return { ok: false, data: [], error: asErrorMessage(result.error) };
+    const rows = Array.isArray(result.data) ? result.data.filter((row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row)) : [];
+    return { ok: true, data: rows.map(mapRetrievalTag) };
+  } catch (error) {
+    return { ok: false, data: [], error: asErrorMessage(error) };
+  }
+}
+
+async function fetchValidationChecks(input: { supabase: SupabaseLikeClient; limit?: number }) {
+  try {
+    const result = (await input.supabase
+      .from("astro_validation_checks")
+      .select("check_id, check_category, check_statement, failure_pattern, correction_instruction, metadata")
+      .limit(input.limit ?? 64)) as SupabaseQueryResult<Record<string, unknown>>;
+    if (result.error) return { ok: false, data: [], error: asErrorMessage(result.error) };
+    const rows = Array.isArray(result.data) ? result.data.filter((row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row)) : [];
+    return { ok: true, data: rows.map(mapValidationCheck) };
+  } catch (error) {
+    return { ok: false, data: [], error: asErrorMessage(error) };
+  }
+}
+
 async function resolveQueryExpansion(input: RetrievalExpansionInput): Promise<{ meta: RetrievalQueryExpansionMeta; expandedSearchTerms: string[]; requiredEvidenceHints: string[]; chartAnchorHints: string[] }> {
   const deterministic = buildDeterministicQueryExpansion({
     question: input.question,
@@ -288,6 +369,9 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
       chartFacts: [],
       reasoningRules: [],
       benchmarkExamples: [],
+      sourceNotes: [],
+      retrievalTags: [],
+      validationChecks: [],
       timingWindows: [],
       safeRemedies: [],
       metadata: {
@@ -304,6 +388,7 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
 
   const plan = input.plan;
   const includeBenchmarks = input.includeBenchmarks !== false;
+  const includeKnowledge = input.includeKnowledge !== false;
   const includeTiming = input.includeTiming !== false;
   const includeRemedies = input.includeRemedies !== false;
   const question = input.question ?? `${plan.domain} ${plan.retrievalTags.join(" ")} ${plan.requiredFacts.join(" ")}`.trim();
@@ -319,7 +404,7 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
   const expandedSearchTerms = expansion.expandedSearchTerms;
   const expandedTags = [...new Set([...plan.retrievalTags, ...expandedSearchTerms])].slice(0, 24);
 
-  const [facts, rules, benchmarks, timing] = await Promise.all([
+  const [facts, rules, benchmarks, sourceNotes, retrievalTags, validationChecks, timing] = await Promise.all([
     safeRepository(
       fetchChartFacts({
         supabase: input.supabase,
@@ -331,10 +416,13 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
         limit: input.limit ?? 80,
       }),
     ),
-    safeRepository(fetchReasoningRules({ supabase: input.supabase, domains: plan.reasoningRuleDomains, tags: expandedTags, limit: 12 })),
+    plan.answerType === "exact_fact" ? Promise.resolve(emptyRepositoryResult<never>()) : safeRepository(fetchReasoningRules({ supabase: input.supabase, domains: plan.reasoningRuleDomains, tags: expandedTags, limit: 12 })),
     includeBenchmarks
-      ? safeRepository(fetchBenchmarkExamples({ supabase: input.supabase, domains: plan.benchmarkDomains, tags: expandedTags, limit: 6 }))
+      ? (plan.answerType === "exact_fact" ? Promise.resolve(emptyRepositoryResult<never>()) : safeRepository(fetchBenchmarkExamples({ supabase: input.supabase, domains: plan.benchmarkDomains, tags: expandedTags, limit: 6 })))
       : Promise.resolve(emptyRepositoryResult<Awaited<ReturnType<typeof fetchBenchmarkExamples>> extends RepositoryResult<infer T> ? T : never>()),
+    includeKnowledge && plan.answerType !== "exact_fact" ? safeRepository(fetchSourceNotes({ supabase: input.supabase, limit: 32 })) : Promise.resolve(emptyRepositoryResult<never>()),
+    includeKnowledge && plan.answerType !== "exact_fact" ? safeRepository(fetchRetrievalTags({ supabase: input.supabase, limit: 64 })) : Promise.resolve(emptyRepositoryResult<never>()),
+    includeKnowledge && plan.answerType !== "exact_fact" ? safeRepository(fetchValidationChecks({ supabase: input.supabase, limit: 64 })) : Promise.resolve(emptyRepositoryResult<never>()),
     includeTiming && (plan.requiresTimingSource || plan.needsTiming || plan.timingAllowed)
       ? safeRepository(
         fetchTimingWindows({
@@ -356,6 +444,9 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
     chartFacts: facts.data,
     reasoningRules: rules.data,
     benchmarkExamples: benchmarks.data,
+    sourceNotes: sourceNotes.data,
+    retrievalTags: retrievalTags.data,
+    validationChecks: validationChecks.data,
     timingWindows: timing.data,
     safeRemedies,
     memorySummary: input.memorySummary && input.memorySummary.trim() ? input.memorySummary : undefined,
@@ -371,7 +462,7 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
       retrievalTags: [...plan.retrievalTags],
       expandedSearchTerms,
       errors,
-      partial: Boolean(facts.partial || rules.partial || benchmarks.partial || timing.partial || errors.length),
+      partial: Boolean(facts.partial || rules.partial || benchmarks.partial || sourceNotes.partial || retrievalTags.partial || validationChecks.partial || timing.partial || errors.length),
     },
   };
 }

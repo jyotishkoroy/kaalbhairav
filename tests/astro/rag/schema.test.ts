@@ -10,13 +10,12 @@ import { describe, expect, it } from "vitest";
 
 function readLatestMigration(): string {
   const dir = join(process.cwd(), "supabase", "migrations");
-  const file = readdirSync(dir)
-    .filter((name) => name.endsWith("_astro_rag_foundation.sql"))
-    .sort()
-    .at(-1);
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith("_astro_rag_foundation.sql") || name.endsWith("_astro_dump_knowledge.sql"))
+    .sort();
 
-  expect(file).toBeTruthy();
-  return readFileSync(join(dir, file as string), "utf8");
+  expect(files.length).toBeGreaterThan(0);
+  return files.map((file) => readFileSync(join(dir, file), "utf8")).join("\n");
 }
 
 function readSeedFile(): string {
@@ -41,6 +40,9 @@ describe("astro rag schema foundation", () => {
       "astro_chart_facts",
       "astro_reasoning_rules",
       "astro_benchmark_examples",
+      "astro_source_notes",
+      "astro_retrieval_tags",
+      "astro_validation_checks",
       "astro_reasoning_paths",
       "astro_answer_contracts",
       "astro_validation_results",
@@ -55,6 +57,9 @@ describe("astro rag schema foundation", () => {
       "astro_chart_facts",
       "astro_reasoning_rules",
       "astro_benchmark_examples",
+      "astro_source_notes",
+      "astro_retrieval_tags",
+      "astro_validation_checks",
       "astro_reasoning_paths",
       "astro_answer_contracts",
       "astro_validation_results",
@@ -93,6 +98,15 @@ describe("astro rag schema foundation", () => {
     expect(migration).toContain("astro_reasoning_rules_description_trgm_idx");
     expect(migration).toContain("astro_benchmark_examples_question_trgm_idx");
     expect(migration).toContain("astro_benchmark_examples_answer_trgm_idx");
+  });
+
+  it("adds dump knowledge tables and columns", () => {
+    expect(migration).toContain("astro_source_notes");
+    expect(migration).toContain("astro_retrieval_tags");
+    expect(migration).toContain("astro_validation_checks");
+    expect(migration).toContain("source_reference text");
+    expect(migration).toContain("structured_rule jsonb not null default '{}'::jsonb");
+    expect(migration).toContain("linked_rule_ids text[] not null default '{}'");
   });
 
   it("includes gin indexes for tags arrays", () => {
