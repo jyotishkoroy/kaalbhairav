@@ -20,6 +20,7 @@ import type {
 import { extractCulturalFamilyContext } from "./cultural-context-extractor";
 import { detectEmotionalState } from "./emotional-state-detector";
 import { extractLifeContext } from "./life-context-extractor";
+import { extractPracticalConstraints } from "./practical-constraints-extractor";
 
 export type ConsultationInput = {
   readonly sessionId?: string;
@@ -149,6 +150,9 @@ export function createEmptyConsultationState(input: ConsultationInput): Consulta
   const emotionalContext = isExactFactIntent(intent.primary)
     ? undefined
     : detectEmotionalState({ question: userQuestion });
+  const practicalContext = isExactFactIntent(intent.primary)
+    ? undefined
+    : extractPracticalConstraints({ question: userQuestion });
 
   return {
     sessionId: normalizeSessionId(input.sessionId),
@@ -180,8 +184,16 @@ export function createEmptyConsultationState(input: ConsultationInput): Consulta
           religiousComfort: culturalContext.religiousComfort,
         }
       : bootstrap.culturalFamilyContext ?? createDefaultCulturalFamilyContext(),
-    practicalConstraints:
-      bootstrap.practicalConstraints ?? createDefaultPracticalConstraints(),
+    practicalConstraints: practicalContext
+      ? {
+          moneyConstraint: practicalContext.moneyConstraint,
+          timeConstraint: practicalContext.timeConstraint,
+          privacyConstraint: practicalContext.privacyConstraint,
+          careerInstability: practicalContext.careerInstability,
+          familyRestriction: practicalContext.familyConstraint,
+          riskTolerance: practicalContext.riskTolerance,
+        }
+      : bootstrap.practicalConstraints ?? createDefaultPracticalConstraints(),
     followUp: createDefaultFollowUpState(intent),
   };
 }

@@ -9,3 +9,4 @@ export * from "./consultation-state";
 export * from "./cultural-context-extractor";
 export * from "./emotional-state-detector";
 export * from "./life-context-extractor";
+export * from "./practical-constraints-extractor";

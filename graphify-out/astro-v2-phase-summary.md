@@ -294,3 +294,10 @@ Deployment:
 - skipped
 Next:
 - later phases will add richer extractors and response planning
+Phase 5 — Practical-constraints Extractor
+- Added deterministic practical-constraint extraction for money, time, privacy, career instability, health, family constraint, risk tolerance, and remedy style.
+- Added safety-preserving rules so constraints do not become financial, medical, career, marriage, relocation, or remedy advice.
+- Integrated non-exact-fact state creation with practical constraints while preserving exact-fact bypass.
+- Added tests for long work hours, living with parents, money constraint, debt, low budget, simple prayer, privacy, career instability, quit decision, business risk, high/low risk tolerance, health/fasting constraints, family responsibilities, dependents, remedy-style preferences, malformed input, previous-context fallback, explicit override, exact-fact bypass, and Phase 2/3/4 regressions.
+- No production route behavior changed.
+- No deployment required.
