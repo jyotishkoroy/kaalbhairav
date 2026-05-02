@@ -1,3 +1,27 @@
+Phase: TarayAI Phase 18 Add Production Monitoring
+Starting commit: 0045a6c
+Runtime behavior changed: no production route behavior change
+UI changed: no
+DB changed: no
+Summary:
+- added privacy-safe consultation monitoring event builder for consultation mode, exact-fact bypass, life/emotional/cultural/practical context detection, chart evidence presence, pattern confidence, follow-up count, timing status, remedy level/cost, validation result, validation failure codes, final-answer delivery, memory reset success, and response length bucket
+- added red-flag detection for multiple follow-ups, long exact-fact answers, expensive remedies, gemstone advice without caution, generic disclaimer overuse, timing without practical guidance, pattern recognition without chart evidence, failed validation, high validation failure rate, raw sensitive text detection, and missing memory reset after final answer
+- added aggregate monitoring report helper and privacy-safe serializer
+- added tests for event shape, privacy safety, red flags, aggregate reports, feature flag behavior, exact-fact monitoring, final-answer monitoring, validator integration, memory reset monitoring, and consultation regressions
+- optionally added ASTRO_CONSULTATION_MONITORING_ENABLED with default false, without requiring it for full consultation pipeline readiness
+- no production route behavior changed
+- no deployment required
+Validation:
+- targeted monitoring tests: passed
+- consultation test suite: passed
+- typecheck: pending
+- lint: pending
+- build: pending
+- full tests: pending
+Deployment:
+- skipped
+Next:
+- continue only if explicitly instructed
 Phase: TarayAI Phase 17 Add Feature Flags and Rollout Controls
 Starting commit: f5510a8
 Runtime behavior changed: no production route behavior change

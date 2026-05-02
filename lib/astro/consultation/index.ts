@@ -36,6 +36,19 @@ export {
 } from "./consultation-orchestrator";
 export * from "./practical-constraints-extractor";
 export {
+  buildConsultationMonitoringAggregateReport,
+  buildConsultationMonitoringEvent,
+  createEmptyConsultationMonitoringEvent,
+  detectConsultationMonitoringRedFlags,
+  isPrivacySafeConsultationMonitoringEvent,
+  serializeConsultationMonitoringEvent,
+  type ConsultationMonitoringAggregateReport,
+  type ConsultationMonitoringEvent,
+  type ConsultationMonitoringInput,
+  type ConsultationMonitoringMode,
+  type ConsultationMonitoringRedFlag,
+} from "./consultation-monitoring";
+export {
   composeFinalConsultationAnswer,
   type FinalConsultationAnswerInput,
   type FinalConsultationAnswerMode,

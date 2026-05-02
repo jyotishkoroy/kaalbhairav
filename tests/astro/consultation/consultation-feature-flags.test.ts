@@ -133,6 +133,7 @@ describe("consultation feature flags", () => {
     expect(flags.orchestrator).toBe(false);
     expect(flags.finalConsultationAnswer).toBe(false);
     expect(flags.validator).toBe(false);
+    expect(flags.monitoring).toBe(false);
     expect(flags.exactFactBypassAlwaysOn).toBe(true);
   });
 
@@ -270,6 +271,7 @@ describe("consultation feature flags", () => {
 
   it("readiness rollback order matches expected reverse order", () => {
     expect(CONSULTATION_ROLLBACK_ORDER).toEqual([
+      "ASTRO_CONSULTATION_MONITORING_ENABLED",
       "ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED",
       "ASTRO_CONSULTATION_VALIDATOR_ENABLED",
       "ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED",

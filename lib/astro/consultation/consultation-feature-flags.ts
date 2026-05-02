@@ -19,7 +19,8 @@ export type ConsultationFeatureFlagName =
   | "ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED"
   | "ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED"
   | "ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED"
-  | "ASTRO_CONSULTATION_VALIDATOR_ENABLED";
+  | "ASTRO_CONSULTATION_VALIDATOR_ENABLED"
+  | "ASTRO_CONSULTATION_MONITORING_ENABLED";
 
 export type ConsultationFeatureFlagsInput = Partial<Record<ConsultationFeatureFlagName, string | boolean | number | undefined>>;
 
@@ -48,6 +49,7 @@ export type ResolvedConsultationFeatureFlags = {
   readonly orchestrator: boolean;
   readonly finalConsultationAnswer: boolean;
   readonly validator: boolean;
+  readonly monitoring: boolean;
   readonly exactFactBypassAlwaysOn: true;
   readonly fullConsultationPipelineEnabled: boolean;
   readonly disabledReasons: readonly string[];
@@ -83,9 +85,11 @@ export const CONSULTATION_FEATURE_FLAG_NAMES: readonly ConsultationFeatureFlagNa
   "ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED",
   "ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED",
   "ASTRO_CONSULTATION_VALIDATOR_ENABLED",
+  "ASTRO_CONSULTATION_MONITORING_ENABLED",
 ] as const;
 
 export const CONSULTATION_ROLLBACK_ORDER: readonly ConsultationFeatureFlagName[] = [
+  "ASTRO_CONSULTATION_MONITORING_ENABLED",
   "ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED",
   "ASTRO_CONSULTATION_VALIDATOR_ENABLED",
   "ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED",
@@ -119,6 +123,7 @@ export const DEFAULT_CONSULTATION_FEATURE_FLAG_DEFAULTS: Record<ConsultationFeat
   ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED: false,
   ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED: false,
   ASTRO_CONSULTATION_VALIDATOR_ENABLED: false,
+  ASTRO_CONSULTATION_MONITORING_ENABLED: false,
 };
 
 const TRUE_STRINGS = new Set(["true", "1", "yes", "on", "enabled"]);
@@ -201,6 +206,7 @@ export function resolveConsultationFeatureFlags(
     raw("ASTRO_REMEDY_PROPORTIONALITY_ENABLED");
   const responsePlan = consultationState && raw("ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED");
   const validator = raw("ASTRO_CONSULTATION_VALIDATOR_ENABLED");
+  const monitoring = raw("ASTRO_CONSULTATION_MONITORING_ENABLED");
   const finalConsultationAnswer = responsePlan && validator && raw("ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED");
   const orchestrator = consultationState && raw("ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED");
 
@@ -219,6 +225,7 @@ export function resolveConsultationFeatureFlags(
   if (raw("ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED") && !orchestrator) disabledReasons.push("orchestrator_disabled_consultation_state_off");
   if (raw("ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED") && !finalConsultationAnswer) disabledReasons.push("final_answer_disabled_response_plan_or_validator_off");
   if (raw("ASTRO_CONSULTATION_VALIDATOR_ENABLED") && !validator) disabledReasons.push("validator_disabled_default_or_invalid");
+  if (raw("ASTRO_CONSULTATION_MONITORING_ENABLED") && !monitoring) disabledReasons.push("monitoring_disabled_default_or_invalid");
   if (!finalConsultationAnswer || !validator || !responsePlan || !orchestrator || !consultationState || !lifeContext || !emotionalState || !culturalContext || !practicalConstraints || !chartEvidence || !patternRecognition || !oneFollowUp || !ephemeralMemoryReset || !timingJudgement || !remedyProportionality) {
     if (!disabledReasons.includes("full_pipeline_disabled_missing_required_flags")) {
       disabledReasons.push("full_pipeline_disabled_missing_required_flags");
@@ -241,6 +248,7 @@ export function resolveConsultationFeatureFlags(
     orchestrator,
     finalConsultationAnswer,
     validator,
+    monitoring,
     exactFactBypassAlwaysOn: true,
     fullConsultationPipelineEnabled:
       Boolean(
