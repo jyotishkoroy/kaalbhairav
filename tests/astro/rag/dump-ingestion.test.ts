@@ -67,6 +67,59 @@ describe("astro dump ingestion", () => {
     expect(counts.astro_reasoning_rules).toBe(0);
   });
 
+  it("backfills only normalized rule columns by rule_id", async () => {
+    const updates: Array<{ table: string; values: Record<string, unknown>; ruleKey: string }> = [];
+    const supabase = {
+      from(table: string) {
+        return {
+          update(values: Record<string, unknown>) {
+            return {
+              eq(column: string, value: string) {
+                updates.push({ table, values, ruleKey: `${column}:${value}` });
+                return Promise.resolve({ data: null, error: null });
+              },
+            };
+          },
+        };
+      },
+    };
+
+    const report = await ingestAstroDump({
+      filePath: fixturePath(),
+      mode: "backfill-normalized",
+      supabase: supabase as never,
+    });
+
+    expect(report.writtenCounts.astro_reasoning_rules).toBe(2);
+    expect(report.errors).toEqual([]);
+    expect(updates).toHaveLength(2);
+    expect(updates[0].table).toBe("astro_reasoning_rules");
+    expect(updates[0].ruleKey).toBe("rule_key:rule_1");
+    expect(Object.keys(updates[0].values).sort()).toEqual([
+      "aspect_type",
+      "dasha_condition",
+      "dignity",
+      "divisional_chart",
+      "house",
+      "lordship",
+      "normalized_condition",
+      "normalized_embedding_text",
+      "normalized_interpretation",
+      "normalized_prompt_compact_summary",
+      "normalized_source_reference",
+      "normalized_source_reliability",
+      "normalized_source_text",
+      "normalized_updated_at",
+      "primary_planet",
+      "secondary_planet",
+      "sign",
+      "target_house",
+      "transit_condition",
+      "yoga_name",
+    ].sort());
+    expect(updates[0].values).not.toHaveProperty("metadata");
+  });
+
   it("keeps exact facts isolated from dump knowledge", async () => {
     const result = await retrieveAstroRagContext({
       supabase: {

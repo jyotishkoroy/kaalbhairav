@@ -185,6 +185,7 @@ export type RetrievalContext = {
   promptIncludedExampleIds?: string[];
   structuredRagUsed?: boolean;
   structuredRagFallbackReason?: string;
+  retrievalTrace?: import("./retrieval-trace").AstroRetrievalTrace;
   metadata: {
     userId: string;
     profileId: string | null;

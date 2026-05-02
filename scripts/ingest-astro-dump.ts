@@ -31,6 +31,9 @@ type DumpRow = Record<string, unknown> & { record_type?: string };
 type SupabaseLike = {
   from: (table: string) => {
     upsert: (rows: Record<string, unknown>[], options?: { onConflict?: string }) => Promise<{ data: unknown; error: { message?: string } | null }>;
+    update?: (values: Record<string, unknown>) => {
+      eq: (column: string, value: string) => Promise<{ data: unknown; error: { message?: string } | null }>;
+    };
     select?: (columns?: string, options?: { count?: "exact" | "planned" | "estimated"; head?: boolean }) => {
       order?: (column: string, options?: { ascending?: boolean; nullsFirst?: boolean }) => unknown;
       limit?: (count: number) => Promise<{ data: unknown; error: { message?: string } | null; count?: number | null }>;
@@ -367,6 +370,45 @@ async function upsertRows(client: SupabaseLike, table: string, conflictKey: stri
   return { ok: true };
 }
 
+const BACKFILL_NORMALIZED_COLUMNS = [
+  "primary_planet",
+  "secondary_planet",
+  "house",
+  "target_house",
+  "sign",
+  "lordship",
+  "dignity",
+  "aspect_type",
+  "yoga_name",
+  "divisional_chart",
+  "dasha_condition",
+  "transit_condition",
+  "normalized_source_text",
+  "normalized_source_reference",
+  "normalized_source_reliability",
+  "normalized_embedding_text",
+  "normalized_prompt_compact_summary",
+  "normalized_condition",
+  "normalized_interpretation",
+  "normalized_updated_at",
+] as const;
+
+function pickBackfillNormalizedColumns(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(BACKFILL_NORMALIZED_COLUMNS.map((column) => [column, row[column] ?? null]));
+}
+
+async function updateBackfillNormalizedRows(
+  client: SupabaseLike,
+  rows: Array<{ ruleId: string; row: Record<string, unknown> }>,
+): Promise<{ ok: boolean; error?: string }> {
+  const table = client.from("astro_reasoning_rules");
+  if (!table.update) return { ok: false, error: "update not supported" };
+  const results = await Promise.all(rows.map((item) => table.update?.(item.row).eq("rule_key", item.ruleId)));
+  const firstError = results.find((result) => result?.error);
+  if (firstError?.error) return { ok: false, error: firstError.error.message ?? "write failed" };
+  return { ok: true };
+}
+
 export async function verifyAstroDumpCounts(client: SupabaseLike): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   for (const table of COUNT_TABLES) {
@@ -407,6 +449,19 @@ export async function ingestAstroDump(input: {
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
   let processed = 0;
   const batches = new Map<string, Array<{ conflictKey: string; row: Record<string, unknown> }>>();
+  const backfillBatches: Array<{ ruleId: string; row: Record<string, unknown> }> = [];
+
+  async function flushBackfillBatches() {
+    if (!input.supabase || !backfillBatches.length) return;
+    const pending = backfillBatches.splice(0, backfillBatches.length);
+    const result = await updateBackfillNormalizedRows(input.supabase, pending);
+    if (!result.ok) {
+      report.skippedCounts.astro_reasoning_rules = (report.skippedCounts.astro_reasoning_rules ?? 0) + pending.length;
+      if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "write_error", message: result.error ?? "write failed" });
+      return;
+    }
+    report.writtenCounts.astro_reasoning_rules = (report.writtenCounts.astro_reasoning_rules ?? 0) + pending.length;
+  }
 
   for await (const line of rl) {
     report.totalLines += 1;
@@ -419,7 +474,7 @@ export async function ingestAstroDump(input: {
       if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: parsed.error, message: "malformed jsonl line" });
       continue;
     }
-    let normalized = normalizeDumpRecord(parsed.value);
+    const normalized = normalizeDumpRecord(parsed.value);
     if (!normalized) {
       report.invalidLines += 1;
       if (report.errors.length < 50) report.errors.push({ line: report.totalLines, code: "unsupported_record", message: "unsupported or incomplete dump record" });
@@ -435,15 +490,14 @@ export async function ingestAstroDump(input: {
     }
     if (input.mode === "backfill-normalized" && normalized.table !== "astro_reasoning_rules") continue;
     if (input.mode === "backfill-normalized" && normalized.table === "astro_reasoning_rules") {
-      normalized = {
-        table: normalized.table,
-        conflictKey: normalized.conflictKey,
-        row: {
-          ...normalized.row,
-          rule_key: String(normalized.row.rule_key ?? ""),
-          ...mapRuleNormalizedColumns(parsed.value),
-        },
-      };
+      const ruleId = trimText(parsed.value.rule_id, 160);
+      if (!ruleId) continue;
+      backfillBatches.push({
+        ruleId,
+        row: pickBackfillNormalizedColumns(mapRuleNormalizedColumns(parsed.value)),
+      });
+      if (!input.validateOnly && !input.dryRun && input.supabase && backfillBatches.length >= WRITE_BATCH_SIZE) await flushBackfillBatches();
+      continue;
     }
     if (input.validateOnly || input.dryRun || !input.supabase) continue;
     const current = normalized as { table: string; conflictKey: string; row: Record<string, unknown> };
@@ -460,6 +514,10 @@ export async function ingestAstroDump(input: {
       }
       report.writtenCounts[normalized.table] = (report.writtenCounts[normalized.table] ?? 0) + rows.length;
     }
+  }
+
+  if (input.mode === "backfill-normalized" && !input.validateOnly && !input.dryRun && input.supabase) {
+    await flushBackfillBatches();
   }
 
   if (!input.validateOnly && !input.dryRun && input.supabase) {
@@ -514,7 +572,7 @@ async function main() {
   const verifyCounts = Boolean(args.verifyCounts);
   let supabase: SupabaseLike | undefined;
   const missingEnv: string[] = [];
-  if ((!validateOnly || verifyCounts) && !dryRun && mode === "existing-db") {
+  if ((!validateOnly || verifyCounts) && !dryRun && (mode === "existing-db" || mode === "backfill-normalized")) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE ?? process.env.SUPABASE_SERVICE_KEY;
     if (!url) missingEnv.push("NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL");

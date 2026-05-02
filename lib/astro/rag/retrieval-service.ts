@@ -23,6 +23,12 @@ import { fetchTimingWindows } from "./timing-repository";
 import { buildStructuredRuleRankingContext, inferHousesFromQuestion, inferLifeAreaTagsFromQuestion, inferPlanetsFromQuestion } from "./chart-fact-extractor";
 import { packAstroRagPromptContext } from "./prompt-packer";
 import { selectStructuredReasoningRules } from "./reasoning-rule-selector";
+import {
+  createAstroRetrievalTraceId,
+  isAstroRetrievalTraceEnabled,
+  sanitizeAstroRetrievalTrace,
+  type AstroRetrievalTrace,
+} from "./retrieval-trace";
 
 export type FetchChartFactsInput = {
   supabase: SupabaseLikeClient;
@@ -215,7 +221,7 @@ function asErrorMessage(error: unknown): string {
 }
 
 function isStructuredRagEnabled(env?: Record<string, string | undefined>): boolean {
-  return env?.ASTRO_STRUCTURED_RAG_ENABLED !== "false";
+  return env?.ASTRO_STRUCTURED_RAG_ENABLED === "true";
 }
 
 function mapChartFact(row: Record<string, unknown>): ChartFact {
@@ -414,6 +420,21 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
   const inferredPlanets = inferPlanetsFromQuestion(question);
   const inferredHouses = inferHousesFromQuestion(question);
   const structuredEnabled = isStructuredRagEnabled(input.env ?? process.env);
+  const traceEnabled = isAstroRetrievalTraceEnabled();
+  const trace: AstroRetrievalTrace | undefined = traceEnabled
+    ? {
+        traceId: createAstroRetrievalTraceId(),
+        enabled: true,
+        questionDomain: plan.domain ?? null,
+        structuredRagEnabled: structuredEnabled,
+        fallbackUsed: false,
+        candidateCount: 0,
+        selectedCount: 0,
+        selectedRules: [],
+        exactFactMode: plan.answerType === "exact_fact",
+        safetyBlocked: plan.blockedBySafety,
+      }
+    : undefined;
 
   const [facts, rules, benchmarks, sourceNotes, retrievalTags, validationChecks, timing] = await Promise.all([
     safeRepository(
@@ -468,6 +489,7 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
         candidateLimit: 120,
       });
       if (structuredCandidates.length) {
+        if (trace) trace.candidateCount = structuredCandidates.length;
         const rankingContext = buildStructuredRuleRankingContext({
           userQuestion: question,
           chartFacts: facts.data,
@@ -478,6 +500,18 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
         const ranked = selectStructuredReasoningRules(structuredCandidates, rankingContext, { limit: 8 });
         if (ranked.length) {
           structuredRanked = ranked;
+          if (trace) {
+            trace.selectedCount = ranked.length;
+            trace.selectedRules = ranked.map((item) => ({
+              ruleId: item.rule.ruleId,
+              score: item.score,
+              rankingReasons: item.rankingReasons,
+              rejectionReasons: item.rejectionReasons,
+              sourceReliability: item.rule.normalizedSourceReliability ?? item.rule.sourceReliability ?? null,
+              lifeAreaTags: item.rule.lifeAreaTags ? [...item.rule.lifeAreaTags] : [],
+              conditionTags: item.rule.conditionTags ? [...item.rule.conditionTags] : [],
+            }));
+          }
           reasoningRules = ranked.map((item) => ({
             id: item.rule.ruleId,
             ruleKey: item.rule.ruleId,
@@ -501,12 +535,18 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
           structuredUsed = true;
         } else {
           structuredFallbackReason = "no_structured_ranked_rules";
+          if (trace) trace.fallbackUsed = true;
         }
       } else {
         structuredFallbackReason = "no_structured_candidates";
+        if (trace) trace.fallbackUsed = true;
       }
     } catch (error) {
       structuredFallbackReason = asErrorMessage(error);
+      if (trace) {
+        trace.fallbackUsed = true;
+        trace.fallbackReason = structuredFallbackReason;
+      }
     }
   }
 
@@ -541,6 +581,7 @@ export async function retrieveAstroRagContext(input?: RetrievalServiceInput): Pr
     promptIncludedExampleIds: packedPrompt?.includedExampleIds,
     structuredRagUsed: structuredUsed,
     structuredRagFallbackReason: structuredFallbackReason,
+    retrievalTrace: trace ? sanitizeAstroRetrievalTrace({ ...trace, fallbackReason: structuredFallbackReason ?? trace.fallbackReason ?? null }) : undefined,
     metadata: {
       userId: input.userId,
       profileId: input.profileId ?? null,

@@ -58,6 +58,9 @@ type AstroV2ReadingDependencies = { oldRoute: typeof generateReadingV2; ragOrche
 type AstroV2ReadingResponse = { answer: string; followUpQuestion?: string | null; followUpAnswer?: string | null; sections?: Record<string, string>; meta?: Record<string, unknown>; } | { error: string; code?: string; meta?: Record<string, unknown>; };
 function getRequestContext(body: AstroV2ReadingRequestBody) { const metadata = parseMetadata(body.metadata); const userId = readString(body.userId); const sessionId = readString(body.sessionId) ?? readString(metadata?.sessionId); return { metadata, userId: userId ?? sessionId ?? "astro-v2-page-anonymous", sessionId, chartVersionId: readString((body as Record<string, unknown>).chartVersionId), profileId: readString((body as Record<string, unknown>).profileId) ?? readString(metadata?.profileId) }; }
 function shouldUseRagReadingRoute(flags: ReturnType<typeof getAstroRagFlags>, question: string): boolean { if (!flags.ragEnabled) return false; if (!question.trim()) return false; return true; }
+function shouldUseDomainAwareCompanionFallback(): boolean {
+  return process.env.ASTRO_DOMAIN_AWARE_COMPANION_ENABLED === "true";
+}
 function parseConsultationChartEvidence(value: unknown) {
   if (!isRecord(value)) return undefined;
   const candidate = value as Record<string, unknown>;
@@ -146,7 +149,7 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
   }
   if (consultationResult.shouldUseFallback || !consultationResult.answer || isGenericFallbackAnswer(consultationResult.answer)) {
     const inferredMode = inferQuestionMode(question);
-    if (inferredMode === "companion") {
+    if (inferredMode === "companion" && shouldUseDomainAwareCompanionFallback()) {
       const domainResult = buildDomainAwareCompanionAnswer({ question, mode: "companion" });
       if (domainResult?.answer && domainResult.answer.trim().length > 100) {
         return NextResponse.json({
