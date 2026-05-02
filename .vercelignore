@@ -1,0 +1,11 @@
+dump.jsonl
+artifacts/
+graphify-out/
+generated/
+QandA.md
+PLAN.md
+Archive 2.zip
+astro_package*.zip
+myVedicReport.docx
+.cache/
+.env*
