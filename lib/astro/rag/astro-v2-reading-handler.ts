@@ -6,6 +6,11 @@
 
 import { NextResponse } from "next/server";
 import {
+  resolveConsultationFeatureFlags,
+  runConsultationProductionWrapper,
+  type ConsultationProductionWrapperInput,
+} from "@/lib/astro/consultation";
+import {
   createAstroE2ETrace,
   sanitizeTraceForResponse,
   shouldExposeAstroE2ETrace,
@@ -16,6 +21,7 @@ import {
   type RagReadingOrchestratorResult,
 } from "@/lib/astro/rag/rag-reading-orchestrator";
 import { getAstroRagFlags } from "@/lib/astro/rag/feature-flags";
+import type { ChartEvidence } from "@/lib/astro/consultation/chart-evidence-builder";
 import { generateReadingV2 } from "@/lib/astro/reading/reading-orchestrator-v2";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
 
@@ -50,6 +56,18 @@ type AstroV2ReadingDependencies = { oldRoute: typeof generateReadingV2; ragOrche
 type AstroV2ReadingResponse = { answer: string; followUpQuestion?: string | null; followUpAnswer?: string | null; sections?: Record<string, string>; meta?: Record<string, unknown>; } | { error: string; code?: string; meta?: Record<string, unknown>; };
 function getRequestContext(body: AstroV2ReadingRequestBody) { const metadata = parseMetadata(body.metadata); const userId = readString(body.userId); const sessionId = readString(body.sessionId) ?? readString(metadata?.sessionId); return { metadata, userId: userId ?? sessionId ?? "astro-v2-page-anonymous", sessionId, chartVersionId: readString((body as Record<string, unknown>).chartVersionId), profileId: readString((body as Record<string, unknown>).profileId) ?? readString(metadata?.profileId) }; }
 function shouldUseRagReadingRoute(flags: ReturnType<typeof getAstroRagFlags>, question: string): boolean { if (!flags.ragEnabled) return false; if (!question.trim()) return false; return true; }
+function parseConsultationChartEvidence(value: unknown) {
+  if (!isRecord(value)) return undefined;
+  const candidate = value as Record<string, unknown>;
+  if (!Array.isArray(candidate.supportiveFactors) || !Array.isArray(candidate.challengingFactors) || !Array.isArray(candidate.neutralFacts)) return undefined;
+  return {
+    domain: typeof candidate.domain === "string" ? candidate.domain : "general",
+    supportiveFactors: candidate.supportiveFactors,
+    challengingFactors: candidate.challengingFactors,
+    neutralFacts: candidate.neutralFacts,
+    birthTimeSensitivity: candidate.birthTimeSensitivity === "low" || candidate.birthTimeSensitivity === "medium" || candidate.birthTimeSensitivity === "high" ? candidate.birthTimeSensitivity : "low",
+  } as ChartEvidence;
+}
 function normalizeRagRouteResponse(result: RagReadingOrchestratorResult, existingMeta: Record<string, unknown> | undefined): AstroV2ReadingResponse { const answer = typeof result.answer === "string" ? result.answer.trim() : ""; const safeMeta: Record<string, unknown> = { ...(normalizeMeta(existingMeta) ?? {}), ...(normalizeMeta(result.meta) ?? {}), rag: { status: result.status, exactFactAnswered: result.meta.exactFactAnswered, safetyBlocked: result.meta.safetyBlocked, followupAsked: result.meta.followupAsked, fallbackUsed: result.meta.fallbackUsed, }, }; return { answer, followUpQuestion: result.followUpQuestion, followUpAnswer: result.followUpAnswer, sections: normalizeSections(result.sections), meta: safeMeta }; }
 function shouldFallbackToOldV2FromRagResult(result: RagReadingOrchestratorResult | undefined): boolean { if (!result) return true; if (typeof result.answer !== "string" || !result.answer.trim()) return true; if (result.meta?.engine === "fallback" && result.status === "fallback") return true; return false; }
 
@@ -61,6 +79,28 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
   const context = getRequestContext(body);
   const birthDetails = parseBirthDetails(body.birthDetails);
   const metadata = context.metadata;
+  const consultationFlags = resolveConsultationFeatureFlags(process.env as never);
+  const consultationChartEvidence = parseConsultationChartEvidence(body.chart);
+  const consultationResult = runConsultationProductionWrapper({
+    userQuestion: question,
+    message: readString(body.message),
+    sessionId: context.sessionId,
+    requestMode: readString(body.mode),
+    chartEvidence: consultationChartEvidence,
+    featureFlags: consultationFlags,
+  } satisfies ConsultationProductionWrapperInput);
+  if (!consultationResult.shouldUseFallback && consultationResult.answer) {
+    const responseMeta: Record<string, unknown> = {
+      source: "astro-v2-page",
+      directV2Route: true,
+      consultationEngine: true,
+      ...metadata,
+    };
+    return NextResponse.json({
+      answer: consultationResult.answer,
+      meta: responseMeta,
+    });
+  }
   const trace = createAstroE2ETrace();
   const exposeTrace = shouldExposeAstroE2ETrace({
     isProduction: process.env.NODE_ENV === "production",

@@ -1,3 +1,28 @@
+Phase: TarayAI Production Wiring Phase
+Starting commit: 499abac
+Runtime behavior changed: yes, but only behind consultation feature flags on the v2 reading handler
+UI changed: no
+DB changed: no
+Summary:
+- added a deterministic consultation production wrapper that preserves exact-fact bypass, requires full consultation flags, refuses to run without usable structured evidence, composes and validates final consultation answers, and falls back safely on disabled flags, missing evidence, validation failure, or runtime error
+- exported the production wrapper from the consultation barrel
+- wired the shared v2 reading handler to attempt consultation only for non-exact requests with structured chart evidence and to return the consultation answer only when the wrapper explicitly allows it
+- preserved the existing old fallback route behavior and exact-fact deterministic path when consultation is not enabled
+- added wrapper tests for flag gating, exact-fact bypass, evidence requirements, validation blocking, privacy-safe monitoring, and internal-field leakage prevention
+- added route integration tests for fallback preservation, malformed input, exact-fact stability, safe consultation response gating, and metadata hygiene
+Validation:
+- targeted wrapper tests: passed
+- targeted route tests: passed
+- consultation production readiness test: passed
+- consultation test suite: passed
+- typecheck: passed
+- lint: passed
+- full tests: passed
+- build: passed
+Deployment:
+- skipped
+Next:
+- keep consultation flags disabled in production until intentional rollout
 Phase: TarayAI Phase 18 Add Production Monitoring
 Starting commit: 0045a6c
 Runtime behavior changed: no production route behavior change

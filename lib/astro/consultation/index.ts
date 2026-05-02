@@ -54,6 +54,12 @@ export {
   type FinalConsultationAnswerMode,
   type FinalConsultationAnswerResult,
 } from "./final-consultation-answer";
+export {
+  runConsultationProductionWrapper,
+  type ConsultationProductionMode,
+  type ConsultationProductionWrapperInput,
+  type ConsultationProductionWrapperResult,
+} from "./consultation-production-wrapper";
 export { buildConsultationResponsePlan } from "./response-plan-builder";
 export {
   buildProportionateRemedyPlan,
