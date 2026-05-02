@@ -72,6 +72,24 @@ function parseConsultationChartEvidence(value: unknown) {
 function normalizeRagRouteResponse(result: RagReadingOrchestratorResult, existingMeta: Record<string, unknown> | undefined): AstroV2ReadingResponse { const answer = typeof result.answer === "string" ? result.answer.trim() : ""; const safeMeta: Record<string, unknown> = { ...(normalizeMeta(existingMeta) ?? {}), ...(normalizeMeta(result.meta) ?? {}), rag: { status: result.status, exactFactAnswered: result.meta.exactFactAnswered, safetyBlocked: result.meta.safetyBlocked, followupAsked: result.meta.followupAsked, fallbackUsed: result.meta.fallbackUsed, }, }; return { answer, followUpQuestion: result.followUpQuestion, followUpAnswer: result.followUpAnswer, sections: normalizeSections(result.sections), meta: safeMeta }; }
 function shouldFallbackToOldV2FromRagResult(result: RagReadingOrchestratorResult | undefined): boolean { if (!result) return true; if (typeof result.answer !== "string" || !result.answer.trim()) return true; if (result.meta?.engine === "fallback" && result.status === "fallback") return true; return false; }
 
+const KNOWN_GENERIC_FALLBACK_PHRASES = [
+  "This is not about forcing certainty",
+  "Pick one area first",
+  "Please clarify career, relationship, money",
+  "I cannot answer that safely right now",
+  "Some required chart facts are still missing",
+  "Missing facts:",
+  "The full generated answer is temporarily unavailable",
+  "The generated answer did not pass grounding checks",
+  "No grounded timing source exists here",
+  "I can answer this as an exact chart fact once",
+];
+
+function isGenericFallbackAnswer(answer: string): boolean {
+  const a = answer.trim();
+  return KNOWN_GENERIC_FALLBACK_PHRASES.some(phrase => a.startsWith(phrase) || a.includes(phrase));
+}
+
 const COMPANION_MODE_PATTERNS = [
   /\bwhy (do|does|am|is|are|did|can|can't|cannot|should|would)\b/i,
   /\bhow (do|does|can|should|would|to)\b/i,
@@ -113,7 +131,7 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
     chartEvidence: consultationChartEvidence,
     featureFlags: consultationFlags,
   } satisfies ConsultationProductionWrapperInput);
-  if (!consultationResult.shouldUseFallback && consultationResult.answer) {
+  if (!consultationResult.shouldUseFallback && consultationResult.answer && !isGenericFallbackAnswer(consultationResult.answer)) {
     const responseMeta: Record<string, unknown> = {
       source: "astro-v2-page",
       directV2Route: true,
@@ -125,7 +143,7 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
       meta: responseMeta,
     });
   }
-  if (consultationResult.shouldUseFallback) {
+  if (consultationResult.shouldUseFallback || (consultationResult.answer && isGenericFallbackAnswer(consultationResult.answer))) {
     const inferredMode = inferQuestionMode(question);
     if (inferredMode === "companion") {
       const domainResult = buildDomainAwareCompanionAnswer({ question, mode: "companion" });
