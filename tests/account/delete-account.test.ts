@@ -13,7 +13,10 @@ type Call = { table: string; method: string; args?: unknown[] }
 function buildService(options?: {
   missingTables?: string[]
   missingColumns?: Array<{ table: string; column: string }>
+  missingTableErrors?: Record<string, { code?: string; message: string; details?: string; hint?: string }>
+  missingColumnErrors?: Record<string, { code?: string; message: string; details?: string; hint?: string }>
   selectRows?: Record<string, Array<{ id: string }>>
+  insertErrors?: Record<string, { code?: string; message: string; details?: string; hint?: string }>
   deleteErrors?: Record<string, { code?: string; message: string }>
   updateErrors?: Record<string, { code?: string; message: string }>
   authDeleteError?: { code?: string; message: string; status?: number }
@@ -21,13 +24,16 @@ function buildService(options?: {
   const calls: Call[] = []
   const missingTables = new Set(options?.missingTables ?? [])
   const missingColumns = new Set((options?.missingColumns ?? []).map((item) => `${item.table}.${item.column}`))
+  const missingTableErrors = options?.missingTableErrors ?? {}
+  const missingColumnErrors = options?.missingColumnErrors ?? {}
   const selectRows = options?.selectRows ?? {}
+  const insertErrors = options?.insertErrors ?? {}
   const deleteErrors = options?.deleteErrors ?? {}
   const updateErrors = options?.updateErrors ?? {}
   const makeSelectResult = (table: string) => {
     const result = Promise.resolve({
       data: selectRows[table] ?? [],
-      error: missingTables.has(table) ? { code: '42P01', message: 'missing relation' } : null,
+      error: missingTables.has(table) ? missingTableErrors[table] ?? { code: '42P01', message: 'missing relation' } : null,
     }) as Promise<{ data: Array<{ id: string }> | null; error: unknown }> & {
       eq: ReturnType<typeof vi.fn>
       limit: ReturnType<typeof vi.fn>
@@ -48,8 +54,8 @@ function buildService(options?: {
         select: vi.fn(() => makeSelectResult(table)),
         insert: vi.fn((payload: unknown) => {
           calls.push({ table, method: 'insert', args: [payload] })
-          if (table === 'deleted_users' && options?.deleteErrors?.deleted_users) {
-            return Promise.resolve({ error: options.deleteErrors.deleted_users })
+          if (insertErrors[table]) {
+            return Promise.resolve({ error: insertErrors[table] })
           }
           return Promise.resolve({ error: null })
         }),
@@ -57,13 +63,15 @@ function buildService(options?: {
           eq: vi.fn((column: string, value: unknown) => {
             calls.push({ table, method: 'delete.eq', args: [column, value] })
             const key = `${table}.${column}`
-            if (missingTables.has(table) || missingColumns.has(key)) return Promise.resolve({ error: { code: '42703', message: 'missing column' } })
+            if (missingTables.has(table)) return Promise.resolve({ error: missingTableErrors[table] ?? { code: '42703', message: 'missing relation' } })
+            if (missingColumns.has(key)) return Promise.resolve({ error: missingColumnErrors[key] ?? { code: '42703', message: 'missing column' } })
             return Promise.resolve({ error: deleteErrors[key] ?? null })
           }),
           in: vi.fn((column: string, value: unknown) => {
             calls.push({ table, method: 'delete.in', args: [column, value] })
             const key = `${table}.${column}`
-            if (missingTables.has(table) || missingColumns.has(key)) return Promise.resolve({ error: { code: '42703', message: 'missing column' } })
+            if (missingTables.has(table)) return Promise.resolve({ error: missingTableErrors[table] ?? { code: '42703', message: 'missing relation' } })
+            if (missingColumns.has(key)) return Promise.resolve({ error: missingColumnErrors[key] ?? { code: '42703', message: 'missing column' } })
             return Promise.resolve({ error: deleteErrors[key] ?? null })
           }),
         })),
@@ -71,13 +79,15 @@ function buildService(options?: {
           eq: vi.fn((column: string, value: unknown) => {
             calls.push({ table, method: 'update.eq', args: [payload, column, value] })
             const key = `${table}.${column}`
-            if (missingTables.has(table) || missingColumns.has(key)) return Promise.resolve({ error: { code: '42703', message: 'missing column' } })
+            if (missingTables.has(table)) return Promise.resolve({ error: missingTableErrors[table] ?? { code: '42703', message: 'missing relation' } })
+            if (missingColumns.has(key)) return Promise.resolve({ error: missingColumnErrors[key] ?? { code: '42703', message: 'missing column' } })
             return Promise.resolve({ error: updateErrors[key] ?? null })
           }),
           in: vi.fn((column: string, value: unknown) => {
             calls.push({ table, method: 'update.in', args: [payload, column, value] })
             const key = `${table}.${column}`
-            if (missingTables.has(table) || missingColumns.has(key)) return Promise.resolve({ error: { code: '42703', message: 'missing column' } })
+            if (missingTables.has(table)) return Promise.resolve({ error: missingTableErrors[table] ?? { code: '42703', message: 'missing relation' } })
+            if (missingColumns.has(key)) return Promise.resolve({ error: missingColumnErrors[key] ?? { code: '42703', message: 'missing column' } })
             return Promise.resolve({ error: updateErrors[key] ?? null })
           }),
         })),
@@ -168,9 +178,120 @@ describe('deleteAccountAndUserData', () => {
     expect(service.auth.admin.deleteUser).toHaveBeenCalled()
   })
 
+  it('skips PGRST205 from optional astro cleanup tables', async () => {
+    const service = buildService({
+      missingTableErrors: {
+        astro_reading_feedback: {
+          code: 'PGRST205',
+          message: 'Could not find the table public.astro_reading_feedback in the schema cache',
+          details: 'Searched for public.astro_reading_feedback',
+        },
+      },
+    })
+
+    await deleteAccountAndUserData({
+      userId: 'user-pgrst205',
+      service: service as never,
+      authUser: { id: 'user-pgrst205', user_metadata: { name: 'Name' } },
+    })
+
+    expect(service.auth.admin.deleteUser).toHaveBeenCalledWith('user-pgrst205')
+  })
+
+  it('skips PGRST204 from optional astro cleanup columns', async () => {
+    const service = buildService({
+      missingColumnErrors: {
+        'astro_reading_feedback.user_id': {
+          code: 'PGRST204',
+          message: 'Could not find the column user_id in the schema cache',
+          details: 'Searched for public.astro_reading_feedback.user_id',
+        },
+      },
+    })
+
+    await deleteAccountAndUserData({
+      userId: 'user-pgrst204',
+      service: service as never,
+      authUser: { id: 'user-pgrst204', user_metadata: { name: 'Name' } },
+    })
+
+    expect(service.auth.admin.deleteUser).toHaveBeenCalledWith('user-pgrst204')
+  })
+
+  it('treats deleted_users PGRST205 as fatal', async () => {
+    const service = buildService({
+      missingTables: ['deleted_users'],
+      missingTableErrors: {
+        deleted_users: {
+          code: 'PGRST205',
+          message: 'Could not find the table public.deleted_users in the schema cache',
+        },
+      },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-deleted-users-table',
+      service: service as never,
+      authUser: { id: 'user-deleted-users-table', user_metadata: { name: 'Name' } },
+    })).rejects.toMatchObject({ stage: 'insert_deleted_users', code: 'PGRST205', table: 'deleted_users' })
+
+    expect(service.auth.admin.deleteUser).not.toHaveBeenCalled()
+  })
+
+  it('treats deleted_users PGRST204 as fatal', async () => {
+    const service = buildService({
+      insertErrors: {
+        deleted_users: {
+          code: 'PGRST204',
+          message: 'Could not find the column name in the schema cache',
+        },
+      },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-deleted-users-column',
+      service: service as never,
+      authUser: { id: 'user-deleted-users-column', user_metadata: { name: 'Name' } },
+    })).rejects.toMatchObject({ stage: 'insert_deleted_users', code: 'PGRST204', table: 'deleted_users' })
+
+    expect(service.auth.admin.deleteUser).not.toHaveBeenCalled()
+  })
+
+  it('tags astro optional cleanup failures with delete_astro_child_rows', async () => {
+    const service = buildService({
+      deleteErrors: {
+        'astro_reading_feedback.user_id': { code: '23503', message: 'foreign key violation' },
+      },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-stage',
+      service: service as never,
+      authUser: { id: 'user-stage', user_metadata: { name: 'Name' } },
+    })).rejects.toMatchObject({ stage: 'delete_astro_child_rows', table: 'astro_reading_feedback', column: 'user_id' })
+  })
+
+  it('succeeds when optional astro cleanup is missing but required deletes are empty', async () => {
+    const service = buildService({
+      missingTableErrors: {
+        astro_reading_feedback: {
+          code: 'PGRST205',
+          message: 'Could not find the table public.astro_reading_feedback in the schema cache',
+        },
+      },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-cleaned',
+      service: service as never,
+      authUser: { id: 'user-cleaned', user_metadata: { name: 'Name' } },
+    })).resolves.toEqual(expect.objectContaining({ ok: true }))
+    expect(service.auth.admin.deleteUser).toHaveBeenCalledWith('user-cleaned')
+  })
+
   it('aborts when deleted_users insert fails', async () => {
     const service = buildService({
-      deleteErrors: { deleted_users: { code: '42501', message: 'permission denied for table deleted_users' } },
+      insertErrors: { deleted_users: { code: '42501', message: 'permission denied for table deleted_users' } },
     })
 
     await expect(deleteAccountAndUserData({

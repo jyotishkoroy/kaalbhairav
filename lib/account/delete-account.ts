@@ -31,7 +31,7 @@ type OwnedIds = {
   sessionIds: string[]
 }
 
-const OPTIONAL_MISSING_ERROR_CODES = new Set(['42P01', '42703'])
+const OPTIONAL_MISSING_ERROR_CODES = new Set(['42P01', '42703', 'PGRST204', 'PGRST205'])
 
 export class AccountDeletionError extends Error {
   stage: string
@@ -59,7 +59,20 @@ function getErrorCode(error: unknown) {
 
 function isMissingTableOrColumnError(error: unknown) {
   const code = getErrorCode(error)
-  return Boolean(code && OPTIONAL_MISSING_ERROR_CODES.has(code))
+  if (code && OPTIONAL_MISSING_ERROR_CODES.has(code)) return true
+  if (!error || typeof error !== 'object') return false
+
+  const typed = error as DbErrorLike
+  const text = [typed.message, typed.details, typed.hint]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    text.includes('could not find the table') ||
+    text.includes('could not find the column') ||
+    text.includes('schema cache')
+  )
 }
 
 function logSafeStage(stage: string, error: unknown, table?: string, column?: string) {
@@ -115,7 +128,6 @@ async function insertDeletedUserRecord(service: ServiceClient, displayName: stri
     .limit(1)
 
   if (selectError) {
-    if (isMissingTableOrColumnError(selectError)) return
     throwStage('insert_deleted_users', selectError, 'deleted_users')
   }
 
@@ -157,10 +169,16 @@ async function collectOwnedIds(service: ServiceClient, userId: string): Promise<
   return { profileIds, calculationIds, chartVersionIds, sessionIds }
 }
 
-async function deleteRowsByUserColumn(service: ServiceClient, table: string, column: string, userId: string) {
+async function deleteRowsByUserColumn(
+  service: ServiceClient,
+  table: string,
+  column: string,
+  userId: string,
+  stage: string,
+) {
   const { error } = await service.from(table).delete().eq(column, userId)
   if (error && !isMissingTableOrColumnError(error)) {
-    throwStage('delete_profile_reference_tables', error, table, column)
+    throwStage(stage, error, table, column)
   }
 }
 
@@ -181,17 +199,24 @@ async function deleteRowsByUserColumns(
   table: string,
   columns: string[],
   userId: string,
+  stage: string,
 ) {
   for (const column of columns) {
-    await deleteRowsByUserColumn(service, table, column, userId)
+    await deleteRowsByUserColumn(service, table, column, userId, stage)
   }
 }
 
-async function deleteRowsByIds(service: ServiceClient, table: string, column: string, ids: string[]) {
+async function deleteRowsByIds(
+  service: ServiceClient,
+  table: string,
+  column: string,
+  ids: string[],
+  stage: string,
+) {
   if (ids.length === 0) return
   const { error } = await service.from(table).delete().in(column, ids)
   if (error && !isMissingTableOrColumnError(error)) {
-    throwStage('delete_astro_child_rows', error, table, column)
+    throwStage(stage, error, table, column)
   }
 }
 
@@ -228,63 +253,63 @@ async function clearBirthProfileCurrentChartPointers(service: ServiceClient, use
 }
 
 async function deleteProfileReferenceTables(service: ServiceClient, userId: string) {
-  await deleteRowsByUserColumns(service, 'admin_audit_log', ['admin_id'], userId)
-  await deleteRowsByUserColumns(service, 'astro_conversations', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'astro_messages', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'birth_charts', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'llm_usage_daily', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'news_bookmarks', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'news_comments', ['user_id'], userId)
+  await deleteRowsByUserColumns(service, 'admin_audit_log', ['admin_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'astro_conversations', ['user_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'astro_messages', ['user_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'birth_charts', ['user_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'llm_usage_daily', ['user_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'news_bookmarks', ['user_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'news_comments', ['user_id'], userId, 'delete_profile_reference_tables')
   await nullColumnIfNullableOrDelete(service, 'news_drafts', 'reviewed_by', userId)
-  await deleteRowsByUserColumns(service, 'news_likes', ['user_id'], userId)
+  await deleteRowsByUserColumns(service, 'news_likes', ['user_id'], userId, 'delete_profile_reference_tables')
   await nullColumnIfNullableOrDelete(service, 'news_posts', 'approved_by', userId)
-  await deleteRowsByUserColumns(service, 'news_posts', ['created_by'], userId)
+  await deleteRowsByUserColumns(service, 'news_posts', ['created_by'], userId, 'delete_profile_reference_tables')
   await nullColumnIfNullableOrDelete(service, 'profiles', 'referred_by', userId)
-  await deleteRowsByUserColumns(service, 'referrals', ['referred_id', 'referrer_id'], userId)
+  await deleteRowsByUserColumns(service, 'referrals', ['referred_id', 'referrer_id'], userId, 'delete_profile_reference_tables')
   await nullColumnIfNullableOrDelete(service, 'site_config', 'updated_by', userId)
-  await deleteRowsByUserColumns(service, 'still_progress', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'still_sessions', ['user_id'], userId)
+  await deleteRowsByUserColumns(service, 'still_progress', ['user_id'], userId, 'delete_profile_reference_tables')
+  await deleteRowsByUserColumns(service, 'still_sessions', ['user_id'], userId, 'delete_profile_reference_tables')
 }
 
 async function deleteAstroChildRows(service: ServiceClient, userId: string, ownedIds: OwnedIds) {
-  await deleteRowsByUserColumns(service, 'astro_chat_messages', ['user_id'], userId)
-  await deleteRowsByIds(service, 'astro_chat_messages', 'session_id', ownedIds.sessionIds)
-  await deleteRowsByIds(service, 'astro_chat_messages', 'profile_id', ownedIds.profileIds)
-  await deleteRowsByIds(service, 'astro_chat_messages', 'chart_version_id', ownedIds.chartVersionIds)
-  await deleteRowsByUserColumns(service, 'astro_chat_sessions', ['user_id'], userId)
-  await deleteRowsByIds(service, 'astro_chat_sessions', 'profile_id', ownedIds.profileIds)
-  await deleteRowsByUserColumns(service, 'astro_reading_feedback', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'astro_companion_memory', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'user_terms_acceptances', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'prediction_ready_summaries', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'calculation_audit_logs', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'astrology_settings', ['user_id'], userId)
-  await deleteRowsByIds(service, 'prediction_ready_summaries', 'chart_version_id', ownedIds.chartVersionIds)
-  await deleteRowsByIds(service, 'calculation_audit_logs', 'chart_version_id', ownedIds.chartVersionIds)
-  await deleteRowsByIds(service, 'calculation_audit_logs', 'calculation_id', ownedIds.calculationIds)
-  await deleteRowsByIds(service, 'prediction_ready_summaries', 'profile_id', ownedIds.profileIds)
-  await deleteRowsByIds(service, 'calculation_audit_logs', 'profile_id', ownedIds.profileIds)
-  await deleteRowsByIds(service, 'astrology_settings', 'profile_id', ownedIds.profileIds)
+  await deleteRowsByUserColumns(service, 'astro_chat_messages', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'astro_chat_messages', 'session_id', ownedIds.sessionIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'astro_chat_messages', 'profile_id', ownedIds.profileIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'astro_chat_messages', 'chart_version_id', ownedIds.chartVersionIds, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'astro_chat_sessions', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'astro_chat_sessions', 'profile_id', ownedIds.profileIds, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'astro_reading_feedback', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'astro_companion_memory', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'user_terms_acceptances', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'prediction_ready_summaries', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'calculation_audit_logs', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'astrology_settings', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'prediction_ready_summaries', 'chart_version_id', ownedIds.chartVersionIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'calculation_audit_logs', 'chart_version_id', ownedIds.chartVersionIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'calculation_audit_logs', 'calculation_id', ownedIds.calculationIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'prediction_ready_summaries', 'profile_id', ownedIds.profileIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'calculation_audit_logs', 'profile_id', ownedIds.profileIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'astrology_settings', 'profile_id', ownedIds.profileIds, 'delete_astro_child_rows')
 }
 
 async function deleteJournalAndReportRows(service: ServiceClient, userId: string) {
-  await deleteRowsByUserColumns(service, 'journal_entries', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'astro_journal_entries', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'saved_reports', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'report_exports', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'chat_messages', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'messages', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'chat_sessions', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'conversations', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'reading_sessions', ['user_id'], userId)
+  await deleteRowsByUserColumns(service, 'journal_entries', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'astro_journal_entries', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'saved_reports', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'report_exports', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'chat_messages', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'messages', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'chat_sessions', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'conversations', ['user_id'], userId, 'delete_astro_child_rows')
+  await deleteRowsByUserColumns(service, 'reading_sessions', ['user_id'], userId, 'delete_astro_child_rows')
 }
 
 async function deleteBirthProfilesAndCharts(service: ServiceClient, userId: string, ownedIds: OwnedIds) {
   await clearBirthProfileCurrentChartPointers(service, userId, ownedIds.profileIds, ownedIds.chartVersionIds)
-  await deleteRowsByIds(service, 'chart_json_versions', 'id', ownedIds.chartVersionIds)
-  await deleteRowsByIds(service, 'chart_calculations', 'id', ownedIds.calculationIds)
-  await deleteRowsByIds(service, 'birth_profiles', 'id', ownedIds.profileIds)
-  await deleteRowsByUserColumn(service, 'birth_profiles', 'user_id', userId)
+  await deleteRowsByIds(service, 'chart_json_versions', 'id', ownedIds.chartVersionIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'chart_calculations', 'id', ownedIds.calculationIds, 'delete_astro_child_rows')
+  await deleteRowsByIds(service, 'birth_profiles', 'id', ownedIds.profileIds, 'delete_astro_child_rows')
+  await deleteRowsByUserColumn(service, 'birth_profiles', 'user_id', userId, 'delete_astro_child_rows')
 }
 
 async function deletePublicProfile(service: ServiceClient, userId: string) {
