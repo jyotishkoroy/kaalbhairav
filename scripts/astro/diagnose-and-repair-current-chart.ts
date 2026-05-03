@@ -5,7 +5,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server";
-import { buildPublicChartFacts, validatePublicChartFacts } from "@/lib/astro/public-chart-facts";
+import { buildPublicChartFacts, extractDeterministicDashaFacts, validatePublicChartFacts } from "@/lib/astro/public-chart-facts";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -35,6 +35,13 @@ type SafeProfileSummary = {
 };
 
 type ChartVersionRow = Record<string, unknown>;
+type ChartCandidateClass = "invalid_wrong_chart" | "repairable_missing_dasha" | "valid_current_candidate";
+type ChartCandidate = {
+  version: ChartVersionRow;
+  facts: ReturnType<typeof buildPublicChartFacts>;
+  validation: ReturnType<typeof validatePublicChartFacts>;
+  className: ChartCandidateClass;
+};
 
 function shortHash(value: string): string {
   let hash = 0;
@@ -202,6 +209,48 @@ function validateExpectedFacts(facts: ReturnType<typeof buildPublicChartFacts>) 
   return failures;
 }
 
+function classifyChartCandidate(facts: ReturnType<typeof buildPublicChartFacts>): ChartCandidateClass {
+  if (facts.lagnaSign === "Virgo") return "invalid_wrong_chart";
+  if (facts.moonSign === "Gemini" && facts.moonHouse === 10) return "invalid_wrong_chart";
+  if (facts.sunSign === "Taurus" && facts.sunHouse === 9) return "invalid_wrong_chart";
+  const repairable = facts.lagnaSign === "Leo"
+    && facts.moonSign === "Gemini"
+    && facts.moonHouse === 11
+    && facts.sunSign === "Taurus"
+    && facts.sunHouse === 10
+    && /Mrigasira|Mrigashira/i.test(String(facts.nakshatra ?? ""));
+  if (repairable && !facts.mahadasha) return "repairable_missing_dasha";
+  return "valid_current_candidate";
+}
+
+function rankCandidate(candidate: ChartCandidate): number {
+  if (candidate.className === "valid_current_candidate" && candidate.validation.ok) return 0;
+  if (candidate.className === "repairable_missing_dasha") return 1;
+  return 2;
+}
+
+function hasExpectedRepairFacts(facts: ReturnType<typeof buildPublicChartFacts>) {
+  return facts.lagnaSign === "Leo"
+    && facts.moonSign === "Gemini"
+    && facts.moonHouse === 11
+    && facts.sunSign === "Taurus"
+    && facts.sunHouse === 10
+    && /Mrigasira|Mrigashira/i.test(String(facts.nakshatra ?? ""));
+}
+
+function withEnrichedDashaFacts(facts: ReturnType<typeof buildPublicChartFacts>, sourceFacts: ReturnType<typeof extractDeterministicDashaFacts>) {
+  return {
+    ...facts,
+    mahadasha: facts.mahadasha ?? sourceFacts.mahadasha,
+    mahadashaStart: facts.mahadashaStart ?? sourceFacts.mahadashaStart,
+    mahadashaEnd: facts.mahadashaEnd ?? sourceFacts.mahadashaEnd,
+    antardashaNow: facts.antardashaNow ?? sourceFacts.antardashaNow,
+    antardashaStart: facts.antardashaStart ?? sourceFacts.antardashaStart,
+    antardashaEnd: facts.antardashaEnd ?? sourceFacts.antardashaEnd,
+    antardashaTimeline: facts.antardashaTimeline ?? sourceFacts.antardashaTimeline,
+  };
+}
+
 async function loadChartVersions(service: ServiceClient, profileId: string, columns: { chartVersions: Set<string> }): Promise<ChartVersionRow[]> {
   const selectCols = Array.from([
     "id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json",
@@ -227,23 +276,43 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
       chartJson: version.chart_json,
     });
     const validation = validatePublicChartFacts(facts);
-    return { version, facts, validation };
+    const className = classifyChartCandidate(facts);
+    return { version, facts, validation, className } satisfies ChartCandidate;
   });
 
-  const valid = versionSummaries.find((row) => row.validation.ok);
-  if (!valid) throw new Error("chart_not_ready");
+  const candidates = versionSummaries
+    .filter((row) => row.className !== "invalid_wrong_chart")
+    .sort((a, b) => {
+      const rank = rankCandidate(a) - rankCandidate(b);
+      if (rank !== 0) return rank;
+      const aCreated = String(a.version.created_at ?? "");
+      const bCreated = String(b.version.created_at ?? "");
+      return bCreated.localeCompare(aCreated);
+    });
+  const selected = candidates[0];
+  if (!selected) throw new Error("chart_not_ready");
 
-  const failures = validateExpectedFacts(valid.facts);
-  if (failures.length > 0) {
-    throw new Error(failures.join("; "));
-  }
+  const dashaSource = extractDeterministicDashaFacts({
+    chartJson: selected.version.chart_json,
+    predictionSummary: selected.version.prediction_summary,
+    reportFacts: selected.version.report_derived_facts ?? selected.version.reportFacts,
+  });
+  const enrichedFacts = withEnrichedDashaFacts(selected.facts, dashaSource);
+  const finalValidation = validatePublicChartFacts(enrichedFacts);
+  const failures = validateExpectedFacts(enrichedFacts);
+  if (selected.className === "repairable_missing_dasha" && !enrichedFacts.mahadasha) failures.push("calculation_or_source_validation_failed: missing Mahadasha enrichment");
+  if (selected.className === "repairable_missing_dasha" && !hasExpectedRepairFacts(enrichedFacts)) failures.push("calculation_or_source_validation_failed: repair candidate mismatch");
+  if (!finalValidation.ok || failures.length > 0) throw new Error(["calculation_or_source_validation_failed", ...failures].join("; "));
 
   if (mode === "dry-run") {
     return {
-      selectedVersionId: String(valid.version.id),
-      facts: valid.facts,
+      selectedVersionId: String(selected.version.id),
+      selectedClass: selected.className,
+      dashaSource: dashaSource.source,
+      facts: enrichedFacts,
       plan: {
-        clearCurrent: columns.chartVersions.has("is_current"),
+        markAllChartVersionsNotCurrent: columns.chartVersions.has("is_current"),
+        createRepairedChartVersion: selected.className === "repairable_missing_dasha",
         updateProfilePointer: columns.birthProfiles.has("current_chart_version_id"),
       },
       versions: versionSummaries,
@@ -258,10 +327,36 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   }
 
   const now = new Date().toISOString();
+  const insertPayload = {
+    profile_id: profileId,
+    chart_version: Number(selected.version.chart_version ?? 0) + 1000,
+    input_hash: selected.version.input_hash ?? null,
+    settings_hash: selected.version.settings_hash ?? null,
+    chart_json: {
+      ...(typeof selected.version.chart_json === "object" && selected.version.chart_json ? selected.version.chart_json as Record<string, unknown> : {}),
+      public_facts: {
+        ...(typeof selected.version.chart_json === "object" && selected.version.chart_json && typeof (selected.version.chart_json as Record<string, unknown>).public_facts === "object" ? (selected.version.chart_json as Record<string, unknown>).public_facts as Record<string, unknown> : {}),
+        mahadasha: enrichedFacts.mahadasha,
+        mahadasha_start: enrichedFacts.mahadashaStart ?? null,
+        mahadasha_end: enrichedFacts.mahadashaEnd ?? null,
+        antardasha_now: enrichedFacts.antardashaNow ?? null,
+        antardasha_start: enrichedFacts.antardashaStart ?? null,
+        antardasha_end: enrichedFacts.antardashaEnd ?? null,
+      },
+    },
+    is_current: true,
+    status: "completed",
+    created_at: now,
+    updated_at: now,
+    repaired_from_chart_version_id: String(selected.version.id),
+  };
+  const insertResult = await service.from("chart_json_versions").insert(insertPayload).select("id").single();
+  if (insertResult.error) throw new Error(String((insertResult.error as { message?: string } | null)?.message ?? insertResult.error));
+  const newChartVersionId = String((insertResult.data as Record<string, unknown>).id);
   const updates = await Promise.all([
     service.from("chart_json_versions").update({ is_current: false }).eq("profile_id", profileId),
-    service.from("chart_json_versions").update({ is_current: true, status: "completed", updated_at: now }).eq("id", valid.version.id),
-    service.from("birth_profiles").update({ current_chart_version_id: valid.version.id }).eq("id", profileId),
+    service.from("chart_json_versions").update({ is_current: true, status: "completed", updated_at: now }).eq("id", newChartVersionId),
+    service.from("birth_profiles").update({ current_chart_version_id: newChartVersionId }).eq("id", profileId),
   ]);
   for (const result of updates) {
     if (result && typeof result === "object" && "error" in result && result.error) {
@@ -270,8 +365,10 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   }
 
   return {
-    selectedVersionId: String(valid.version.id),
-    facts: valid.facts,
+    selectedVersionId: newChartVersionId,
+    selectedClass: selected.className,
+    dashaSource: dashaSource.source,
+    facts: enrichedFacts,
   };
 }
 
@@ -334,6 +431,7 @@ export async function main(argv = process.argv.slice(2)) {
         mangal_dosha: facts.mangalDosha ?? null,
         kalsarpa_yoga: facts.kalsarpaYoga ?? null,
       },
+      className: classifyChartCandidate(facts),
       validation,
     }, null, 2));
   }
@@ -343,18 +441,22 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(JSON.stringify({
       action: "dry-run",
       selected_chart_version_id: result.selectedVersionId,
+      selected_class: result.selectedClass,
+      dasha_source: result.dashaSource,
       plan: result.plan,
       facts: result.facts,
     }, null, 2));
     return 0;
   }
 
-  console.log(JSON.stringify({
-    action: "apply",
-    profile_id: summary.profileId,
-    selected_chart_version_id: result.selectedVersionId,
-    facts: result.facts,
-  }, null, 2));
+    console.log(JSON.stringify({
+      action: "apply",
+      profile_id: summary.profileId,
+      selected_chart_version_id: result.selectedVersionId,
+      selected_class: result.selectedClass,
+      dasha_source: result.dashaSource,
+      facts: result.facts,
+    }, null, 2));
   return 0;
 }
 

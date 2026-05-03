@@ -87,10 +87,89 @@ function bool(root: unknown, ...paths: string[][]): boolean | undefined {
   }
   return undefined;
 }
+function readTimeline(root: unknown): Array<{ mahadasha: string; antardasha: string; startDate?: string; endDate?: string }> {
+  const source = str(root, ["prediction_ready_summaries", "current_timing_summary"]) ? undefined : undefined;
+  void source;
+  const candidates = [
+    (isRecord(root) ? (root as Record<string, unknown>)["antardashaTimeline"] : undefined),
+    (isRecord(root) ? (root as Record<string, unknown>)["mahadasha_sequence"] : undefined),
+    str(root, ["timing_signatures", "mahadasha_sequence"]) ? undefined : undefined,
+  ];
+  const list = candidates.find(Array.isArray);
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((row) => {
+    if (!isRecord(row)) return [];
+    const mahadasha = str(row, ["mahadasha"], ["major"], ["lord"], ["name"]);
+    const antardasha = str(row, ["antardasha"], ["minor"], ["sub_lord"], ["subLord"]);
+    if (!mahadasha || !antardasha) return [];
+    return [{
+      mahadasha,
+      antardasha,
+      startDate: str(row, ["startDate"], ["start_date"], ["from"]),
+      endDate: str(row, ["endDate"], ["end_date"], ["to"]),
+    }];
+  });
+}
 function canonSign(s: string | undefined): string | undefined {
   if (!s) return undefined;
   const m: Record<string, string> = { aries:"Aries",taurus:"Taurus",gemini:"Gemini",cancer:"Cancer",leo:"Leo",virgo:"Virgo",libra:"Libra",scorpio:"Scorpio",sagittarius:"Sagittarius",capricorn:"Capricorn",aquarius:"Aquarius",pisces:"Pisces" };
   return m[s.toLowerCase().trim()] ?? s.trim();
+}
+
+function readDashaValue(root: unknown): string | undefined {
+  return canonSign(
+    str(root,
+      ["public_facts", "mahadasha"], ["publicFacts", "mahadasha"], ["publicFacts", "currentMahadasha"],
+      ["public_facts", "currentMahadasha"], ["public_facts", "current_mahadasha"], ["publicFacts", "current_mahadasha"],
+      ["dasha", "mahadasha"], ["dasha", "currentMahadasha"], ["dasha", "major"], ["dasha", "current", "mahadasha"], ["dasha", "current", "major"],
+      ["vimshottari", "mahadasha"], ["vimshottari", "currentMahadasha"], ["dashas", "current", "mahadasha"], ["dashas", "current", "major"],
+      ["prediction_summary", "mahadasha"], ["predictionSummary", "mahadasha"],
+      ["report_derived_facts", "mahadasha"], ["reportDerivedFacts", "mahadasha"],
+      ["mahadasha"], ["currentMahadasha"], ["current_mahadasha"],
+    ) ?? str(root, ["current_timing_summary"])?.match(/\b(Jupiter|Saturn|Mercury|Venus|Mars|Sun|Moon|Rahu|Ketu)\b/i)?.[1]
+  );
+}
+
+export function extractDeterministicDashaFacts(input: {
+  chartJson?: unknown;
+  predictionSummary?: unknown;
+  reportFacts?: unknown;
+}): {
+  mahadasha?: string;
+  mahadashaStart?: string;
+  mahadashaEnd?: string;
+  antardashaNow?: string;
+  antardashaStart?: string;
+  antardashaEnd?: string;
+  antardashaTimeline?: Array<{ mahadasha: string; antardasha: string; startDate?: string; endDate?: string }>;
+  source: string | null;
+} {
+  const sources = [
+    ["chartJson", input.chartJson],
+    ["predictionSummary", input.predictionSummary],
+    ["reportFacts", input.reportFacts],
+  ] as const;
+  for (const [sourceName, root] of sources) {
+    const mahadasha = readDashaValue(root);
+    const antardashaNow = canonSign(
+      str(root,
+        ["public_facts", "antardasha_now"], ["publicFacts", "antardashaNow"],
+        ["public_facts", "currentAntardasha"], ["publicFacts", "currentAntardasha"],
+        ["dasha", "antardasha"], ["dasha", "currentAntardasha"], ["dasha", "current", "antardasha"],
+        ["vimshottari", "antardasha"], ["dashas", "current", "antardasha"],
+        ["antardashaNow"], ["currentAntardasha"], ["current_antardasha"]
+      )
+    );
+    const mahadashaStart = str(root, ["public_facts", "mahadasha_start"], ["publicFacts", "mahadashaStart"], ["mahadashaStart"], ["mahadasha_start"], ["dasha", "startDate"], ["vimshottari", "currentMahadasha", "startDate"]);
+    const mahadashaEnd = str(root, ["public_facts", "mahadasha_end"], ["publicFacts", "mahadashaEnd"], ["mahadashaEnd"], ["mahadasha_end"], ["dasha", "endDate"], ["vimshottari", "currentMahadasha", "endDate"]);
+    const antardashaStart = str(root, ["public_facts", "antardasha_start"], ["publicFacts", "antardashaStart"], ["antardashaStart"], ["antardasha_start"]);
+    const antardashaEnd = str(root, ["public_facts", "antardasha_end"], ["publicFacts", "antardashaEnd"], ["antardashaEnd"], ["antardasha_end"]);
+    const antardashaTimeline = readTimeline(root);
+    if (mahadasha || antardashaNow || mahadashaStart || mahadashaEnd || antardashaTimeline.length) {
+      return { mahadasha, mahadashaStart, mahadashaEnd, antardashaNow, antardashaStart, antardashaEnd, antardashaTimeline: antardashaTimeline.length ? antardashaTimeline : undefined, source: sourceName };
+    }
+  }
+  return { source: null };
 }
 
 function extractPlacements(chartJson: unknown, lagnaSign?: string): Record<string, PublicPlanetPlacement> {
@@ -220,11 +299,8 @@ export function buildPublicChartFacts(input: {
   const westernSunSign = str(chartJson, ["westernSunSign"], ["tropicalSunSign"], ["western_sun_sign"])
     ?? str(predictionSummary, ["westernSunSign"], ["western_sun_sign"]);
 
-  const mahadasha = str(chartJson,
-    ["public_facts","mahadasha"], ["publicFacts","mahadasha"], ["public_facts","current_mahadasha"], ["publicFacts","currentMahadasha"], ["mahadasha"], ["currentMahadasha"]
-  ) ?? str(predictionSummary,
-    ["public_facts","mahadasha"], ["publicFacts","mahadasha"], ["mahadasha"], ["currentMahadasha"]
-  ) ?? str(reportFacts, ["mahadasha"], ["currentMahadasha"]);
+  const dashaFacts = extractDeterministicDashaFacts({ chartJson, predictionSummary, reportFacts });
+  const mahadasha = dashaFacts.mahadasha;
 
   const mahadashaStart = str(chartJson,
     ["public_facts","mahadasha_start"], ["publicFacts","mahadashaStart"], ["public_facts","current_mahadasha_start"], ["publicFacts","currentMahadashaStart"], ["mahadashaStart"], ["mahadasha_start"]
@@ -232,31 +308,10 @@ export function buildPublicChartFacts(input: {
   const mahadashaEnd = str(chartJson,
     ["public_facts","mahadasha_end"], ["publicFacts","mahadashaEnd"], ["public_facts","current_mahadasha_end"], ["publicFacts","currentMahadashaEnd"], ["mahadashaEnd"], ["mahadasha_end"]
   ) ?? str(predictionSummary, ["public_facts","mahadasha_end"], ["publicFacts","mahadashaEnd"], ["mahadashaEnd"], ["mahadasha_end"]);
-  const antardashaNow = str(chartJson,
-    ["public_facts","antardasha_now"], ["publicFacts","antardashaNow"], ["public_facts","current_antardasha"], ["publicFacts","currentAntardasha"], ["antardashaNow"], ["currentAntardasha"]
-  ) ?? str(predictionSummary, ["public_facts","antardasha_now"], ["publicFacts","antardashaNow"], ["antardashaNow"], ["currentAntardasha"]);
-
-  // Try to find antardasha end date from timeline
-  let antardashaEnd: string | undefined;
-  let antardashaStart: string | undefined;
-  const timelineSrc = isRecord(chartJson) ? (chartJson as Record<string, unknown>)["antardashaTimeline"] ?? (chartJson as Record<string, unknown>)["mahadasha_sequence"] : undefined;
-  const timelineArr = Array.isArray(timelineSrc) ? timelineSrc : (isRecord(predictionSummary) ? ((predictionSummary as Record<string, unknown>)["antardashaTimeline"]) : undefined);
-  const antardashaTimeline: Array<{ mahadasha: string; antardasha: string; startDate?: string; endDate?: string }> = [];
-  if (Array.isArray(timelineArr)) {
-    for (const row of timelineArr) {
-      if (!isRecord(row)) continue;
-      const md = str(row, ["mahadasha"], ["lord"], ["name"]);
-      const ad = str(row, ["antardasha"], ["sub_lord"]);
-      if (!md || !ad) continue;
-      const startDate = str(row, ["startDate"], ["start_date"], ["from"]);
-      const endDate = str(row, ["endDate"], ["end_date"], ["to"]);
-      antardashaTimeline.push({ mahadasha: md, antardasha: ad, startDate, endDate });
-      if (antardashaNow && (antardashaNow.includes(ad) || (md + "-" + ad) === antardashaNow)) {
-        antardashaStart = startDate;
-        antardashaEnd = endDate;
-      }
-    }
-  }
+  const antardashaNow = dashaFacts.antardashaNow;
+  const antardashaStart = dashaFacts.antardashaStart;
+  const antardashaEnd = dashaFacts.antardashaEnd;
+  const antardashaTimeline = dashaFacts.antardashaTimeline ?? [];
 
   const mangalDosha = bool(chartJson,
     ["public_facts","mangal_dosha"], ["publicFacts","mangalDosha"], ["public_facts","manglik"], ["publicFacts","manglik"], ["mangalDosha"], ["manglik"]

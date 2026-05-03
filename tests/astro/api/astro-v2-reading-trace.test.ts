@@ -41,6 +41,7 @@ describe("/api/astro/v2/reading trace exposure", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    delete process.env.ASTRO_E2E_TRACE_ENABLED;
     readMock.mockClear();
   });
 
@@ -52,6 +53,7 @@ describe("/api/astro/v2/reading trace exposure", () => {
 
   it("requires env flag in production", async () => {
     setEnv("NODE_ENV", "production");
+    setEnv("ASTRO_E2E_TRACE_ENABLED", "false");
     const response = await POST(req({ question: "What is my Lagna?", metadata: { debugTrace: true } }, true));
     const payload = await response.json();
     expect(payload.meta.e2eTrace).toBeUndefined();

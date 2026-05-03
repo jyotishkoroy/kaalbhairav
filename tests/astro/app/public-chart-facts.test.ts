@@ -11,6 +11,7 @@ import {
   formatPublicChartBasis,
   computeWholeSignHouse,
   sanitizeVisibleAstroAnswer,
+  extractDeterministicDashaFacts,
 } from "@/lib/astro/public-chart-facts";
 
 const leoChartJson = {
@@ -74,6 +75,32 @@ describe("buildPublicChartFacts from predictionSummary.public_facts", () => {
   it("extracts lagnaSign from predictionSummary", () => expect(facts.lagnaSign).toBe("Leo"));
   it("extracts moonSign from predictionSummary", () => expect(facts.moonSign).toBe("Gemini"));
   it("extracts mahadasha from predictionSummary", () => expect(facts.mahadasha).toBe("Jupiter"));
+});
+
+describe("buildPublicChartFacts from dasha-shaped sources", () => {
+  it("extracts mahadasha from nested dasha/current shapes", () => {
+    const facts = buildPublicChartFacts({
+      profileId: "p4",
+      chartVersionId: "cv4",
+      chartJson: {
+        lagna: { sign: "Leo" },
+        planets: { Moon: { sign: "Gemini", house: 11 }, Sun: { sign: "Taurus", house: 10 } },
+        dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } },
+        nakshatra: "Mrigashira",
+        nakshatraPada: 4,
+      },
+    });
+    expect(facts.mahadasha).toBe("Jupiter");
+    expect(facts.antardashaNow).toBe("Ketu");
+  });
+
+  it("extracts mahadasha from prediction_ready_summaries current_timing_summary", () => {
+    const dasha = extractDeterministicDashaFacts({
+      predictionSummary: { current_timing_summary: "Mahadasha: Jupiter. Antardasha: Ketu" },
+    });
+    expect(dasha.mahadasha).toBe("Jupiter");
+    expect(dasha.source).toBe("predictionSummary");
+  });
 });
 
 // ── 3. Merges chartJson and predictionSummary without losing facts ────────
