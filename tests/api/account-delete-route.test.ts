@@ -21,6 +21,8 @@ vi.mock('@/lib/account/delete-account', async (importOriginal) => {
   return {
     ...actual,
     deleteAccountAndUserData: vi.fn(),
+    generateAccountDeletionFeedbackToken: vi.fn(() => 'test-token'),
+    hashAccountDeletionFeedbackToken: vi.fn(() => 'hashed-token'),
   }
 })
 
@@ -44,12 +46,16 @@ describe('DELETE /api/account/delete', () => {
     vi.mocked(createClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1', email: 'x@y.com', user_metadata: { full_name: 'X' } } } }) },
     } as never)
-    vi.mocked(createServiceClient).mockReturnValue({} as never)
-    vi.mocked(deleteAccountAndUserData).mockResolvedValue({ ok: true, name: 'X' } as never)
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: vi.fn(() => ({
+        insert: vi.fn(() => Promise.resolve({ error: null })),
+      })),
+    } as never)
+    vi.mocked(deleteAccountAndUserData).mockResolvedValue({ ok: true, name: 'X', deletedUserId: 'deleted-1' } as never)
 
     const res = await DELETE(makeReq())
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ok: true })
+    expect(await res.json()).toEqual({ ok: true, redirectTo: '/account-deleted?token=test-token' })
     expect(deleteAccountAndUserData).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1' }))
   })
 

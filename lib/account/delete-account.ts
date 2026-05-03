@@ -5,6 +5,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { createHash, randomBytes } from 'node:crypto'
 
 type ServiceClient = SupabaseClient
 
@@ -131,15 +132,16 @@ async function insertDeletedUserRecord(service: ServiceClient, displayName: stri
     throwStage('insert_deleted_users', selectError, 'deleted_users')
   }
 
-  if ((existing?.length ?? 0) > 0) return
+  if ((existing?.length ?? 0) > 0 && existing?.[0]?.id) return existing[0].id as string
 
-  const { error } = await service.from('deleted_users').insert({
+  const { data, error } = await service.from('deleted_users').insert({
     name: displayName,
     deletion_source: 'account_settings',
-  })
+  }).select('id')
   if (error) {
     throwStage('insert_deleted_users', error, 'deleted_users')
   }
+  return data?.[0]?.id ?? null
 }
 
 async function collectOwnedIds(service: ServiceClient, userId: string): Promise<OwnedIds> {
@@ -330,7 +332,7 @@ export async function deleteAccountAndUserData(params: DeleteAccountParams) {
   resolveAuthenticatedUser(params)
   const displayName = resolveDisplayName(params)
 
-  await insertDeletedUserRecord(params.service, displayName)
+  const deletedUserId = await insertDeletedUserRecord(params.service, displayName)
 
   const ownedIds = await collectOwnedIds(params.service, params.userId)
 
@@ -345,5 +347,13 @@ export async function deleteAccountAndUserData(params: DeleteAccountParams) {
     throwStage('delete_auth_user', authDeleteError, 'auth.users')
   }
 
-  return { ok: true, name: displayName }
+  return { ok: true, name: displayName, deletedUserId }
+}
+
+export function generateAccountDeletionFeedbackToken() {
+  return randomBytes(32).toString('base64url')
+}
+
+export function hashAccountDeletionFeedbackToken(token: string) {
+  return createHash('sha256').update(token).digest('hex')
 }

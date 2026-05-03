@@ -55,9 +55,13 @@ function buildService(options?: {
         insert: vi.fn((payload: unknown) => {
           calls.push({ table, method: 'insert', args: [payload] })
           if (insertErrors[table]) {
-            return Promise.resolve({ error: insertErrors[table] })
+            const result = Promise.resolve({ data: null, error: insertErrors[table] })
+            ;(result as { select?: unknown }).select = vi.fn(() => result)
+            return result
           }
-          return Promise.resolve({ error: null })
+          const result = Promise.resolve({ data: [{ id: `${table}-row-1` }], error: null })
+          ;(result as { select?: unknown }).select = vi.fn(() => result)
+          return result
         }),
         delete: vi.fn(() => ({
           eq: vi.fn((column: string, value: unknown) => {

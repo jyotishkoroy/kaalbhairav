@@ -32,7 +32,7 @@ describe('DeleteAccountButton', () => {
     await expect(deleteAccountFlow({
       confirmImpl,
       fetchImpl: fetchImpl as never,
-    })).resolves.toEqual({ status: 'success' })
+    })).resolves.toEqual({ status: 'success', redirectTo: '/account-deleted' })
 
     expect(fetchImpl).toHaveBeenCalledWith('/api/account/delete', {
       method: 'DELETE',
@@ -89,8 +89,8 @@ describe('DeleteAccountButton', () => {
       fetchImpl: fetchImpl as never,
     })
 
-    expect(firstResult).toEqual({ status: 'success' })
-    expect(secondResult).toEqual({ status: 'success' })
+    expect(firstResult).toEqual({ status: 'success', redirectTo: '/account-deleted' })
+    expect(secondResult).toEqual({ status: 'success', redirectTo: '/account-deleted' })
   })
 
   it('returns cancelled when confirmation is cancelled and leaves fetch unused', async () => {

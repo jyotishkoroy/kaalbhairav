@@ -7,7 +7,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { assertSameOriginRequest } from '@/lib/security/request-guards'
-import { AccountDeletionError, deleteAccountAndUserData } from '@/lib/account/delete-account'
+import {
+  AccountDeletionError,
+  deleteAccountAndUserData,
+  generateAccountDeletionFeedbackToken,
+  hashAccountDeletionFeedbackToken,
+} from '@/lib/account/delete-account'
 
 export const runtime = 'nodejs'
 
@@ -26,14 +31,32 @@ export async function DELETE(req: NextRequest) {
   const service = createServiceClient()
 
   try {
-    await deleteAccountAndUserData({
+    const deletionResult = await deleteAccountAndUserData({
       userId: user.id,
       displayNameFallback: user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email ?? 'Deleted user',
       service,
       authUser: user,
     })
 
-    return NextResponse.json({ ok: true })
+    let redirectTo = '/account-deleted'
+    try {
+      const token = generateAccountDeletionFeedbackToken()
+      const tokenHash = hashAccountDeletionFeedbackToken(token)
+      if (deletionResult.deletedUserId) {
+        const { error } = await service.from('account_deletion_feedback_tokens').insert({
+          deleted_user_id: deletionResult.deletedUserId,
+          token_hash: tokenHash,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        if (!error) {
+          redirectTo = `/account-deleted?token=${token}`
+        }
+      }
+    } catch {
+      redirectTo = '/account-deleted'
+    }
+
+    return NextResponse.json({ ok: true, redirectTo })
   } catch (error) {
     const safeError = error instanceof AccountDeletionError
       ? {
