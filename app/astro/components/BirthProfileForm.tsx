@@ -1,9 +1,9 @@
 'use client'
 
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import { useState } from 'react'
@@ -11,51 +11,108 @@ import { useRouter } from 'next/navigation'
 
 type FormState = 'idle' | 'submitting' | 'calculating' | 'error'
 
-export function BirthProfileForm() {
+type Props = {
+  googleName: string
+  googleEmail: string
+  hasProfile: boolean
+  initialStep?: string
+}
+
+const TERMS_VERSION = 'tarayai-astro-v1-2026-05-03'
+
+export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialStep }: Props) {
   const router = useRouter()
   const [state, setState] = useState<FormState>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [showTerms, setShowTerms] = useState(initialStep === 'terms')
+  const [pendingPayload, setPendingPayload] = useState<null | Record<string, unknown>>(null)
+  const [birthTimeUnknown, setBirthTimeUnknown] = useState(false)
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const birthDate = String(formData.get('birth_date') || '')
+    const birthTime = birthTimeUnknown ? null : (String(formData.get('birth_time') || '') || null)
+    const birthPlace = String(formData.get('birth_place_name') || '')
+    const aboutSelf = String(formData.get('about_self') || '') || undefined
+
+    if (!birthDate) { setError('Birth date is required.'); return }
+    if (!birthPlace) { setError('Birth place is required.'); return }
+
     setState('submitting')
 
-    const formData = new FormData(event.currentTarget)
-    const birthTimeKnown = formData.get('birth_time_known') === 'on'
-
-    const profilePayload = {
-      display_name: String(formData.get('display_name') || ''),
-      birth_date: String(formData.get('birth_date') || ''),
-      birth_time: birthTimeKnown ? String(formData.get('birth_time') || '') : null,
-      birth_time_known: birthTimeKnown,
-      birth_time_precision: birthTimeKnown ? 'exact_to_minute' : 'unknown',
-      birth_place_name: String(formData.get('birth_place_name') || ''),
-      latitude: Number(formData.get('latitude')),
-      longitude: Number(formData.get('longitude')),
-      timezone: String(formData.get('timezone') || ''),
-      gender: 'not_provided',
-      calendar_system: 'gregorian',
-      data_consent_version: 'astro-v1-2026-04-25',
+    // Resolve place to coordinates server-side via a small helper endpoint
+    let latitude: number, longitude: number, timezone: string
+    try {
+      const geoResp = await fetch('/api/astro/resolve-place', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ place: birthPlace }),
+      })
+      const geoData = await geoResp.json()
+      if (!geoResp.ok || !geoData.latitude) {
+        setState('error')
+        setError(geoData?.error || 'Could not find this birth place. Please try a more specific city name.')
+        return
+      }
+      latitude = geoData.latitude
+      longitude = geoData.longitude
+      timezone = geoData.timezone
+    } catch {
+      setState('error')
+      setError('Could not look up birth place. Please check your connection and try again.')
+      return
     }
 
-    const profileResponse = await fetch('/api/astro/profile', {
+    const payload: Record<string, unknown> = {
+      birth_date: birthDate,
+      birth_time: birthTime || null,
+      birth_time_known: !birthTimeUnknown && !!birthTime,
+      birth_time_precision: birthTimeUnknown ? 'unknown' : (birthTime ? 'exact' : 'unknown'),
+      birth_place_name: birthPlace,
+      latitude,
+      longitude,
+      timezone,
+      about_self: aboutSelf,
+      calendar_system: 'gregorian',
+      data_consent_version: 'astro-v1-2026-04-25',
+      terms_accepted_version: TERMS_VERSION,
+    }
+
+    setPendingPayload(payload)
+    setState('idle')
+    setShowTerms(true)
+  }
+
+  async function acceptTermsAndSave() {
+    if (!pendingPayload) return
+    setShowTerms(false)
+    setState('submitting')
+    setError(null)
+
+    const profileResponse = await fetch('/api/astro/v1/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(profilePayload),
+      body: JSON.stringify(pendingPayload),
     })
 
     const profileJson = await profileResponse.json()
 
     if (!profileResponse.ok) {
       setState('error')
-      setError(profileJson?.error || 'Profile creation failed')
+      setError(
+        profileJson?.message ||
+        profileJson?.error ||
+        'Profile save failed. Please try again.',
+      )
       return
     }
 
     setState('calculating')
 
-    const calculateResponse = await fetch('/api/astro/calculate', {
+    const calculateResponse = await fetch('/api/astro/v1/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile_id: profileJson.profile_id }),
@@ -65,81 +122,164 @@ export function BirthProfileForm() {
 
     if (!calculateResponse.ok) {
       setState('error')
-      setError(calculateJson?.error || 'Calculation failed')
+      setError(calculateJson?.error || 'Chart calculation failed. Please try again.')
       return
     }
 
-    router.push(`/astro/chart/${profileJson.profile_id}`)
+    router.push('/astro')
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.14)',
+    borderRadius: '8px',
+    padding: '0.75rem 1rem',
+    color: '#f0e8d8',
+    fontSize: '0.95rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.82rem',
+    color: 'rgba(240,232,216,0.65)',
+    marginBottom: '0.4rem',
+  }
+
+  const fieldStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0' }
+
+  const busy = state === 'submitting' || state === 'calculating'
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6">
-      <div>
-        <label className="block text-sm font-medium text-zinc-900" htmlFor="display_name">
-          Profile name
-        </label>
-        <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="display_name" name="display_name" required />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-zinc-900" htmlFor="birth_date">
-          Birth date
-        </label>
-        <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="birth_date" name="birth_date" type="date" required />
-      </div>
-
-      <div>
-        <label className="flex items-center gap-2 text-sm font-medium text-zinc-900">
-          <input name="birth_time_known" type="checkbox" defaultChecked />
-          Birth time is known
-        </label>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-zinc-900" htmlFor="birth_time">
-          Birth time
-        </label>
-        <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="birth_time" name="birth_time" type="time" />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-zinc-900" htmlFor="birth_place_name">
-          Birth place
-        </label>
-        <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="birth_place_name" name="birth_place_name" placeholder="Kolkata, India" required />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-zinc-900" htmlFor="latitude">
-            Latitude
-          </label>
-          <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="latitude" name="latitude" type="number" step="any" placeholder="22.5667" required />
+    <>
+      {/* Terms modal */}
+      {showTerms && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem',
+        }}>
+          <div style={{
+            background: '#141210', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px',
+            padding: '2rem', maxWidth: '420px', width: '100%', color: '#f0e8d8',
+          }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '1rem' }}>Terms of use</h2>
+            <p style={{ fontSize: '0.88rem', lineHeight: '1.7', color: 'rgba(240,232,216,0.7)', marginBottom: '1rem' }}>
+              Tarayai provides astrology guidance for reflection and symbolism only — not medical, financial, legal, or life advice. Guidance is not a prediction or guarantee. By continuing you agree to these terms.
+            </p>
+            <p style={{ fontSize: '0.78rem', color: 'rgba(240,232,216,0.45)', marginBottom: '1.5rem' }}>
+              Your birth details are stored encrypted and are not shared with third parties.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => { setShowTerms(false); setPendingPayload(null) }}
+                style={{
+                  flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '999px', padding: '0.6rem 1rem', color: 'rgba(240,232,216,0.7)',
+                  cursor: 'pointer', fontSize: '0.88rem',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={acceptTermsAndSave}
+                style={{
+                  flex: 2, background: 'rgba(181,150,98,0.85)', border: 'none', borderRadius: '999px',
+                  padding: '0.6rem 1rem', color: '#0a0806', fontWeight: '600', cursor: 'pointer', fontSize: '0.88rem',
+                }}
+              >
+                I accept — continue
+              </button>
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-900" htmlFor="longitude">
-            Longitude
-          </label>
-          <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="longitude" name="longitude" type="number" step="any" placeholder="88.3667" required />
+      )}
+
+      {/* Identity — read-only from Google */}
+      <div style={{ marginBottom: '1.5rem', padding: '0.875rem 1rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}>
+        <p style={{ fontSize: '0.8rem', color: 'rgba(240,232,216,0.45)', marginBottom: '0.25rem' }}>Signed in as</p>
+        <p style={{ fontSize: '0.95rem', fontWeight: '500' }}>{googleName}</p>
+        <p style={{ fontSize: '0.82rem', color: 'rgba(240,232,216,0.5)' }}>{googleEmail}</p>
+      </div>
+
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+        <div style={fieldStyle}>
+          <label style={labelStyle} htmlFor="birth_date">Date of birth</label>
+          <input id="birth_date" name="birth_date" type="date" required disabled={busy} style={inputStyle} />
         </div>
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-900" htmlFor="timezone">
-          Timezone
-        </label>
-        <input className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2" id="timezone" name="timezone" placeholder="Asia/Kolkata" required />
-      </div>
+        <div style={fieldStyle}>
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={birthTimeUnknown}
+              onChange={(e) => setBirthTimeUnknown(e.target.checked)}
+              disabled={busy}
+            />
+            I don&apos;t know my birth time
+          </label>
+        </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {!birthTimeUnknown && (
+          <div style={fieldStyle}>
+            <label style={labelStyle} htmlFor="birth_time">Time of birth</label>
+            <input id="birth_time" name="birth_time" type="time" disabled={busy} style={inputStyle} />
+          </div>
+        )}
 
-      <button
-        className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        disabled={state === 'submitting' || state === 'calculating'}
-        type="submit"
-      >
-        {state === 'submitting' ? 'Saving...' : state === 'calculating' ? 'Calculating...' : 'Create V1 chart'}
-      </button>
-    </form>
+        <div style={fieldStyle}>
+          <label style={labelStyle} htmlFor="birth_place_name">Place of birth</label>
+          <input
+            id="birth_place_name"
+            name="birth_place_name"
+            type="text"
+            placeholder="Kolkata, India"
+            required
+            disabled={busy}
+            style={inputStyle}
+          />
+          <p style={{ fontSize: '0.75rem', color: 'rgba(240,232,216,0.35)', marginTop: '0.3rem' }}>
+            City and country. Coordinates are resolved automatically.
+          </p>
+        </div>
+
+        <div style={fieldStyle}>
+          <label style={labelStyle} htmlFor="about_self">About yourself <span style={{ color: 'rgba(240,232,216,0.35)' }}>(optional)</span></label>
+          <textarea
+            id="about_self"
+            name="about_self"
+            placeholder="Share any context that may help guide the reading…"
+            rows={3}
+            maxLength={2000}
+            disabled={busy}
+            style={{ ...inputStyle, resize: 'vertical' }}
+          />
+        </div>
+
+        {error && (
+          <p style={{ color: '#e07070', fontSize: '0.88rem' }}>{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy}
+          style={{
+            background: busy ? 'rgba(181,150,98,0.35)' : 'rgba(181,150,98,0.85)',
+            color: busy ? 'rgba(240,232,216,0.45)' : '#0a0806',
+            border: 'none',
+            borderRadius: '999px',
+            padding: '0.75rem',
+            fontWeight: '600',
+            fontSize: '0.95rem',
+            cursor: busy ? 'not-allowed' : 'pointer',
+            width: '100%',
+          }}
+        >
+          {state === 'submitting' ? 'Saving…' : state === 'calculating' ? 'Calculating chart…' : hasProfile ? 'Update birth details' : 'Continue'}
+        </button>
+      </form>
+    </>
   )
 }

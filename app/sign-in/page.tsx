@@ -1,14 +1,27 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignInButton from './sign-in-button'
 
-export default async function SignInPage() {
+type Props = {
+  searchParams: Promise<{ next?: string }>
+}
+
+export default async function SignInPage({ searchParams }: Props) {
+  const { next } = await searchParams
+  const safePath = next && next.startsWith('/') && !next.startsWith('//') ? next : '/astro'
+
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    redirect(safePath)
+  }
 
   const { data: config } = await supabase
     .from('site_config')
@@ -26,7 +39,7 @@ export default async function SignInPage() {
         {signupsEnabled ? (
           <>
             <p className="text-white/70">Begin your journey</p>
-            <SignInButton />
+            <SignInButton nextPath={safePath} />
           </>
         ) : (
           <p className="text-white/60 max-w-md">

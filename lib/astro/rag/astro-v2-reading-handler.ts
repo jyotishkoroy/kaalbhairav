@@ -73,7 +73,26 @@ function parseConsultationChartEvidence(value: unknown) {
     birthTimeSensitivity: candidate.birthTimeSensitivity === "low" || candidate.birthTimeSensitivity === "medium" || candidate.birthTimeSensitivity === "high" ? candidate.birthTimeSensitivity : "low",
   } as ChartEvidence;
 }
-function normalizeRagRouteResponse(result: RagReadingOrchestratorResult, existingMeta: Record<string, unknown> | undefined): AstroV2ReadingResponse { const answer = typeof result.answer === "string" ? result.answer.trim() : ""; const safeMeta: Record<string, unknown> = { ...(normalizeMeta(existingMeta) ?? {}), ...(normalizeMeta(result.meta) ?? {}), rag: { status: result.status, exactFactAnswered: result.meta.exactFactAnswered, safetyBlocked: result.meta.safetyBlocked, followupAsked: result.meta.followupAsked, fallbackUsed: result.meta.fallbackUsed, }, }; return { answer, followUpQuestion: result.followUpQuestion, followUpAnswer: result.followUpAnswer, sections: normalizeSections(result.sections), meta: safeMeta }; }
+type OneShotFlags = { oneShot?: boolean; disableFollowUps?: boolean; disableMemory?: boolean };
+function parseOneShotFlags(body: AstroV2ReadingRequestBody): OneShotFlags {
+  const meta = isRecord(body.metadata) ? body.metadata : {};
+  const root = body as Record<string, unknown>;
+  return {
+    oneShot: Boolean(meta.oneShot ?? root.oneShot),
+    disableFollowUps: Boolean(meta.disableFollowUps ?? root.disableFollowUps),
+    disableMemory: Boolean(meta.disableMemory ?? root.disableMemory),
+  };
+}
+function normalizeRagRouteResponse(result: RagReadingOrchestratorResult, existingMeta: Record<string, unknown> | undefined, flags?: OneShotFlags): AstroV2ReadingResponse {
+  const answer = typeof result.answer === "string" ? result.answer.trim() : "";
+  const safeMeta: Record<string, unknown> = { ...(normalizeMeta(existingMeta) ?? {}), ...(normalizeMeta(result.meta) ?? {}), rag: { status: result.status, exactFactAnswered: result.meta.exactFactAnswered, safetyBlocked: result.meta.safetyBlocked, followupAsked: flags?.disableFollowUps ? false : result.meta.followupAsked, fallbackUsed: result.meta.fallbackUsed, }, };
+  if (flags?.disableFollowUps || flags?.oneShot) {
+    const sections = normalizeSections(result.sections);
+    const filteredSections = sections ? Object.fromEntries(Object.entries(sections).filter(([k]) => k !== 'suggested_follow_up')) : undefined;
+    return { answer, followUpQuestion: null, followUpAnswer: null, sections: filteredSections, meta: safeMeta };
+  }
+  return { answer, followUpQuestion: result.followUpQuestion, followUpAnswer: result.followUpAnswer, sections: normalizeSections(result.sections), meta: safeMeta };
+}
 function shouldFallbackToOldV2FromRagResult(result: RagReadingOrchestratorResult | undefined): boolean { if (!result) return true; if (typeof result.answer !== "string" || !result.answer.trim()) return true; if (result.meta?.engine === "fallback" && result.status === "fallback") return true; return false; }
 
 const KNOWN_GENERIC_FALLBACK_PHRASES = [
@@ -122,6 +141,7 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
   try { body = (await request.json()) as AstroV2ReadingRequestBody; } catch { return NextResponse.json({ error: "Invalid JSON request body." }, { status: 400 }); }
   const question = readString(body.question) ?? readString(body.message);
   if (!question) return NextResponse.json({ error: "Question is required." }, { status: 400 });
+  const oneShotFlags = parseOneShotFlags(body);
   const context = getRequestContext(body);
   const birthDetails = parseBirthDetails(body.birthDetails);
   const metadata = context.metadata;
@@ -180,15 +200,20 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
     routingEnabled: Boolean(flags.routingEnabled),
   });
   const ragBranchEnabled = routeDecision.kind === "rag" && shouldUseRagReadingRoute(flags, question);
-  const ragInput: Partial<RagReadingOrchestratorInput> = { question, userId: context.userId, profileId: context.profileId ?? undefined, chartVersionId: context.chartVersionId ?? undefined, env: process.env, explicitUserDates: Array.isArray((body as Record<string, unknown>).explicitUserDates) ? ((body as Record<string, unknown>).explicitUserDates as NonNullable<RagReadingOrchestratorInput["explicitUserDates"]>) : undefined, memorySummary: readString(metadata?.memorySummary) };
+  const ragInput: Partial<RagReadingOrchestratorInput> = { question, userId: context.userId, profileId: context.profileId ?? undefined, chartVersionId: context.chartVersionId ?? undefined, env: process.env, explicitUserDates: Array.isArray((body as Record<string, unknown>).explicitUserDates) ? ((body as Record<string, unknown>).explicitUserDates as NonNullable<RagReadingOrchestratorInput["explicitUserDates"]>) : undefined, memorySummary: (oneShotFlags.disableMemory || oneShotFlags.oneShot) ? undefined : readString(metadata?.memorySummary) };
   try {
     if (ragBranchEnabled) {
-      try { const ragResult = await (deps.ragOrchestrator ?? ragReadingOrchestrator)(ragInput); if (!shouldFallbackToOldV2FromRagResult(ragResult)) return NextResponse.json(normalizeRagRouteResponse(ragResult, { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata })); console.error("Astro V2 reading route falling back to old path after rag result"); } catch (error) { console.error("Astro V2 reading route rag branch failed, falling back to old path", error); }
+      try { const ragResult = await (deps.ragOrchestrator ?? ragReadingOrchestrator)(ragInput); if (!shouldFallbackToOldV2FromRagResult(ragResult)) return NextResponse.json(normalizeRagRouteResponse(ragResult, { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata }, oneShotFlags)); console.error("Astro V2 reading route falling back to old path after rag result"); } catch (error) { console.error("Astro V2 reading route rag branch failed, falling back to old path", error); }
     }
     const result = await (deps.oldRoute ?? generateReadingV2)({ userId: context.userId, question, mode: readMode(body.mode), birthDetails: birthDetails as | { dateOfBirth?: string; timeOfBirth?: string; placeOfBirth?: string; latitude?: number; longitude?: number; timezone?: string; } | undefined, chart: isRecord(body.chart) ? body.chart : undefined, context: isRecord(body.context) ? body.context : undefined, dasha: isRecord(body.dasha) ? body.dasha : undefined, transits: isRecord(body.transits) ? body.transits : undefined, metadata: { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata }, }, { trace, exposeTrace });
     const responseMeta: Record<string, unknown> = { ...result.meta, source: "astro-v2-page", directV2Route: true };
     if (exposeTrace) responseMeta.e2eTrace = sanitizeTraceForResponse(trace);
     trace.response.debugTraceExposed = exposeTrace;
+    if (oneShotFlags.disableFollowUps || oneShotFlags.oneShot) {
+      const sections = normalizeSections((result as { sections?: unknown }).sections);
+      const filteredSections = sections ? Object.fromEntries(Object.entries(sections).filter(([k]) => k !== 'suggested_follow_up')) : undefined;
+      return NextResponse.json({ answer: result.answer, followUpQuestion: null, followUpAnswer: null, sections: filteredSections, meta: responseMeta });
+    }
     return NextResponse.json({ answer: result.answer, followUpQuestion: result.meta?.followUpQuestion, followUpAnswer: result.meta?.followUpAnswer, sections: normalizeSections((result as { sections?: unknown }).sections), meta: responseMeta });
   } catch (error) { console.error("Astro V2 reading route failed", error); return NextResponse.json({ error: "Unable to generate a reading right now. Please try again." }, { status: 500 }); }
 }
