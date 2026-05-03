@@ -7,16 +7,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { guardOneShotAstroQuestion } from '@/lib/astro/app/one-shot-question-guard'
+import { analyzeQuestionQuality } from '@/lib/astro/app/question-quality'
 import { handleAstroV2ReadingRequest } from '@/lib/astro/rag/astro-v2-reading-handler'
+import { assertSameOriginRequest, checkRateLimit, getClientIp } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  const originCheck = assertSameOriginRequest(req as unknown as Request)
+  if (!originCheck.ok) {
+    return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
+  }
+
+  // Rate limit: 10 requests/min per user
+  const rl = checkRateLimit(`ask:${user.id}`, 10, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'rate_limited', retryAfterSeconds: rl.retryAfterSeconds },
+      { status: 429 },
+    )
+  }
+  // Fallback rate limit by IP
+  const ip = getClientIp(req as unknown as Request)
+  const rlIp = checkRateLimit(`ask-ip:${ip}`, 20, 60_000)
+  if (!rlIp.ok) {
+    return NextResponse.json(
+      { error: 'rate_limited', retryAfterSeconds: rlIp.retryAfterSeconds },
+      { status: 429 },
+    )
   }
 
   let body: unknown
@@ -34,16 +59,23 @@ export async function POST(req: NextRequest) {
   const questionRaw = typeof raw.question === 'string' ? raw.question : ''
   const requestId = typeof raw.requestId === 'string' ? raw.requestId.slice(0, 120) : undefined
 
+  // Input size limit
+  if (questionRaw.length > 2000) {
+    return NextResponse.json({ answer: 'aadesh: Your question is too long. Please ask one focused question.' })
+  }
+
+  // Language + security guard (runs first, before quality)
   const guard = guardOneShotAstroQuestion(questionRaw)
   if (!guard.allowed) {
     return NextResponse.json({ answer: guard.answer }, { status: 200 })
   }
 
-  const question = guard.normalizedQuestion
+  // Question quality + misspelling correction
+  const quality = analyzeQuestionQuality(guard.normalizedQuestion)
+  const question = quality.normalizedQuestion
 
   const service = createServiceClient()
 
-  // Load the one active birth profile for the authenticated user
   const { data: activeProfile } = await service
     .from('birth_profiles')
     .select('id')
@@ -58,7 +90,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Load latest chart version
   const { data: latestChart } = await service
     .from('chart_json_versions')
     .select('id')
@@ -74,7 +105,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Build server-side body for V2/RAG handler — never use client-supplied ids
   const v2Body = {
     question,
     message: question,
@@ -114,6 +144,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: errMsg }, { status: v2Response.ok ? 500 : v2Response.status })
   }
 
-  // Strip follow-up and meta — return only answer
-  return NextResponse.json({ answer: v2Data.answer })
+  // Prefix with spelling correction notice if any
+  let answer = v2Data.answer
+  if (quality.warnings.length > 0) {
+    const notice = `aadesh: ${quality.warnings.join(' ')} `
+    answer = notice + answer
+  }
+
+  // Return only { answer } — no metadata, model, provider, server, profileId, etc.
+  return NextResponse.json({ answer })
 }

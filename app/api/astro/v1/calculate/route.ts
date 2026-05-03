@@ -1,7 +1,7 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
+/*
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import { randomUUID } from 'crypto'
@@ -20,6 +20,7 @@ import type { MasterAstroCalculationOutput } from '@/lib/astro/schemas/master'
 import type { ChartJson } from '@/lib/astro/types'
 import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
 import { mergeAvailableJyotishSectionsIntoChartJson } from '@/lib/astro/chart-json-persistence'
+import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -115,9 +116,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
   }
 
+  const originCheck = assertSameOriginRequest(req as unknown as Request)
+  if (!originCheck.ok) {
+    return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
+
+  // Rate limit: 5 requests/hour per user
+  const rl = checkRateLimit(`calculate:${user.id}`, 5, 60 * 60_000)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'rate_limited', retryAfterSeconds: rl.retryAfterSeconds },
+      { status: 429 },
+    )
+  }
 
   const body = await req.json().catch(() => null)
   const parsed = calculateRequestSchema.safeParse(body)
@@ -135,6 +150,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
+  // Ownership check — never trust client-supplied profileId without verifying owner
   if (profile.user_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   const { data: settings } = await service

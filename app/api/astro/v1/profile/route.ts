@@ -10,6 +10,7 @@ import { birthProfileInputSchema } from '@/lib/astro/schemas/profile'
 import { encryptJson } from '@/lib/astro/encryption'
 import { hashSettings, DEFAULT_SETTINGS } from '@/lib/astro/settings'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
+import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -18,14 +19,55 @@ export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
   }
+
+  const originCheck = assertSameOriginRequest(req as unknown as Request)
+  if (!originCheck.ok) {
+    return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
 
-  const body = await req.json().catch(() => null)
+  // Rate limit: 5 requests/hour per user
+  const rl = checkRateLimit(`profile:${user.id}`, 5, 60 * 60_000)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'rate_limited', retryAfterSeconds: rl.retryAfterSeconds },
+      { status: 429 },
+    )
+  }
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'invalid_input' }, { status: 400 })
+  }
+
+  // Basic input size guards
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const raw = body as Record<string, unknown>
+    if (typeof raw.birth_place_name === 'string' && raw.birth_place_name.length > 180) {
+      return NextResponse.json({ error: 'invalid_input', field: 'birth_place_name' }, { status: 400 })
+    }
+    if (typeof raw.about_self === 'string' && raw.about_self.length > 2000) {
+      return NextResponse.json({ error: 'invalid_input', field: 'about_self' }, { status: 400 })
+    }
+    if (typeof raw.display_name === 'string' && raw.display_name.length > 120) {
+      return NextResponse.json({ error: 'invalid_input', field: 'display_name' }, { status: 400 })
+    }
+  }
+
   const parsed = birthProfileInputSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'invalid_input', issues: parsed.error.issues }, { status: 400 })
+    const issues = parsed.error.issues
+    // Surface specific validation errors safely
+    const dateIssue = issues.find(i => i.path.includes('birth_date'))
+    const timeIssue = issues.find(i => i.path.includes('birth_time'))
+    if (dateIssue) return NextResponse.json({ error: 'invalid_birth_date' }, { status: 400 })
+    if (timeIssue) return NextResponse.json({ error: 'invalid_birth_time' }, { status: 400 })
+    return NextResponse.json({ error: 'invalid_input' }, { status: 400 })
   }
   const input = parsed.data
 
@@ -44,7 +86,6 @@ export async function POST(req: NextRequest) {
 
   const service = createServiceClient()
 
-  // Check for existing active profile
   const { data: existingProfile } = await service
     .from('birth_profiles')
     .select('id, last_birth_details_updated_at, birth_details_change_available_at')
@@ -57,7 +98,6 @@ export async function POST(req: NextRequest) {
   const changeAvailableAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
   if (existingProfile) {
-    // Enforce one-week edit lock
     if (existingProfile.birth_details_change_available_at) {
       const lockDate = new Date(existingProfile.birth_details_change_available_at)
       if (lockDate > now) {
@@ -72,7 +112,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Update existing profile
     const { error: updateError } = await service
       .from('birth_profiles')
       .update({
@@ -93,11 +132,10 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
 
     if (updateError) {
-      console.error('profile_update_failed', updateError?.code)
-      return NextResponse.json({ error: 'profile_update_failed' }, { status: 500 })
+      console.error('[profile_update_failed]', updateError?.code, updateError?.message?.slice(0, 100))
+      return NextResponse.json({ error: 'profile_save_failed' }, { status: 500 })
     }
 
-    // Ensure settings row exists
     const { data: existingSettings } = await service
       .from('astrology_settings')
       .select('id')
@@ -159,8 +197,8 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (profileError || !profile) {
-    console.error('profile_insert_failed', profileError?.code)
-    return NextResponse.json({ error: 'profile_create_failed' }, { status: 500 })
+    console.error('[profile_insert_failed]', profileError?.code, profileError?.message?.slice(0, 100))
+    return NextResponse.json({ error: 'profile_save_failed' }, { status: 500 })
   }
 
   const { error: settingsError } = await service
@@ -173,8 +211,8 @@ export async function POST(req: NextRequest) {
     })
 
   if (settingsError) {
-    console.error('settings_insert_failed', settingsError?.code)
-    return NextResponse.json({ error: 'settings_create_failed' }, { status: 500 })
+    console.error('[settings_insert_failed]', settingsError?.code, settingsError?.message?.slice(0, 100))
+    return NextResponse.json({ error: 'profile_save_failed' }, { status: 500 })
   }
 
   if (input.terms_accepted_version) {

@@ -6,10 +6,19 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { PlaceAutocomplete } from './PlaceAutocomplete'
 
 type FormState = 'idle' | 'submitting' | 'calculating' | 'error'
+
+type ResolvedPlace = {
+  label: string
+  latitude: number
+  longitude: number
+  timezone: string
+  elevationMeters?: number | null
+}
 
 type Props = {
   googleName: string
@@ -20,6 +29,26 @@ type Props = {
 
 const TERMS_VERSION = 'tarayai-astro-v1-2026-05-03'
 
+function mapErrorCode(code: string): string {
+  switch (code) {
+    case 'unauthenticated': return 'Your session has expired. Please sign in again.'
+    case 'invalid_birth_date': return 'The birth date you entered is not valid. Please check the date format.'
+    case 'invalid_birth_time': return 'The birth time you entered is not valid.'
+    case 'place_resolution_failed': return 'Please select a valid place from the suggestions.'
+    case 'profile_edit_locked': return 'Birth details are currently locked and cannot be changed yet.'
+    case 'profile_save_failed':
+    case 'profile_update_failed':
+    case 'profile_create_failed': return 'We could not save your birth profile. Please check the details and try again.'
+    case 'chart_calculation_failed': return 'Chart calculation failed. Please try again.'
+    case 'invalid_input': return 'Some profile details are invalid. Please check the form and try again.'
+    case 'rate_limited': return 'Too many requests. Please wait a moment and try again.'
+    default:
+      // Only pass through if it looks like a human-readable message (contains spaces), not a machine code
+      if (code && code.includes(' ') && !code.includes('\n') && code.length < 200) return code
+      return 'We could not save your birth profile. Please check the details and try again.'
+  }
+}
+
 export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialStep }: Props) {
   const router = useRouter()
   const [state, setState] = useState<FormState>('idle')
@@ -27,42 +56,31 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
   const [showTerms, setShowTerms] = useState(initialStep === 'terms')
   const [pendingPayload, setPendingPayload] = useState<null | Record<string, unknown>>(null)
   const [birthTimeUnknown, setBirthTimeUnknown] = useState(false)
+  const [resolvedPlace, setResolvedPlace] = useState<ResolvedPlace | null>(null)
+  const submittingRef = useRef(false)
+
+  function handlePlaceResolved(place: ResolvedPlace) {
+    setResolvedPlace(place)
+    setError(null)
+  }
+
+  function handlePlaceClear() {
+    setResolvedPlace(null)
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submittingRef.current) return
     setError(null)
 
     const formData = new FormData(e.currentTarget)
     const birthDate = String(formData.get('birth_date') || '')
     const birthTime = birthTimeUnknown ? null : (String(formData.get('birth_time') || '') || null)
-    const birthPlace = String(formData.get('birth_place_name') || '')
     const aboutSelf = String(formData.get('about_self') || '') || undefined
 
     if (!birthDate) { setError('Birth date is required.'); return }
-    if (!birthPlace) { setError('Birth place is required.'); return }
-
-    setState('submitting')
-
-    // Resolve place to coordinates server-side via a small helper endpoint
-    let latitude: number, longitude: number, timezone: string
-    try {
-      const geoResp = await fetch('/api/astro/resolve-place', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ place: birthPlace }),
-      })
-      const geoData = await geoResp.json()
-      if (!geoResp.ok || !geoData.latitude) {
-        setState('error')
-        setError(geoData?.error || 'Could not find this birth place. Please try a more specific city name.')
-        return
-      }
-      latitude = geoData.latitude
-      longitude = geoData.longitude
-      timezone = geoData.timezone
-    } catch {
-      setState('error')
-      setError('Could not look up birth place. Please check your connection and try again.')
+    if (!resolvedPlace) {
+      setError('Please select a valid place from the suggestions.')
       return
     }
 
@@ -71,10 +89,10 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
       birth_time: birthTime || null,
       birth_time_known: !birthTimeUnknown && !!birthTime,
       birth_time_precision: birthTimeUnknown ? 'unknown' : (birthTime ? 'exact' : 'unknown'),
-      birth_place_name: birthPlace,
-      latitude,
-      longitude,
-      timezone,
+      birth_place_name: resolvedPlace.label,
+      latitude: resolvedPlace.latitude,
+      longitude: resolvedPlace.longitude,
+      timezone: resolvedPlace.timezone,
       about_self: aboutSelf,
       calendar_system: 'gregorian',
       data_consent_version: 'astro-v1-2026-04-25',
@@ -82,51 +100,57 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
     }
 
     setPendingPayload(payload)
-    setState('idle')
     setShowTerms(true)
   }
 
   async function acceptTermsAndSave() {
-    if (!pendingPayload) return
+    if (!pendingPayload || submittingRef.current) return
+    submittingRef.current = true
     setShowTerms(false)
     setState('submitting')
     setError(null)
 
-    const profileResponse = await fetch('/api/astro/v1/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pendingPayload),
-    })
+    try {
+      const profileResponse = await fetch('/api/astro/v1/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(pendingPayload),
+      })
 
-    const profileJson = await profileResponse.json()
+      const profileJson = await profileResponse.json().catch(() => ({}))
 
-    if (!profileResponse.ok) {
-      setState('error')
-      setError(
-        profileJson?.message ||
-        profileJson?.error ||
-        'Profile save failed. Please try again.',
-      )
-      return
+      if (!profileResponse.ok) {
+        setState('error')
+        const rawError = profileJson?.error ?? ''
+        const message = profileJson?.message && !profileJson.message.includes('_')
+          ? profileJson.message
+          : mapErrorCode(rawError)
+        setError(message)
+        return
+      }
+
+      setState('calculating')
+
+      const calculateResponse = await fetch('/api/astro/v1/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ profile_id: profileJson.profile_id }),
+      })
+
+      const calculateJson = await calculateResponse.json().catch(() => ({}))
+
+      if (!calculateResponse.ok) {
+        setState('error')
+        setError(mapErrorCode(calculateJson?.error ?? 'chart_calculation_failed'))
+        return
+      }
+
+      router.push('/astro')
+    } finally {
+      submittingRef.current = false
     }
-
-    setState('calculating')
-
-    const calculateResponse = await fetch('/api/astro/v1/calculate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_id: profileJson.profile_id }),
-    })
-
-    const calculateJson = await calculateResponse.json()
-
-    if (!calculateResponse.ok) {
-      setState('error')
-      setError(calculateJson?.error || 'Chart calculation failed. Please try again.')
-      return
-    }
-
-    router.push('/astro')
   }
 
   const inputStyle: React.CSSProperties = {
@@ -184,9 +208,10 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
               </button>
               <button
                 onClick={acceptTermsAndSave}
+                disabled={busy}
                 style={{
                   flex: 2, background: 'rgba(181,150,98,0.85)', border: 'none', borderRadius: '999px',
-                  padding: '0.6rem 1rem', color: '#0a0806', fontWeight: '600', cursor: 'pointer', fontSize: '0.88rem',
+                  padding: '0.6rem 1rem', color: '#0a0806', fontWeight: '600', cursor: busy ? 'not-allowed' : 'pointer', fontSize: '0.88rem',
                 }}
               >
                 I accept — continue
@@ -230,19 +255,23 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
         )}
 
         <div style={fieldStyle}>
-          <label style={labelStyle} htmlFor="birth_place_name">Place of birth</label>
-          <input
-            id="birth_place_name"
-            name="birth_place_name"
-            type="text"
-            placeholder="Kolkata, India"
-            required
+          <label style={labelStyle}>Place of birth</label>
+          <PlaceAutocomplete
             disabled={busy}
-            style={inputStyle}
+            onResolved={handlePlaceResolved}
+            onClear={handlePlaceClear}
+            inputStyle={inputStyle}
           />
-          <p style={{ fontSize: '0.75rem', color: 'rgba(240,232,216,0.35)', marginTop: '0.3rem' }}>
-            City and country. Coordinates are resolved automatically.
-          </p>
+          {resolvedPlace && (
+            <p style={{ fontSize: '0.75rem', color: 'rgba(128,200,128,0.8)', marginTop: '0.3rem' }}>
+              Place resolved: {resolvedPlace.label}
+            </p>
+          )}
+          {!resolvedPlace && (
+            <p style={{ fontSize: '0.75rem', color: 'rgba(240,232,216,0.35)', marginTop: '0.3rem' }}>
+              Type your city — select from the dropdown to confirm.
+            </p>
+          )}
         </div>
 
         <div style={fieldStyle}>
@@ -264,16 +293,16 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
 
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || !resolvedPlace}
           style={{
-            background: busy ? 'rgba(181,150,98,0.35)' : 'rgba(181,150,98,0.85)',
-            color: busy ? 'rgba(240,232,216,0.45)' : '#0a0806',
+            background: (busy || !resolvedPlace) ? 'rgba(181,150,98,0.35)' : 'rgba(181,150,98,0.85)',
+            color: (busy || !resolvedPlace) ? 'rgba(240,232,216,0.45)' : '#0a0806',
             border: 'none',
             borderRadius: '999px',
             padding: '0.75rem',
             fontWeight: '600',
             fontSize: '0.95rem',
-            cursor: busy ? 'not-allowed' : 'pointer',
+            cursor: (busy || !resolvedPlace) ? 'not-allowed' : 'pointer',
             width: '100%',
           }}
         >

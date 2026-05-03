@@ -6,17 +6,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getSafeRelativeRedirect } from '@/lib/security/safe-redirect'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const rawNext = searchParams.get('next') ?? '/astro'
 
-  // Prevent open redirect: only allow relative paths starting with /
-  const safeNext =
-    rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes(':')
-      ? rawNext
-      : '/astro'
+  const safeNext = getSafeRelativeRedirect(rawNext, '/astro')
 
   if (code) {
     const supabase = await createClient()

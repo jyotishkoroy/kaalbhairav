@@ -42,6 +42,22 @@ const MODEL_SERVER_PATTERNS: RegExp[] = [
   /\bignore\s+(previous|prior|all)\s+instructions?\b/i,
   /\brepeat\s+the\s+(system|prompt)\b/i,
   /\bwhat\s+is\s+your\s+prompt\b/i,
+  /\breveal\b.{0,40}\b(prompt|instruction|message|context|data)\b/i,
+  /\bshow\b.{0,30}\b(logs?|prompt|system\s+message|developer\s+message|tool\s+call)\b/i,
+  /\bleak\s+(database|data|profile|key|token|secret)\b/i,
+  /\bbypass\s+(safety|security|filter|guard|restriction)\b/i,
+  /\bact\s+as\s+(admin|root|developer|god|superuser)\b/i,
+  /\bphishing\b/i,
+  /\bclone\s+login\b/i,
+  /\bsteal\s+(password|session|cookie|token)\b/i,
+  /\bsession\s+cookie\b/i,
+  /\bauth\s*token\b/i,
+  /\bsupabase\s+key\b/i,
+  /\bservice\s+role\b/i,
+  /\benvironment\s+variable\b/i,
+  /\bcross.site\b/i,
+  /\bsql\s+inject/i,
+  /\bexec\s*(ute)?\s*\(/i,
 ]
 
 const COMPATIBILITY_PATTERNS: RegExp[] = [
@@ -74,6 +90,69 @@ const FILE_IMAGE_PATTERNS: RegExp[] = [
   /\bshare\s*(photo|image|file|pdf|document)\b/i,
 ]
 
+// Devanagari script block (Hindi, Marathi, Sanskrit, Nepali)
+const DEVANAGARI_RE = /[ऀ-ॿ]/
+
+// Bengali script block
+const BENGALI_RE = /[ঀ-৿]/
+
+// Other non-Latin script blocks
+const NON_LATIN_SCRIPT_RE = /[؀-ۿЀ-ӿ一-鿿぀-ヿ가-힯฀-๿]/
+
+// Common Hinglish / Banglish romanized words that indicate non-English content
+const HINGLISH_BANGLISH_PATTERNS: RegExp[] = [
+  // Hindi romanized
+  /\bkya\b/i,
+  /\bkaise\b/i,
+  /\bkab\b(?!\s*uli)/i,
+  /\bmera\b/i,
+  /\bmeri\b/i,
+  /\bmujhe\b/i,
+  /\bshaadi\b/i,
+  /\bpaisa\b/i,
+  /\bnaukri\b/i,
+  /\bhoga\b/i,
+  /\bhogi\b/i,
+  /\bhoge\b/i,
+  /\bkaro\b/i,
+  /\bkarna\b/i,
+  /\bkarta\b/i,
+  /\bkarti\b/i,
+  /\baapka\b/i,
+  /\baapki\b/i,
+  /\btumhara\b/i,
+  /\btumhari\b/i,
+  // Bengali romanized
+  /\bbhalo\b/i,
+  /\bkeno\b/i,
+  /\bamar\b(?!\s+is|\s+god|\s+will|\s+lov)/i,
+  /\btomar\b/i,
+  /\bhobe\b/i,
+  /\bkorbo\b/i,
+  /\bami\b(?!\s+in|\s+is|\s+go|\s+ready|\s+sure|\s+not)/i,
+  /\btumi\b/i,
+  /\bkobe\b/i,
+  /\bbiye\b/i,
+  /\bchakri\b/i,
+  /\bkothay\b/i,
+  /\bkemon\b/i,
+]
+
+// Safe Vedic/Sanskrit terms written in English — not to be blocked
+const SAFE_VEDIC_TERMS = new Set([
+  'karma', 'puja', 'mantra', 'dharma', 'guru', 'kundali', 'kundli',
+  'dasha', 'rashi', 'nakshatra', 'lagna', 'rahu', 'ketu', 'shani',
+  'mangal', 'budha', 'shukra', 'surya', 'chandra', 'antardasha',
+  'mahadasha', 'panchang', 'panchanga', 'navamsa', 'ashtakvarga',
+  'vimshottari', 'jyotish', 'jyotisha', 'bhava', 'graha', 'yoga',
+])
+
+function hasOnlySymbolsOrEmoji(s: string): boolean {
+  // After removing spaces, punctuation, and emoji, nothing meaningful remains
+  const stripped = s.replace(/[\s\p{P}\p{S}\p{So}]/gu, '')
+  return stripped.length === 0
+}
+
 function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, ' ').trim()
 }
@@ -105,13 +184,49 @@ export function guardOneShotAstroQuestion(question: string): AstroQuestionGuardR
     }
   }
 
+  // Block emoji/symbol-only input
+  if (hasOnlySymbolsOrEmoji(normalized)) {
+    return {
+      allowed: false,
+      code: 'malformed_question',
+      answer: 'aadesh: Please ask a question in English text.',
+    }
+  }
+
+  // Block non-Latin scripts
+  if (DEVANAGARI_RE.test(normalized) || BENGALI_RE.test(normalized) || NON_LATIN_SCRIPT_RE.test(normalized)) {
+    return {
+      allowed: false,
+      code: 'language_blocked',
+      answer:
+        'aadesh: Please ask in English only. Tarayai currently does not support Hindi, Bengali, Hinglish, Banglish, or other languages in the Ask Guru window.',
+    }
+  }
+
+  // Block Hinglish/Banglish romanized patterns
+  for (const pattern of HINGLISH_BANGLISH_PATTERNS) {
+    if (pattern.test(normalized)) {
+      // Make sure it's not a safe Vedic term or common English word
+      const matchArr = normalized.match(pattern)
+      const matchWord = matchArr ? matchArr[0].toLowerCase() : ''
+      if (!SAFE_VEDIC_TERMS.has(matchWord)) {
+        return {
+          allowed: false,
+          code: 'language_blocked',
+          answer:
+            'aadesh: Please ask in English only. Tarayai currently does not support Hindi, Bengali, Hinglish, Banglish, or other languages in the Ask Guru window.',
+        }
+      }
+    }
+  }
+
   for (const pattern of MODEL_SERVER_PATTERNS) {
     if (pattern.test(normalized)) {
       return {
         allowed: false,
         code: 'model_server_blocked',
         answer:
-          'aadesh: I can answer astrology guidance from your saved birth profile, but I cannot discuss internal models, servers, prompts, tools, databases, or system architecture.',
+          'aadesh: I can answer astrology guidance from your saved birth profile, but I cannot help with bypassing safety, accessing private data, credentials, prompts, tools, logs, or system internals.',
       }
     }
   }
