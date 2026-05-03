@@ -16,12 +16,16 @@ vi.mock('@/lib/security/request-guards', () => ({
   assertSameOriginRequest: vi.fn(() => ({ ok: true })),
 }))
 
-vi.mock('@/lib/account/delete-account', () => ({
-  deleteAccountAndUserData: vi.fn(),
-}))
+vi.mock('@/lib/account/delete-account', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/account/delete-account')>()
+  return {
+    ...actual,
+    deleteAccountAndUserData: vi.fn(),
+  }
+})
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { deleteAccountAndUserData } from '@/lib/account/delete-account'
+import { AccountDeletionError, deleteAccountAndUserData } from '@/lib/account/delete-account'
 import { DELETE } from '@/app/api/account/delete/route'
 
 function makeReq() {
@@ -62,6 +66,27 @@ describe('DELETE /api/account/delete', () => {
     expect(await res.json()).toEqual({ error: 'account_deletion_failed' })
     expect(consoleSpy).toHaveBeenCalledWith('[account-delete]', expect.objectContaining({ stage: 'route_delete_account' }))
     consoleSpy.mockRestore()
+  })
+
+  it('includes safe stage details in debug mode', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => void 0)
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u5', user_metadata: {} } } }) },
+    } as never)
+    vi.mocked(createServiceClient).mockReturnValue({} as never)
+    vi.mocked(deleteAccountAndUserData).mockRejectedValue(new AccountDeletionError('delete_auth_user', { code: '500' }, 'auth.users'))
+    process.env.ACCOUNT_DELETE_DEBUG = 'true'
+
+    const res = await DELETE(makeReq())
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({
+      error: 'account_deletion_failed',
+      stage: 'delete_auth_user',
+      code: '500',
+      table: 'auth.users',
+    })
+    consoleSpy.mockRestore()
+    delete process.env.ACCOUNT_DELETE_DEBUG
   })
 
   it('does not leak private error details to browser', async () => {

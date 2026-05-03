@@ -22,8 +22,7 @@ type DeleteAccountParams = {
 }
 
 type DbError = { code?: string; message?: string }
-
-type MaybeMutationResult = PromiseLike<{ error: unknown }>
+type DbErrorLike = DbError & { status?: number; details?: string; hint?: string }
 
 type OwnedIds = {
   profileIds: string[]
@@ -33,6 +32,22 @@ type OwnedIds = {
 }
 
 const OPTIONAL_MISSING_ERROR_CODES = new Set(['42P01', '42703'])
+
+export class AccountDeletionError extends Error {
+  stage: string
+  code?: string
+  table?: string
+  column?: string
+
+  constructor(stage: string, error?: unknown, table?: string, column?: string) {
+    super(stage)
+    this.name = 'AccountDeletionError'
+    this.stage = stage
+    this.code = getErrorCode(error)
+    this.table = table
+    this.column = column
+  }
+}
 
 function isDbError(error: unknown): error is DbError {
   return Boolean(error && typeof error === 'object')
@@ -47,16 +62,16 @@ function isMissingTableOrColumnError(error: unknown) {
   return Boolean(code && OPTIONAL_MISSING_ERROR_CODES.has(code))
 }
 
-function logSafeStage(stage: string, error: unknown, table?: string) {
-  const payload: Record<string, unknown> = {
-    stage,
-    code: getErrorCode(error),
-  }
+function logSafeStage(stage: string, error: unknown, table?: string, column?: string) {
+  const payload: Record<string, unknown> = { stage, code: getErrorCode(error) }
   if (table) payload.table = table
-  if (isDbError(error) && typeof error.message === 'string') {
-    payload.message = error.message
-  }
+  if (column) payload.column = column
   console.error('[account-delete]', payload)
+}
+
+function throwStage(stage: string, error: unknown, table?: string, column?: string): never {
+  logSafeStage(stage, error, table, column)
+  throw new AccountDeletionError(stage, error, table, column)
 }
 
 function assertServiceRoleAvailable() {
@@ -92,13 +107,26 @@ async function runQuery<T>(query: PromiseLike<{ data: T | null; error: unknown }
 }
 
 async function insertDeletedUserRecord(service: ServiceClient, displayName: string) {
+  const { data: existing, error: selectError } = await service
+    .from('deleted_users')
+    .select('id')
+    .eq('name', displayName)
+    .eq('deletion_source', 'account_settings')
+    .limit(1)
+
+  if (selectError) {
+    if (isMissingTableOrColumnError(selectError)) return
+    throwStage('insert_deleted_users', selectError, 'deleted_users')
+  }
+
+  if ((existing?.length ?? 0) > 0) return
+
   const { error } = await service.from('deleted_users').insert({
     name: displayName,
     deletion_source: 'account_settings',
   })
   if (error) {
-    logSafeStage('insert_deleted_users', error, 'deleted_users')
-    throw error
+    throwStage('insert_deleted_users', error, 'deleted_users')
   }
 }
 
@@ -114,8 +142,7 @@ async function collectOwnedIds(service: ServiceClient, userId: string): Promise<
     )
     if (error) {
       if (isMissingTableOrColumnError(error)) return
-      logSafeStage(`collect_ids:${table}`, error, table)
-      throw error
+      throwStage('collect_owned_ids', error, table)
     }
     for (const row of data ?? []) {
       if (row?.id) target.push(row.id)
@@ -133,8 +160,7 @@ async function collectOwnedIds(service: ServiceClient, userId: string): Promise<
 async function deleteRowsByUserColumn(service: ServiceClient, table: string, column: string, userId: string) {
   const { error } = await service.from(table).delete().eq(column, userId)
   if (error && !isMissingTableOrColumnError(error)) {
-    logSafeStage(`delete:${table}.${column}`, error, table)
-    throw error
+    throwStage('delete_profile_reference_tables', error, table, column)
   }
 }
 
@@ -147,8 +173,7 @@ async function nullColumnIfNullableOrDelete(
   const { error: updateError } = await service.from(table).update({ [column]: null }).eq(column, userId)
   if (!updateError) return
   if (isMissingTableOrColumnError(updateError)) return
-  logSafeStage(`null:${table}.${column}`, updateError, table)
-  throw updateError
+  throwStage('clear_profile_references', updateError, table, column)
 }
 
 async function deleteRowsByUserColumns(
@@ -166,8 +191,7 @@ async function deleteRowsByIds(service: ServiceClient, table: string, column: st
   if (ids.length === 0) return
   const { error } = await service.from(table).delete().in(column, ids)
   if (error && !isMissingTableOrColumnError(error)) {
-    logSafeStage(`delete:${table}.${column}`, error, table)
-    throw error
+    throwStage('delete_astro_child_rows', error, table, column)
   }
 }
 
@@ -179,8 +203,7 @@ async function clearBirthProfileCurrentChartPointers(service: ServiceClient, use
 
   if (error) {
     if (isMissingTableOrColumnError(error)) return
-    logSafeStage('clear_birth_profile_current_chart_pointer', error, 'birth_profiles')
-    throw error
+    throwStage('clear_birth_profile_current_chart_pointer', error, 'birth_profiles', 'current_chart_version_id')
   }
 
   if (profileIds.length > 0) {
@@ -189,8 +212,7 @@ async function clearBirthProfileCurrentChartPointers(service: ServiceClient, use
       .update({ current_chart_version_id: null })
       .in('id', profileIds)
     if (byProfileError && !isMissingTableOrColumnError(byProfileError)) {
-      logSafeStage('clear_birth_profile_current_chart_pointer_by_profile', byProfileError, 'birth_profiles')
-      throw byProfileError
+      throwStage('clear_birth_profile_current_chart_pointer', byProfileError, 'birth_profiles', 'current_chart_version_id')
     }
   }
 
@@ -200,8 +222,7 @@ async function clearBirthProfileCurrentChartPointers(service: ServiceClient, use
       .update({ current_chart_version_id: null })
       .in('current_chart_version_id', chartVersionIds)
     if (byVersionError && !isMissingTableOrColumnError(byVersionError)) {
-      logSafeStage('clear_birth_profile_current_chart_pointer_by_version', byVersionError, 'birth_profiles')
-      throw byVersionError
+      throwStage('clear_birth_profile_current_chart_pointer', byVersionError, 'birth_profiles', 'current_chart_version_id')
     }
   }
 }
@@ -227,20 +248,20 @@ async function deleteProfileReferenceTables(service: ServiceClient, userId: stri
 
 async function deleteAstroChildRows(service: ServiceClient, userId: string, ownedIds: OwnedIds) {
   await deleteRowsByUserColumns(service, 'astro_chat_messages', ['user_id'], userId)
+  await deleteRowsByIds(service, 'astro_chat_messages', 'session_id', ownedIds.sessionIds)
+  await deleteRowsByIds(service, 'astro_chat_messages', 'profile_id', ownedIds.profileIds)
+  await deleteRowsByIds(service, 'astro_chat_messages', 'chart_version_id', ownedIds.chartVersionIds)
   await deleteRowsByUserColumns(service, 'astro_chat_sessions', ['user_id'], userId)
+  await deleteRowsByIds(service, 'astro_chat_sessions', 'profile_id', ownedIds.profileIds)
   await deleteRowsByUserColumns(service, 'astro_reading_feedback', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'astro_companion_memory', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'user_terms_acceptances', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'prediction_ready_summaries', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'calculation_audit_logs', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'astrology_settings', ['user_id'], userId)
-  await deleteRowsByIds(service, 'astro_chat_messages', 'session_id', ownedIds.sessionIds)
-  await deleteRowsByIds(service, 'astro_chat_messages', 'chart_version_id', ownedIds.chartVersionIds)
   await deleteRowsByIds(service, 'prediction_ready_summaries', 'chart_version_id', ownedIds.chartVersionIds)
   await deleteRowsByIds(service, 'calculation_audit_logs', 'chart_version_id', ownedIds.chartVersionIds)
   await deleteRowsByIds(service, 'calculation_audit_logs', 'calculation_id', ownedIds.calculationIds)
-  await deleteRowsByIds(service, 'astro_chat_sessions', 'profile_id', ownedIds.profileIds)
-  await deleteRowsByIds(service, 'astro_chat_messages', 'profile_id', ownedIds.profileIds)
   await deleteRowsByIds(service, 'prediction_ready_summaries', 'profile_id', ownedIds.profileIds)
   await deleteRowsByIds(service, 'calculation_audit_logs', 'profile_id', ownedIds.profileIds)
   await deleteRowsByIds(service, 'astrology_settings', 'profile_id', ownedIds.profileIds)
@@ -251,10 +272,10 @@ async function deleteJournalAndReportRows(service: ServiceClient, userId: string
   await deleteRowsByUserColumns(service, 'astro_journal_entries', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'saved_reports', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'report_exports', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'chat_sessions', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'chat_messages', ['user_id'], userId)
-  await deleteRowsByUserColumns(service, 'conversations', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'messages', ['user_id'], userId)
+  await deleteRowsByUserColumns(service, 'chat_sessions', ['user_id'], userId)
+  await deleteRowsByUserColumns(service, 'conversations', ['user_id'], userId)
   await deleteRowsByUserColumns(service, 'reading_sessions', ['user_id'], userId)
 }
 
@@ -269,9 +290,14 @@ async function deleteBirthProfilesAndCharts(service: ServiceClient, userId: stri
 async function deletePublicProfile(service: ServiceClient, userId: string) {
   const { error } = await service.from('profiles').delete().eq('id', userId)
   if (error && !isMissingTableOrColumnError(error)) {
-    logSafeStage('delete_public_profile', error, 'profiles')
-    throw error
+    throwStage('delete_public_profile', error, 'profiles')
   }
+}
+
+function isAuthDeleteSuccess(error: unknown) {
+  if (!error || typeof error !== 'object') return true
+  const typed = error as DbErrorLike
+  return typed.status === 404 || typed.code === '404' || typed.code === 'user_not_found'
 }
 
 export async function deleteAccountAndUserData(params: DeleteAccountParams) {
@@ -290,9 +316,8 @@ export async function deleteAccountAndUserData(params: DeleteAccountParams) {
   await deletePublicProfile(params.service, params.userId)
 
   const { error: authDeleteError } = await params.service.auth.admin.deleteUser(params.userId)
-  if (authDeleteError) {
-    logSafeStage('delete_auth_user', authDeleteError, 'auth.users')
-    throw authDeleteError
+  if (authDeleteError && !isAuthDeleteSuccess(authDeleteError)) {
+    throwStage('delete_auth_user', authDeleteError, 'auth.users')
   }
 
   return { ok: true, name: displayName }

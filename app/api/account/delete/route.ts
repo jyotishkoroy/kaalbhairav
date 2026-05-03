@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { assertSameOriginRequest } from '@/lib/security/request-guards'
-import { deleteAccountAndUserData } from '@/lib/account/delete-account'
+import { AccountDeletionError, deleteAccountAndUserData } from '@/lib/account/delete-account'
 
 export const runtime = 'nodejs'
 
@@ -35,11 +35,20 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('[account-delete]', {
-      stage: 'route_delete_account',
-      code: error instanceof Error && 'code' in error ? (error as { code?: string }).code : undefined,
-      message: error instanceof Error ? error.message : 'unknown_error',
-    })
+    const safeError = error instanceof AccountDeletionError
+      ? {
+          stage: error.stage,
+          code: error.code,
+          table: error.table,
+          column: error.column,
+        }
+      : {
+          stage: 'route_delete_account',
+        }
+    console.error('[account-delete]', safeError)
+    if (process.env.ACCOUNT_DELETE_DEBUG === 'true') {
+      return NextResponse.json({ error: 'account_deletion_failed', ...safeError }, { status: 500 })
+    }
     return NextResponse.json({ error: 'account_deletion_failed' }, { status: 500 })
   }
 }

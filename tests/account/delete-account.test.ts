@@ -16,7 +16,7 @@ function buildService(options?: {
   selectRows?: Record<string, Array<{ id: string }>>
   deleteErrors?: Record<string, { code?: string; message: string }>
   updateErrors?: Record<string, { code?: string; message: string }>
-  authDeleteError?: { code?: string; message: string }
+  authDeleteError?: { code?: string; message: string; status?: number }
 }) {
   const calls: Call[] = []
   const missingTables = new Set(options?.missingTables ?? [])
@@ -24,6 +24,18 @@ function buildService(options?: {
   const selectRows = options?.selectRows ?? {}
   const deleteErrors = options?.deleteErrors ?? {}
   const updateErrors = options?.updateErrors ?? {}
+  const makeSelectResult = (table: string) => {
+    const result = Promise.resolve({
+      data: selectRows[table] ?? [],
+      error: missingTables.has(table) ? { code: '42P01', message: 'missing relation' } : null,
+    }) as Promise<{ data: Array<{ id: string }> | null; error: unknown }> & {
+      eq: ReturnType<typeof vi.fn>
+      limit: ReturnType<typeof vi.fn>
+    }
+    result.eq = vi.fn(() => makeSelectResult(table))
+    result.limit = vi.fn(() => result)
+    return result
+  }
   const service = {
     auth: {
       admin: {
@@ -33,9 +45,7 @@ function buildService(options?: {
     from: vi.fn((table: string) => {
       calls.push({ table, method: 'from' })
       const base = {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ data: selectRows[table] ?? [], error: missingTables.has(table) ? { code: '42P01', message: 'missing relation' } : null })),
-        })),
+        select: vi.fn(() => makeSelectResult(table)),
         insert: vi.fn((payload: unknown) => {
           calls.push({ table, method: 'insert', args: [payload] })
           if (table === 'deleted_users' && options?.deleteErrors?.deleted_users) {
@@ -127,6 +137,22 @@ describe('deleteAccountAndUserData', () => {
     expect(service.auth.admin.deleteUser).toHaveBeenCalledWith('user-empty')
   })
 
+  it('does not insert another deleted_users row when a prior marker exists', async () => {
+    const service = buildService({
+      selectRows: {
+        deleted_users: [{ id: 'marker-1' }],
+      },
+    })
+
+    await deleteAccountAndUserData({
+      userId: 'user-idempotent',
+      service: service as never,
+      authUser: { id: 'user-idempotent', user_metadata: { name: 'Name' } },
+    })
+
+    expect(service._calls.filter((call) => call.table === 'deleted_users' && call.method === 'insert')).toHaveLength(0)
+  })
+
   it('skips missing optional tables and missing optional columns', async () => {
     const service = buildService({
       missingTables: ['news_posts', 'astro_conversations', 'prediction_ready_summaries'],
@@ -151,10 +177,34 @@ describe('deleteAccountAndUserData', () => {
       userId: 'user-fail',
       service: service as never,
       authUser: { id: 'user-fail', user_metadata: { name: 'Name' } },
-    })).rejects.toMatchObject({ message: 'permission denied for table deleted_users' })
+    })).rejects.toMatchObject({ stage: 'insert_deleted_users', code: '42501', table: 'deleted_users' })
 
     expect(service._calls.some((call) => call.table === 'birth_profiles')).toBe(false)
     expect(service.auth.admin.deleteUser).not.toHaveBeenCalled()
+  })
+
+  it('treats auth delete 404 as success after cleanup', async () => {
+    const service = buildService({
+      authDeleteError: { status: 404, message: 'not found' },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-404',
+      service: service as never,
+      authUser: { id: 'user-404', user_metadata: { name: 'Name' } },
+    })).resolves.toEqual(expect.objectContaining({ ok: true }))
+  })
+
+  it('fails on auth delete permission errors after cleanup', async () => {
+    const service = buildService({
+      authDeleteError: { status: 500, code: '500', message: 'permission denied' },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-auth-fail',
+      service: service as never,
+      authUser: { id: 'user-auth-fail', user_metadata: { name: 'Name' } },
+    })).rejects.toMatchObject({ stage: 'delete_auth_user', code: '500' })
   })
 
   it('clears birth_profiles.current_chart_version_id before deleting chart_json_versions', async () => {
@@ -175,6 +225,25 @@ describe('deleteAccountAndUserData', () => {
     const deleteChartIndex = service._calls.findIndex((call) => call.table === 'chart_json_versions' && call.method === 'delete.in')
     expect(clearIndex).toBeGreaterThan(-1)
     expect(deleteChartIndex).toBeGreaterThan(clearIndex)
+  })
+
+  it('deletes astro chat messages by session_id before astro_chat_sessions', async () => {
+    const service = buildService({
+      selectRows: {
+        astro_chat_sessions: [{ id: 'session-1' }],
+      },
+    })
+
+    await deleteAccountAndUserData({
+      userId: 'user-chat-order',
+      service: service as never,
+      authUser: { id: 'user-chat-order', user_metadata: { name: 'Name' } },
+    })
+
+    const messageSessionDelete = service._calls.findIndex((call) => call.table === 'astro_chat_messages' && call.method === 'delete.in' && call.args?.[0] === 'session_id')
+    const sessionDelete = service._calls.findIndex((call) => call.table === 'astro_chat_sessions' && call.method.startsWith('delete'))
+    expect(messageSessionDelete).toBeGreaterThan(-1)
+    expect(sessionDelete).toBeGreaterThan(messageSessionDelete)
   })
 
   it('cleans profile fk references before deleting profiles', async () => {
@@ -207,8 +276,8 @@ describe('deleteAccountAndUserData', () => {
       authUser: { id: 'user-owned', user_metadata: { name: 'Name' } },
     })
 
-    expect(service._calls.filter((call) => call.table === 'birth_profiles' && call.method === 'delete.in').length).toBeGreaterThan(0)
-    expect(service._calls.filter((call) => call.table === 'chart_json_versions' && call.method === 'delete.in').length).toBeGreaterThan(0)
+    expect(service._calls.some((call) => call.table === 'birth_profiles' && call.method === 'delete.in' && Array.isArray(call.args?.[1]) && call.args?.[1]?.includes('profile-1'))).toBe(true)
+    expect(service._calls.some((call) => call.table === 'chart_json_versions' && call.method === 'delete.in' && Array.isArray(call.args?.[1]) && call.args?.[1]?.includes('chart-1'))).toBe(true)
   })
 
   it('keeps deleted_users payload private', async () => {
@@ -226,6 +295,28 @@ describe('deleteAccountAndUserData', () => {
     expect(Object.keys(payload)).toEqual(['name', 'deletion_source'])
   })
 
+  it('does not store email, user_id, or chart metadata in deleted_users', async () => {
+    const service = buildService()
+
+    await deleteAccountAndUserData({
+      userId: 'user-private-2',
+      service: service as never,
+      authUser: {
+        id: 'user-private-2',
+        email: 'private@example.com',
+        user_metadata: {
+          full_name: 'Private Name',
+          user_id: 'leak',
+          chart_version_id: 'chart-1',
+          conversation_id: 'conv-1',
+        },
+      },
+    })
+
+    const payload = service._calls.find((call) => call.method === 'insert' && call.table === 'deleted_users')?.args?.[0] as Record<string, unknown>
+    expect(payload).toEqual({ name: 'Private Name', deletion_source: 'account_settings' })
+  })
+
   it('logs and propagates auth deletion errors after cleanup', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => void 0)
     const service = buildService({ authDeleteError: { code: '500', message: 'auth failed' } })
@@ -234,10 +325,22 @@ describe('deleteAccountAndUserData', () => {
       userId: 'user-auth',
       service: service as never,
       authUser: { id: 'user-auth', user_metadata: { name: 'Name' } },
-    })).rejects.toMatchObject({ message: 'auth failed' })
+    })).rejects.toMatchObject({ stage: 'delete_auth_user', code: '500', table: 'auth.users' })
 
     expect(consoleSpy).toHaveBeenCalledWith('[account-delete]', expect.objectContaining({ stage: 'delete_auth_user' }))
     consoleSpy.mockRestore()
+  })
+
+  it('fails on nullable fk cleanup when nulling is rejected and the row exists', async () => {
+    const service = buildService({
+      updateErrors: { 'profiles.referred_by': { code: '23502', message: 'null violation' } },
+    })
+
+    await expect(deleteAccountAndUserData({
+      userId: 'user-fk',
+      service: service as never,
+      authUser: { id: 'user-fk', user_metadata: { name: 'Name' } },
+    })).rejects.toMatchObject({ stage: 'clear_profile_references', table: 'profiles', column: 'referred_by' })
   })
 
   it('fails deterministically when service role env is missing', async () => {
