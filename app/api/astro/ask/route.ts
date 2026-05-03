@@ -11,6 +11,7 @@ import { analyzeQuestionQuality } from '@/lib/astro/app/question-quality'
 import { answerCanonicalAstroQuestion } from '@/lib/astro/ask/answer-canonical-astro-question'
 import { buildAstroChartContext } from '@/lib/astro/chart-context'
 import { sha256Canonical } from '@/lib/astro/hashing'
+import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from '@/lib/security/e2e-rate-limit'
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
@@ -29,22 +30,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
   }
 
-  // Rate limit: 10 requests/min per user
-  const rl = checkRateLimit(`ask:${user.id}`, 10, 60_000)
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: 'rate_limited', retryAfterSeconds: rl.retryAfterSeconds },
-      { status: 429 },
-    )
-  }
-  // Fallback rate limit by IP
-  const ip = getClientIp(req as unknown as Request)
-  const rlIp = checkRateLimit(`ask-ip:${ip}`, 20, 60_000)
-  if (!rlIp.ok) {
-    return NextResponse.json(
-      { error: 'rate_limited', retryAfterSeconds: rlIp.retryAfterSeconds },
-      { status: 429 },
-    )
+  if (!isE2ERateLimitDisabled()) {
+    // Rate limit: 10 requests/min per user
+    const rl = checkRateLimit(`ask:${user.id}`, 10, 60_000)
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'rate_limited', retryAfterSeconds: rl.retryAfterSeconds },
+        { status: 429 },
+      )
+    }
+    // Fallback rate limit by IP
+    const ip = getClientIp(req as unknown as Request)
+    const rlIp = checkRateLimit(`ask-ip:${ip}`, 20, 60_000)
+    if (!rlIp.ok) {
+      return NextResponse.json(
+        { error: 'rate_limited', retryAfterSeconds: rlIp.retryAfterSeconds },
+        { status: 429 },
+      )
+    }
+  } else {
+    logE2ERateLimitDisabled('/api/astro/ask', 'ask-user-and-ip')
   }
 
   let body: unknown

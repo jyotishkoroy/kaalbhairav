@@ -11,6 +11,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { chatRequestSchema } from '@/lib/astro/schemas/chat'
 import { astroV1ChatEnabled, astroConversationOrchestratorEnabled } from '@/lib/astro/feature-flags'
 import { runOrchestrator } from '@/lib/astro/conversation/orchestrator'
+import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from '@/lib/security/e2e-rate-limit'
 import type { PredictionContext } from '@/lib/astro/types'
 
 export const runtime = 'nodejs'
@@ -60,12 +61,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return Response.json({ error: 'invalid_input' }, { status: 400 })
   const { profile_id, session_id, topic, question } = parsed.data
 
-  const { success, remaining } = await rl.limit(user.id)
-  if (!success) {
-    return Response.json({
-      error: 'daily_limit',
-      message: 'You have reached today\'s reflection limit. Return tomorrow.',
-    }, { status: 429 })
+  let remaining = dailyLimit
+  if (isE2ERateLimitDisabled()) {
+    logE2ERateLimitDisabled('/api/astro/v1/chat', 'astro-v1-chat')
+  } else {
+    const rateLimitResult = await rl.limit(user.id)
+    remaining = rateLimitResult.remaining
+    if (!rateLimitResult.success) {
+      return Response.json({
+        error: 'daily_limit',
+        message: 'You have reached today\'s reflection limit. Return tomorrow.',
+      }, { status: 429 })
+    }
   }
 
   const service = createServiceClient()

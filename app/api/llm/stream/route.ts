@@ -9,6 +9,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from '@/lib/security/e2e-rate-limit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -57,25 +58,27 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: llmConfig } = await supabase
-  .from('site_config')
-  .select('value')
-  .eq('key', 'llm_enabled')
-  .single()
+    .from('site_config')
+    .select('value')
+    .eq('key', 'llm_enabled')
+    .single()
 
-if (llmConfig?.value === false) {
-  return Response.json(
-    {
-      error: 'disabled',
-      message: 'The Guru is taking a brief pause. Please return shortly.',
-    },
-    { status: 503 }
-  )
-}
+  if (llmConfig?.value === false) {
+    return Response.json(
+      {
+        error: 'disabled',
+        message: 'The Guru is taking a brief pause. Please return shortly.',
+      },
+      { status: 503 }
+    )
+  }
 
   const rateLimiter = createRateLimiter()
   let remaining: number | null = null
 
-  if (rateLimiter) {
+  if (isE2ERateLimitDisabled()) {
+    logE2ERateLimitDisabled('/api/llm/stream', 'llm-free')
+  } else if (rateLimiter) {
     const result = await rateLimiter.limit(user.id)
     remaining = Math.max(0, result.remaining - 1)
 
