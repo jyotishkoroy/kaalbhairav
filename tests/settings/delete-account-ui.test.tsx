@@ -26,47 +26,81 @@ describe('DeleteAccountButton', () => {
     expect(html).toContain('Delete my account')
   })
 
-  it('calls delete endpoint and redirects on success', async () => {
+  it('calls delete endpoint with hardened request options and returns success', async () => {
     const fetchImpl = vi.fn(async () => ({ ok: true }))
     const confirmImpl = vi.fn(() => true)
-    await deleteAccountFlow({
+    await expect(deleteAccountFlow({
       confirmImpl,
       fetchImpl: fetchImpl as never,
-      onSuccess: () => {
-        replace('/sign-in')
-        refresh()
-      },
-      onFailure: () => void 0,
-    })
+    })).resolves.toEqual({ status: 'success' })
 
-    expect(fetchImpl).toHaveBeenCalledWith('/api/account/delete', { method: 'DELETE' })
-    expect(replace).toHaveBeenCalledWith('/sign-in')
-    expect(refresh).toHaveBeenCalled()
+    expect(fetchImpl).toHaveBeenCalledWith('/api/account/delete', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
   })
 
-  it('shows generic error on failure', async () => {
-    const onFailure = vi.fn()
+  it('returns failure and preserves generic error handling on non-ok response', async () => {
     const fetchImpl = vi.fn(async () => ({ ok: false }))
-    await deleteAccountFlow({
+    await expect(deleteAccountFlow({
       confirmImpl: vi.fn(() => true),
       fetchImpl: fetchImpl as never,
-      onSuccess: () => void 0,
-      onFailure,
-    })
-
-    expect(onFailure).toHaveBeenCalled()
+    })).resolves.toEqual({ status: 'failure' })
   })
 
-  it('does not proceed when confirmation is cancelled', async () => {
-    const fetchImpl = vi.fn(async () => ({ ok: true }))
-    await deleteAccountFlow({
-      confirmImpl: vi.fn(() => false),
-      fetchImpl: fetchImpl as never,
-      onSuccess: () => void 0,
-      onFailure: () => void 0,
+  it('returns failure when fetch throws', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('raw server error stage=delete_auth_user code=500')
     })
 
+    await expect(deleteAccountFlow({
+      confirmImpl: vi.fn(() => true),
+      fetchImpl: fetchImpl as never,
+    })).resolves.toEqual({ status: 'failure' })
+  })
+
+  it('returns cancelled and does not call fetch when confirmation is cancelled', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true }))
+    await expect(deleteAccountFlow({
+      confirmImpl: vi.fn(() => false),
+      fetchImpl: fetchImpl as never,
+    })).resolves.toEqual({ status: 'cancelled' })
+
     expect(fetchImpl).not.toHaveBeenCalled()
-    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('does not render raw server error, stage, or code', () => {
+    const html = renderToStaticMarkup(<DeleteAccountButton />)
+    expect(html).not.toContain('stage=')
+    expect(html).not.toContain('code=')
+    expect(html).not.toContain('raw server error')
+  })
+
+  it('keeps pending and redirect state isolated from stale errors via helper result', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true }))
+    const firstResult = await deleteAccountFlow({
+      confirmImpl: vi.fn(() => true),
+      fetchImpl: fetchImpl as never,
+    })
+    const secondResult = await deleteAccountFlow({
+      confirmImpl: vi.fn(() => true),
+      fetchImpl: fetchImpl as never,
+    })
+
+    expect(firstResult).toEqual({ status: 'success' })
+    expect(secondResult).toEqual({ status: 'success' })
+  })
+
+  it('returns cancelled when confirmation is cancelled and leaves fetch unused', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true }))
+    const result = await deleteAccountFlow({
+      confirmImpl: vi.fn(() => false),
+      fetchImpl: fetchImpl as never,
+    })
+
+    expect(result).toEqual({ status: 'cancelled' })
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 })

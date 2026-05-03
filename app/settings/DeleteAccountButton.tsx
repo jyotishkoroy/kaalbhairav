@@ -12,38 +12,61 @@ import { useState } from 'react'
 export async function deleteAccountFlow(input: {
   confirmImpl: (message: string) => boolean
   fetchImpl: typeof fetch
-  onSuccess: () => void
-  onFailure: () => void
-}) {
-  if (!input.confirmImpl('This permanently deletes your account data. This cannot be undone.')) return
-  const response = await input.fetchImpl('/api/account/delete', { method: 'DELETE' })
-  if (!response.ok) {
-    input.onFailure()
-    return
+}) : Promise<{ status: 'cancelled' | 'success' | 'failure' }> {
+  if (!input.confirmImpl('This permanently deletes your account data. This cannot be undone.')) {
+    return { status: 'cancelled' }
   }
-  input.onSuccess()
+
+  try {
+    const response = await input.fetchImpl('/api/account/delete', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      return { status: 'failure' }
+    }
+
+    return { status: 'success' }
+  } catch {
+    return { status: 'failure' }
+  }
 }
 
 export function DeleteAccountButton() {
   const router = useRouter()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleted, setDeleted] = useState(false)
 
   async function onDelete() {
+    if (pending || deleted) return
     setPending(true)
     setError(null)
     try {
-      await deleteAccountFlow({
+      const result = await deleteAccountFlow({
         confirmImpl: confirm,
         fetchImpl: fetch,
-        onSuccess: () => {
-          router.replace('/sign-in')
-          router.refresh()
-        },
-        onFailure: () => {
-          setError('Account deletion failed. Please try again or contact support.')
-        },
       })
+
+      if (result.status === 'success') {
+        setError(null)
+        setDeleted(true)
+        if (typeof window !== 'undefined' && typeof window.location?.replace === 'function') {
+          window.location.replace('/sign-in')
+          return
+        }
+        router.replace('/sign-in')
+        return
+      }
+
+      if (result.status === 'failure') {
+        setError('Account deletion failed. Please try again or contact support.')
+      }
     } catch {
       setError('Account deletion failed. Please try again or contact support.')
     } finally {
@@ -55,13 +78,13 @@ export function DeleteAccountButton() {
     <div>
       <button
         type="button"
-        disabled={pending}
+        disabled={pending || deleted}
         onClick={onDelete}
         className="px-4 py-2 bg-red-700 rounded hover:bg-red-600 text-sm disabled:opacity-60"
       >
-        {pending ? 'Deleting...' : 'Delete my account'}
+        {deleted ? 'Account deleted' : pending ? 'Deleting...' : 'Delete my account'}
       </button>
-      {error ? <p className="mt-3 text-sm text-red-200">{error}</p> : null}
+      {deleted ? <p className="mt-3 text-sm text-red-200">Account deleted. Redirecting...</p> : error ? <p className="mt-3 text-sm text-red-200">{error}</p> : null}
     </div>
   )
 }
