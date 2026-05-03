@@ -132,9 +132,9 @@ describe("validatePublicChartFacts", () => {
   it("complete Leo chart → ok=true", () => {
     const facts = buildPublicChartFacts({ profileId: "t", chartVersionId: "v", chartJson: leoChartJson });
     const result = validatePublicChartFacts(facts);
-    // lagnaSign and moonSign present — required fields pass
-    expect(result.missing).not.toContain("lagnaSign");
-    expect(result.missing).not.toContain("moonSign");
+    expect(result.ok).toBe(true);
+    expect(result.missing).toEqual([]);
+    expect(result.contradictions).toEqual([]);
   });
 
   it("missing Moon → missing contains moonSign", () => {
@@ -145,6 +145,12 @@ describe("validatePublicChartFacts", () => {
     });
     const result = validatePublicChartFacts(facts);
     expect(result.missing).toContain("moonSign");
+  });
+
+  it("Leo/Gemini/Taurus fixture passes validation", () => {
+    const facts = buildPublicChartFacts({ profileId: "t", chartVersionId: "v", chartJson: leoChartJson });
+    const result = validatePublicChartFacts(facts);
+    expect(result.ok).toBe(true);
   });
 });
 
