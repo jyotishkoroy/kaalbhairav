@@ -1,11 +1,36 @@
-dump.jsonl
+# Environment / secrets
+.env
+.env.*
+.env*.local
+
+# Dependencies and build output
+node_modules/
+.next/
+.turbo/
+.vercel/cache/
+
+# Generated/local artifacts
 artifacts/
+artifacts/**
 graphify-out/
-generated/
-QandA.md
-PLAN.md
-Archive 2.zip
-astro_package*.zip
-myVedicReport.docx
-.cache/
-.env*
+graphify-out/**
+graphify-out.zip
+
+# Browser/CDP profiles
+**/chrome-cdp-profile/**
+**/Default/Cache/**
+**/Code Cache/**
+**/GPUCache/**
+
+# Private/raw/large local files
+*.zip
+*.docx
+*.doc
+*.jsonl
+*.log
+
+# Local benchmark / generated scratch
+vedicQA500.md
+FIX_ROADMAP.md
+RagError.md
+created:
