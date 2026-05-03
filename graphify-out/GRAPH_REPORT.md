@@ -1,12 +1,12 @@
 # Graph Report - kaalbhairav  (2026-05-03)
 
 ## Corpus Check
-- 1314 files · ~4,324,871 words
+- 695 files · ~988,898 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 31564 nodes · 111809 edges · 53 communities detected
-- Extraction: 75% EXTRACTED · 25% INFERRED · 0% AMBIGUOUS · INFERRED: 27868 edges (avg confidence: 0.8)
+- 3230 nodes · 6365 edges · 62 communities detected
+- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 1197 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -51,294 +51,340 @@
 - [[_COMMUNITY_Community 38|Community 38]]
 - [[_COMMUNITY_Community 39|Community 39]]
 - [[_COMMUNITY_Community 40|Community 40]]
+- [[_COMMUNITY_Community 41|Community 41]]
+- [[_COMMUNITY_Community 42|Community 42]]
 - [[_COMMUNITY_Community 43|Community 43]]
 - [[_COMMUNITY_Community 44|Community 44]]
 - [[_COMMUNITY_Community 45|Community 45]]
 - [[_COMMUNITY_Community 46|Community 46]]
+- [[_COMMUNITY_Community 47|Community 47]]
+- [[_COMMUNITY_Community 48|Community 48]]
 - [[_COMMUNITY_Community 49|Community 49]]
 - [[_COMMUNITY_Community 50|Community 50]]
-- [[_COMMUNITY_Community 52|Community 52]]
+- [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 56|Community 56]]
 - [[_COMMUNITY_Community 58|Community 58]]
-- [[_COMMUNITY_Community 59|Community 59]]
-- [[_COMMUNITY_Community 65|Community 65]]
-- [[_COMMUNITY_Community 66|Community 66]]
-- [[_COMMUNITY_Community 113|Community 113]]
+- [[_COMMUNITY_Community 62|Community 62]]
+- [[_COMMUNITY_Community 71|Community 71]]
+- [[_COMMUNITY_Community 72|Community 72]]
+- [[_COMMUNITY_Community 76|Community 76]]
+- [[_COMMUNITY_Community 77|Community 77]]
+- [[_COMMUNITY_Community 78|Community 78]]
+- [[_COMMUNITY_Community 80|Community 80]]
+- [[_COMMUNITY_Community 147|Community 147]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `push()` - 1228 edges
-2. `forEach()` - 913 edges
-3. `map()` - 712 edges
-4. `join()` - 580 edges
-5. `replace()` - 553 edges
-6. `"assets/index-EPFHXy_1.js"()` - 516 edges
-7. `isArray()` - 512 edges
-8. `trim()` - 477 edges
-9. `L()` - 464 edges
-10. `indexOf()` - 458 edges
+1. `stringify()` - 110 edges
+2. `has()` - 74 edges
+3. `GET()` - 70 edges
+4. `POST()` - 52 edges
+5. `generateReadingV2()` - 47 edges
+6. `calculateMasterAstroOutput()` - 31 edges
+7. `runEngineReal()` - 30 edges
+8. `keys()` - 29 edges
+9. `answerExactFact()` - 28 edges
+10. `generateHumanReading()` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `pruneHour()` --calls--> `shift()`  [INFERRED]
-  local-services/ollama-analyzer-proxy/server.js → artifacts/auth/chrome-cdp-profile/Default/Extensions/mpiodijhokgodhhofbcjdecpffjipkle/1.22.98_0/src/lib/mhtml-to-html/vendor/csstree.esm.js
-- `averageLatency()` --calls--> `reduce()`  [INFERRED]
-  local-services/ollama-analyzer-proxy/server.js → artifacts/auth/chrome-cdp-profile/Default/Extensions/mpiodijhokgodhhofbcjdecpffjipkle/1.22.98_0/src/lib/mhtml-to-html/vendor/csstree.esm.js
-- `canDoOneTimeReload()` --calls--> `GET()`  [INFERRED]
-  artifacts/auth/chrome-cdp-profile/Default/Extensions/pejdijmoenmkgeppbflobdenhhabjlaj/3.3.0_0/page_popup.js → app/api/cron/backup/route.ts
-- `setIsDark()` --calls--> `set()`  [INFERRED]
-  artifacts/auth/chrome-cdp-profile/Default/Extensions/pejdijmoenmkgeppbflobdenhhabjlaj/3.3.0_0/background.js → app/astro/v1/new/page.tsx
-- `recenterLocation()` --calls--> `GET()`  [INFERRED]
-  artifacts/auth/chrome-cdp-profile/Default/Extensions/pejdijmoenmkgeppbflobdenhhabjlaj/3.3.0_0/content_script.js → app/api/cron/backup/route.ts
-
-## Hyperedges (group relationships)
-- **Python Engine end-to-end stack: Node bridge, Docker, Swiss Ephemeris files** — astro_python_node_bridge, astro_python_docker_verified, swiss_ephe_files [INFERRED 0.85]
-- **Privacy/safety model: PII encryption, prediction context, no raw birth to LLM** — plan_pii_encryption, plan_prediction_context, plan_rationale_no_raw_birth_to_llm [EXTRACTED 0.95]
-- **Production gate: validation suite, feature flags, Docker service running** — plan_validation_suite, rework_plan_feature_flags, rework_plan_docker_service [INFERRED 0.80]
+- `GET()` --calls--> `inferSlot()`  [INFERRED]
+  app/api/cron/backup/route.ts → lib/news/kolkata.ts
+- `GET()` --calls--> `getEphemeralConsultationState()`  [INFERRED]
+  app/api/cron/backup/route.ts → lib/astro/consultation/ephemeral-consultation-memory.ts
+- `findForbiddenKeyPath()` --calls--> `has()`  [INFERRED]
+  tests/astro/security.test.ts → lib/astro/synthesis/synthesis-acceptance.ts
+- `baseInput()` --calls--> `createEmptyConsultationState()`  [INFERRED]
+  tests/astro/consultation/response-plan-builder.test.ts → lib/astro/consultation/consultation-state.ts
+- `makeRequest()` --calls--> `stringify()`  [INFERRED]
+  tests/astro/baseline/chat-api-shape.test.ts → lib/astro/critic/critic-prompts.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.0
-Nodes (184): addContextToFrame(), hashString(), localize(), metric_summary_updateMetricSummaryOnSpan(), processExpirationInterval(), setData(), string_snipLine(), displayUserAccountLoginCTA() (+176 more)
+Cohesion: 0.02
+Nodes (125): approveDraft(), approvePost(), cleanSlug(), createPost(), deleteAccount(), deletePost(), geocode(), publishPost() (+117 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.0
-Nodes (1307): addRet(), applyFilterTextUpdate(), b(), ce(), cleanup(), _dropUndefinedKeys(), $e(), filterDuplicates() (+1299 more)
+Cohesion: 0.04
+Nodes (101): calculateGrahaDrishti(), calculateAyanamsa(), getAstroEngineBackend(), getAstroEngineServiceApiKey(), getAstroEngineServiceUrl(), isRemoteAstroEngineConfigured(), nearNakshatraBoundary(), nearNavamsaBoundary() (+93 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.0
-Nodes (1864): createStackParser(), disableRuleset(), enableRuleset(), ensureDNRRulesetsEnabled(), eq(), getPerformanceTimings(), getRuleInfoByUrl(), getSpanDescendants() (+1856 more)
+Cohesion: 0.02
+Nodes (63): makeRequest(), makeRequest(), makeRequest(), createRequest(), makeReq(), request(), createRequest(), createRequest() (+55 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.01
-Nodes (2104): createToken(), EventEmitter, f(), detectRepeatedAnswers(), stratifyLiveCases(), onMessageExternal(), consultStage1Logins(), createFrame() (+2096 more)
+Cohesion: 0.03
+Nodes (97): renderClosing(), getLLMProviderConfig(), getLLMRefinerConfig(), isLLMRefinerEnabled(), isLocalLLMEnabled(), normalizeProviderName(), readBooleanEnv(), readNumberEnv() (+89 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.0
-Nodes (1365): A(), abortUploadTransaction(), AbstractLogger, account_start(), account_stop(), AccountService, activateSchedules(), active_ping_clearStorage() (+1357 more)
+Cohesion: 0.03
+Nodes (101): buildDeterministicAnalyzerResult(), isObject(), normalizeAnalyzerResult(), normalizeBoolean(), normalizeConfidence(), normalizeFollowupQuestion(), normalizeQuestionType(), normalizeSource() (+93 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.0
-Nodes (1319): configure(), ct(), decodeUTF8(), fe(), formatInnerCurlyBraceText(), getBrowserVersion(), getDomElement(), getResourceTypes() (+1311 more)
+Cohesion: 0.04
+Nodes (87): accuracyFor(), buildAnchorsFromFacts(), buildAnswerContract(), buildContractAnchors(), buildContractForbiddenClaims(), buildContractValidatorRules(), normalizeContractDomain(), normalizeDomainValue() (+79 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.0
-Nodes (1148): hash(), Operator(), Recommendation, rng(), Rusha(), handleCreatePushSubscription(), bt, Ce (+1140 more)
+Cohesion: 0.04
+Nodes (76): applyContextToState(), enrichStateForOutput(), getSessionId(), hasAnyChartEvidence(), inferEvidenceDomain(), inferRequestedRemedyType(), mergeStateFromMemory(), normalizeQuestion() (+68 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.0
-Nodes (860): extractCSSProperties(), readFileContent(), requestPublicKey(), ActionButton, addSubscription(), generateIconButton(), pauseOnDomain(), resumeThisPage() (+852 more)
+Cohesion: 0.05
+Nodes (82): checkEnv(), readFlag(), redactedPresence(), buildReadingPayload(), classifyResult(), classifyTransportFailure(), fetchEndpoint(), fetchWithFallback() (+74 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.0
-Nodes (620): addCustomFilterMessageValidation(), isCommandMap(), isSatisfiable(), Settings(), SyncPromise, Te(), handleSubmit(), ExtensionSettings (+612 more)
+Cohesion: 0.04
+Nodes (68): buildDiagnosticContext(), buildEndpointPreflight(), buildRouteDiagnostic(), buildSmokeRequestPayload(), classifyRoutePreflightResult(), compactResponseSummary(), detectCause(), evaluateAstroReadingResponse() (+60 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.01
-Nodes (779): defineProperties(), ft(), I(), l(), M(), MockRecognition, setWindow(), appendSnippets() (+771 more)
+Cohesion: 0.06
+Nodes (65): answerCanonicalAstroQuestion(), ensureChartGroundedAnswer(), stripMetadata(), basisFor(), buildAstroAnswerPlan(), houseOf(), ord(), planetDesc() (+57 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.01
-Nodes (775): dispatchEvent(), _eventFromRejectionWithPrimitive(), safeToString(), asErrorMessage(), mapExample(), trimText(), addButton(), getLogRecordId() (+767 more)
+Cohesion: 0.06
+Nodes (69): asErrorMessage(), fetchBenchmarkExamples(), mapExample(), trimText(), limit(), addUnique(), buildDeterministicQueryExpansion(), clampMaxTerms() (+61 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.01
-Nodes (609): makeRequest(), makeService(), makeSupabase(), makeRequest(), makeServiceMock(), makeSupabaseMock(), makeStore(), a() (+601 more)
+Cohesion: 0.05
+Nodes (71): applyDeterministicCriticChecks(), buildBaseResult(), buildFallbackReadingCriticResult(), buildRewritePolicy(), buildSkippedReadingCriticResult(), clamp01(), containsFear(), hasTimingLanguage() (+63 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.01
-Nodes (59): _(), A, arch(), b(), basename(), be(), c(), Ce() (+51 more)
+Cohesion: 0.04
+Nodes (63): buildMemorySummary(), decideCompanionMemoryUse(), filterRetrievedMemories(), gateCompanionMemoriesForUserFacingUse(), getCompanionMemoryMaxItems(), inferCurrentTopic(), isCompanionMemoryEnabled(), isCompanionMemoryRetrieveEnabled() (+55 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.01
-Nodes (506): constructorReducer(), makeTypeReducer(), objectify(), pageZeroCloseClickHandler(), readImports(), resolveLocalImport(), isEmpty(), datePlaceholderParser() (+498 more)
+Cohesion: 0.06
+Nodes (62): clamp01(), normalizeLocalCriticResult(), normalizeString(), normalizeStringArray(), validateLocalCriticResult(), anchorSummary(), baseLimitations(), buildFallbackAnswer() (+54 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.01
-Nodes (529): cr(), parseXML(), $a(), Ac(), addAtrule_(), addMissingResource(), addNoteRef(), addProperty_() (+521 more)
+Cohesion: 0.06
+Nodes (49): assertCaseShape(), includesAllExpectedFailures(), loadBank(), main(), runBulkAnswerQualityRegression(), classifyNetworkError(), evaluateCase(), extractAnswer() (+41 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.01
-Nodes (404): getProperty(), addCallbackToNextTick(), addErrorComponentStack(), addEventListener(), addLegacyStylesheetTokensShim(), addVNodeToChildLWC(), allocateChildren(), allocateInSlot() (+396 more)
+Cohesion: 0.06
+Nodes (45): evaluateAstroAnswerQuality(), evaluateExactFactAnswer(), evaluateInaccurateAnswer(), evaluateInterpretiveAnswer(), extractExpectedFactTokens(), getAnswerSimilarityKey(), normalizeAnswerForSimilarity(), normalizeAstroFactText() (+37 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.01
-Nodes (142): contains(), cTypes(), objCTypes(), addEventListeners(), addPasswordRequirementsToFormMetadata(), allControlsForSingleCharacterLogicalFieldForControl(), anchorWithURLString(), articleTitleAndSiteNameFromTitleString() (+134 more)
+Cohesion: 0.06
+Nodes (52): adviceFromAnswer(), asString(), clampMaxChars(), concernFromQuestion(), createSupabaseCompanionMemoryRepository(), detectRedactions(), extractCompanionMemoryDrafts(), pushDraft() (+44 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.01
-Nodes (346): applyChanges(), loadWasmModuleToAllWorkers(), _d(), registerSvgSprite(), $, _a(), aa, Ab() (+338 more)
+Cohesion: 0.07
+Nodes (47): asBoolean(), asText(), buildChartEvidence(), buildFactorText(), buildInterpretationHint(), classifyPolarity(), countKeywordHits(), dedupeNormalizedFacts() (+39 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.01
-Nodes (71): cMulTo(), cSqrTo(), montMulTo(), montSqrTo(), sumRuleCounts(), testAdditionalProperty(), reduce(), B() (+63 more)
+Cohesion: 0.07
+Nodes (49): getConsultationFallbackMode(), parseConsultationFlagValue(), resolveConsultationFeatureFlags(), resolveConsultationFeatureFlagValues(), bucketResponseLength(), buildConsultationMonitoringAggregateReport(), buildConsultationMonitoringEvent(), containsAny() (+41 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.02
-Nodes (223): err(), adapt_planet(), build_aspects(), build_birth_details(), build_d1_chart(), build_houses(), build_lagna(), build_not_implemented_section() (+215 more)
+Cohesion: 0.08
+Nodes (34): contentHash(), isDuplicateNewsPost(), titleHash(), fetchInternetArchiveSource(), SourceUnavailableError, decodeHtmlEntities(), normalizeText(), normalizeTitle() (+26 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.02
-Nodes (192): addParamsToUrl(), all(), applyMappingDefinitions(), assertTrue(), broadcast(), build(), buildChromeCookiesFromHybridRefreshFlow(), buildPageContext() (+184 more)
+Cohesion: 0.1
+Nodes (41): buildDashaExactFactAnswer(), formatExactFactAnswer(), getActiveJupiterAntardasha(), isDashaQuestion(), missingAnswer(), unavailableExactFactAnswer(), answerCoPresence(), answerCurrentDasha() (+33 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.02
-Nodes (166): calculateAspects(), calculateGrahaDrishti(), targetHouse(), calculateAyanamsa(), getAstroEngineBackend(), getAstroEngineServiceApiKey(), getAstroEngineServiceUrl(), isRemoteAstroEngineConfigured() (+158 more)
+Cohesion: 0.09
+Nodes (38): checkDeterministicFactAccuracy(), checkWrongChartFact(), containsLeak(), detectDeterministicContradiction(), normalizeAnswerForMatch(), scoreAnswerMatch(), tokens(), assertNoSecretLeaks() (+30 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.02
-Nodes (132): getWeekNumber(), __awaiter(), Stream(), at(), b, c, ct(), d() (+124 more)
+Cohesion: 0.08
+Nodes (32): interpretCareer(), getAntardasha(), getArrayField(), getLagna(), getMahadasha(), getMoonSign(), getRecordField(), getStringField() (+24 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.02
-Nodes (27): addProperties(), App, ChildActionsCell, ChildObjectCell, ChildRow, ChildRowList, ColumnsVisibiltyBox, ColumnVisibiltyToggle (+19 more)
+Cohesion: 0.11
+Nodes (43): asBool(), asNumber(), asString(), baseColumnsFromError(), buildFallbackDashaFacts(), buildRepairInsertPayloadFromSource(), buildSelectColumns(), chartVersionColumnPresence() (+35 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.03
-Nodes (7): AckExtension, CometD, Extension, ReloadExtension, TimeSyncExtension, Transport, TransportRegistry
+Cohesion: 0.12
+Nodes (42): baseStep(), buildCareerSteps(), buildDomainSpecificSteps(), buildEducationSteps(), buildExactFactSteps(), buildForeignSteps(), buildGenericSteps(), buildMarriageSteps() (+34 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.04
-Nodes (62): addParamsToUrl(), all(), assertTrue(), ChromeStorageManager, clear(), consumeBit(), ContentScriptProxy(), convertDuration() (+54 more)
+Cohesion: 0.1
+Nodes (34): makeContext(), buildBenchmarkAnswerContract(), derivedContract(), domainProfile(), exactContract(), hasAny(), interpretiveBase(), lower() (+26 more)
 
 ### Community 26 - "Community 26"
-Cohesion: 0.03
-Nodes (67): ae, be, bn(), ce(), close(), Cn(), constructor(), ct() (+59 more)
+Cohesion: 0.1
+Nodes (35): buildGroqAnswerMessages(), compactChartFacts(), compactContextForPrompt(), compactContractForPrompt(), compactExamples(), compactList(), compactObjects(), compactReasoningPathForPrompt() (+27 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.04
-Nodes (7): a(), c(), h, m, p, r, y
+Cohesion: 0.12
+Nodes (35): computeBenchmarkSourceHash(), computeHash(), detectUnsafe(), firstField(), getFieldAll(), inferAnchors(), inferBenchmarkTags(), inferQuestionTypeTags() (+27 more)
 
 ### Community 28 - "Community 28"
-Cohesion: 0.04
-Nodes (59): addParamsToUrl(), all(), assertTrue(), consumeBit(), convertDuration(), deepEquals(), define(), delay() (+51 more)
+Cohesion: 0.16
+Nodes (35): adaptAspects(), adaptCurrentTimingFromVimshottari(), adaptD1Chart(), adaptDailyTransits(), adaptHouses(), adaptLifeAreas(), adaptNavamsa(), adaptPanchang() (+27 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.05
-Nodes (50): addParamsToUrl(), all(), assertTrue(), consumeBit(), convertDuration(), deepEquals(), define(), delay() (+42 more)
+Cohesion: 0.23
+Nodes (33): addFact(), asNumber(), asString(), buildStructuredRuleRankingContext(), extractBirthFacts(), extractChartFactsFromVersion(), extractDashaFacts(), extractExplicitRelations() (+25 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.08
-Nodes (54): anchorSummary(), baseLimitations(), buildFallbackAnswer(), buildFollowupFallback(), buildGroqUnavailableFallback(), buildInsufficientDataFallback(), buildResult(), buildSafetyFallback() (+46 more)
+Cohesion: 0.17
+Nodes (28): addFailure(), addWarning(), buildAllowedEvidence(), containsAny(), containsGenericChartLanguage(), containsPredictiveContext(), countFollowUpQuestions(), evidenceTokenOverlap() (+20 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.05
-Nodes (52): Midpoint Ephemeris Calculation (astro_package.zip reference), Engine Output Tree (chart.json, midpoint_ephemeris_normalized.json, validation_report.md), Astro Calculation Engine Python Package, Docker Build Verified (health: ok, startup_validation_passed: true), Astro Python Engine Integration Verification, Engine Modes: ts / shadow / python, Node-to-Python child_process Bridge, Rationale: Keep ASTRO_ENGINE_IMPL=ts in production until reviewed; deploy shadow mode first (+44 more)
+Cohesion: 0.09
+Nodes (24): createSpeechRecognition(), getSpeechRecognitionConstructor(), isSpeechRecognitionSupported(), isSpeechSynthesisSupported(), speakText(), stopSpeaking(), getAstroIntegrationChecks(), hasEnv() (+16 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.06
-Nodes (37): a(), Aa(), Ab(), ac(), b(), Ba(), Bb(), c() (+29 more)
+Cohesion: 0.12
+Nodes (30): getRequestContext(), handleAstroV2ReadingRequest(), inferQuestionMode(), isGenericFallbackAnswer(), isRecord(), normalizeMeta(), normalizeRagRouteResponse(), normalizeSections() (+22 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.1
-Nodes (25): allTrueConsultationFlags(), chartEvidence(), buildConsultationTestBankScenarios(), finalShapeExpectations(), followUpExpectations(), productionExpectations(), remedyExpectations(), syntheticBirthTimeSensitiveEvidence() (+17 more)
+Cohesion: 0.12
+Nodes (28): buildMarkdown(), checkDeathSafety(), extractFromPayload(), parseArgs(), postQuestion(), run(), validateByRule(), validateCase() (+20 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.14
-Nodes (22): API, encodeHexadecimal(), fetchS3(), getCanonicalHeaders(), getCanonicalQuery(), getCanonicalRequest(), getCanonicalURI(), getCredentialScope() (+14 more)
+Cohesion: 0.16
+Nodes (32): behavioralRemedies(), buildAvoidList(), buildProportionateRemedyPlan(), buildRemediesForLevel(), chooseBaseLevel(), createNoRemedyPlan(), extraAvoids(), formalRemedies() (+24 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.08
-Nodes (5): generateKeystreamAndEncrypt(), HH(), incCounter(), incWord(), X64Word_create()
+Cohesion: 0.13
+Nodes (28): compareIsoDates(), getPythonTimingWindows(), isIsoDate(), isWindowLikeArray(), normalizeTags(), sanitizeWindow(), buildTimingContext(), cloneMetadata() (+20 more)
 
 ### Community 36 - "Community 36"
-Cohesion: 0.21
-Nodes (16): ApplyUpdateResult, BareFontInfo, CancellationTokenSource, ConfigurationChangedEvent, Emitter, FindMatch, FoldingRangeKind, FontInfo (+8 more)
+Cohesion: 0.15
+Nodes (22): main(), angular_distance(), aspects(), assign_houses(), calculate_chart(), configure_zodiac(), house_cusps(), julian_day_ut() (+14 more)
 
 ### Community 37 - "Community 37"
-Cohesion: 0.51
-Nodes (12): buildGroqAnswerMessages(), compactChartFacts(), compactContextForPrompt(), compactContractForPrompt(), compactExamples(), compactList(), compactObjects(), compactReasoningPathForPrompt() (+4 more)
+Cohesion: 0.28
+Nodes (28): assertNoDeterministicLanguage(), buildNormalizedBundle(), clampEvidenceList(), countMatches(), createMixedSignal(), filterEvidence(), getChallengingEvidence(), getNeutralEvidence() (+20 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.23
-Nodes (7): analyzer(), baseDecision(), chartFact(), context(), plan(), safetyAllowed(), safetyBlocked()
+Cohesion: 0.14
+Nodes (21): appendLimitation(), buildDefaultFollowupQuestion(), checkSufficiency(), collectPresentFactKeys(), getMissingRequiredFacts(), hasCoreMissingReasoningAnchors(), hasReasoningSupport(), hasRequestedTiming() (+13 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.29
-Nodes (6): AckExtension, BinaryExtension, CometD, ReloadExtension, TimeStampExtension, TimeSyncExtension
+Cohesion: 0.18
+Nodes (25): acknowledgementGuidance(), buildConsultationResponsePlan(), buildEvidenceSummary(), buildFollowUp(), buildSafetyGuardrails(), buildSections(), buildTone(), countQuestionMarks() (+17 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.38
-Nodes (3): blobToBase64(), GitHub, upload()
+Cohesion: 0.16
+Nodes (24): buildCurrentPeriodMeaning(), buildReasoning(), chooseRecommendedAction(), clampReasoning(), classifyTimingStatus(), containsForbiddenTimingOutput(), countKeywordHits(), dedupeTimingFacts() (+16 more)
+
+### Community 41 - "Community 41"
+Cohesion: 0.16
+Nodes (21): isSoftRejection(), readNumber(), readTextCandidate(), sanitizeAnswer(), synthesizeCompassionatelySafely(), hasAcknowledgement(), hasBadTone(), hasChartAnchor() (+13 more)
+
+### Community 42 - "Community 42"
+Cohesion: 0.19
+Nodes (21): extractRuleCondition(), extractRuleInterpretation(), ingestAstroDump(), isWritableRecord(), listStrings(), main(), mapRuleNormalizedColumns(), normalizeDumpRecord() (+13 more)
 
 ### Community 43 - "Community 43"
+Cohesion: 0.15
+Nodes (17): containsForbiddenClaim(), escapeRegExp(), removeForbiddenClaims(), classifySafety(), classifySafetyRisk(), detectSafetyRisk(), escapeRegExp(), hasAnyMatch() (+9 more)
+
+### Community 44 - "Community 44"
+Cohesion: 0.19
+Nodes (20): buildMarkdown(), checkDomainMatch(), computeExpectedSimilarity(), computeOverall(), detectMissingComponents(), detectQuestionDomain(), evaluatePass(), extractFromPayload() (+12 more)
+
+### Community 45 - "Community 45"
+Cohesion: 0.13
+Nodes (14): isLLMProviderDisabledError(), LLMProviderDisabledError, createGroqProvider(), normalizeBaseUrl(), getLLMProvider(), buildSystemPrompt(), buildUserPrompt(), containsTopicText() (+6 more)
+
+### Community 46 - "Community 46"
+Cohesion: 0.28
+Nodes (15): countQuestionMarks(), createNoFollowUpDecision(), decideFollowUp(), decideMajorDecisionFollowUp(), decideMeaningChangeFollowUp(), decideSafetyOrHealthFollowUp(), ensureValidFollowUpDecision(), hasCompoundDiscoveryPattern() (+7 more)
+
+### Community 47 - "Community 47"
+Cohesion: 0.29
+Nodes (12): buildSafetyFlags(), calculateIntensity(), createNeutralState(), detectEmotionalState(), emotionSecondaries(), hasAny(), hasStrongDistress(), normalizeQuestion() (+4 more)
+
+### Community 48 - "Community 48"
+Cohesion: 0.24
+Nodes (5): buildCase(), buildQuestion(), generateQuestionBankRecords(), slugify(), summarizeQuestionBank()
+
+### Community 49 - "Community 49"
+Cohesion: 0.29
+Nodes (2): chartEvidence(), timingInput()
+
+### Community 50 - "Community 50"
+Cohesion: 0.43
+Nodes (4): aggregateScore(), buildConsultationTestBankReport(), clampScore(), uniqueStrings()
+
+### Community 54 - "Community 54"
 Cohesion: 0.6
 Nodes (3): context(), fact(), rule()
 
-### Community 44 - "Community 44"
+### Community 56 - "Community 56"
 Cohesion: 0.6
 Nodes (3): baseContext(), fact(), rule()
 
-### Community 45 - "Community 45"
-Cohesion: 0.5
-Nodes (5): Next.js Logo SVG (wordmark), Next.js Framework, Vercel Deployment Platform, Vercel Logo SVG (triangle/chevron mark), Browser Window Icon SVG
-
-### Community 46 - "Community 46"
-Cohesion: 0.67
-Nodes (2): lastError(), tabId()
-
-### Community 49 - "Community 49"
-Cohesion: 0.5
-Nodes (4): Document/File Icon SVG, Globe/World Icon SVG, Tarayai Brand Identity, Tarayai Brand Logo PNG (lotus mandala with inverted triangle, gold and maroon)
-
-### Community 50 - "Community 50"
-Cohesion: 0.67
-Nodes (1): TimeStampExtension
-
-### Community 52 - "Community 52"
-Cohesion: 1.0
-Nodes (2): convert(), parse()
-
 ### Community 58 - "Community 58"
+Cohesion: 0.67
+Nodes (2): allFalseEnv(), envFromOverrides()
+
+### Community 62 - "Community 62"
+Cohesion: 0.67
+Nodes (2): ReadingConfidenceNote(), safeList()
+
+### Community 71 - "Community 71"
+Cohesion: 0.67
+Nodes (1): MockRecognition
+
+### Community 72 - "Community 72"
+Cohesion: 1.0
+Nodes (2): makeResolvedChain(), makeServiceMock()
+
+### Community 76 - "Community 76"
+Cohesion: 1.0
+Nodes (2): clampText(), GentleFollowUpCard()
+
+### Community 77 - "Community 77"
+Cohesion: 1.0
+Nodes (2): clampText(), CompanionMemoryNotice()
+
+### Community 78 - "Community 78"
+Cohesion: 1.0
+Nodes (2): clampText(), ListeningReflectionCard()
+
+### Community 80 - "Community 80"
 Cohesion: 1.0
 Nodes (2): fetchVectorReasoningRuleCandidates(), isAstroVectorRetrievalEnabled()
 
-### Community 59 - "Community 59"
-Cohesion: 0.67
-Nodes (3): Next.js Agent Rules (breaking changes warning), CLAUDE.md References AGENTS.md, Kaalbhairav Next.js Project (create-next-app)
-
-### Community 65 - "Community 65"
-Cohesion: 1.0
-Nodes (1): DataCollectionV2
-
-### Community 66 - "Community 66"
-Cohesion: 1.0
-Nodes (1): SubscriptionAdapter
-
-### Community 113 - "Community 113"
+### Community 147 - "Community 147"
 Cohesion: 1.0
 Nodes (1): Editable install root for astro_calculation_engine.
 
 ## Knowledge Gaps
-- **54 isolated node(s):** `EmscriptenEH`, `EmscriptenSjLj`, `Constants`, `CometD`, `AckExtension` (+49 more)
+- **4 isolated node(s):** `MockRecognition`, `SourceUnavailableError`, `SourceUnavailableError`, `Editable install root for astro_calculation_engine.`
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 46`** (4 nodes): `chrome-browser-polyfill.js`, `chrome-browser-polyfill.js`, `lastError()`, `tabId()`
+- **Thin community `Community 49`** (8 nodes): `timing-judgement.test.ts`, `allGeneratedText()`, `chartEvidence()`, `defaultEmotionalState()`, `defaultLifeContext()`, `defaultPracticalConstraints()`, `factor()`, `timingInput()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (3 nodes): `TimeStampExtension.js`, `TimeStampExtension`, `.outgoing()`
+- **Thin community `Community 58`** (4 nodes): `allFalseEnv()`, `allTrueEnv()`, `envFromOverrides()`, `consultation-feature-flags.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 52`** (3 nodes): `mod.js`, `convert()`, `parse()`
+- **Thin community `Community 62`** (4 nodes): `ReadingConfidenceNote.tsx`, `clampText()`, `ReadingConfidenceNote()`, `safeList()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 58`** (3 nodes): `vector-retrieval.ts`, `fetchVectorReasoningRuleCandidates()`, `isAstroVectorRetrievalEnabled()`
+- **Thin community `Community 71`** (3 nodes): `MockRecognition`, `setWindow()`, `browser-speech.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (2 nodes): `DataCollectionV2`, `adblock-options-datacollectionproxy.js`
+- **Thin community `Community 72`** (3 nodes): `makeResolvedChain()`, `makeServiceMock()`, `diagnose-and-repair-current-chart.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (2 nodes): `SubscriptionAdapter`, `adblock-options-subscriptionadapterproxy.js`
+- **Thin community `Community 76`** (3 nodes): `GentleFollowUpCard.tsx`, `clampText()`, `GentleFollowUpCard()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (2 nodes): `Editable install root for astro_calculation_engine.`, `__init__.py`
+- **Thin community `Community 77`** (3 nodes): `clampText()`, `CompanionMemoryNotice()`, `CompanionMemoryNotice.tsx`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 78`** (3 nodes): `ListeningReflectionCard.tsx`, `clampText()`, `ListeningReflectionCard()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 80`** (3 nodes): `vector-retrieval.ts`, `fetchVectorReasoningRuleCandidates()`, `isAstroVectorRetrievalEnabled()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 147`** (2 nodes): `Editable install root for astro_calculation_engine.`, `__init__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `push()` connect `Community 5` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 25`, `Community 26`, `Community 27`, `Community 28`, `Community 29`, `Community 30`, `Community 32`, `Community 33`, `Community 37`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
-- **Why does `"assets/index-EPFHXy_1.js"()` connect `Community 6` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 35`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 13`, `Community 14`, `Community 16`, `Community 17`, `Community 18`, `Community 21`, `Community 22`?**
-  _High betweenness centrality (0.062) - this node is a cross-community bridge._
-- **Why does `isArray()` connect `Community 1` to `Community 0`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 26`, `Community 27`, `Community 30`, `Community 32`, `Community 37`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Are the 1202 inferred relationships involving `push()` (e.g. with `humanReadableVersionToPacked()` and `allocateUnusedWorker()`) actually correct?**
-  _`push()` has 1202 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 908 inferred relationships involving `forEach()` (e.g. with `threadInitTLS()` and `sharedRegisterType()`) actually correct?**
-  _`forEach()` has 908 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 706 inferred relationships involving `map()` (e.g. with `humanReadableVersionToPacked()` and `dbg()`) actually correct?**
-  _`map()` has 706 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 493 inferred relationships involving `join()` (e.g. with `buildAnalyzePrompt()` and `buildCriticPrompt()`) actually correct?**
-  _`join()` has 493 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `has()` connect `Community 4` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 5`, `Community 7`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 23`, `Community 24`, `Community 26`, `Community 27`, `Community 29`, `Community 30`, `Community 34`, `Community 35`, `Community 38`, `Community 40`, `Community 41`, `Community 42`, `Community 44`, `Community 46`?**
+  _High betweenness centrality (0.275) - this node is a cross-community bridge._
+- **Why does `stringify()` connect `Community 2` to `Community 0`, `Community 1`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 9`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 21`, `Community 22`, `Community 23`, `Community 26`, `Community 27`, `Community 33`, `Community 37`, `Community 42`, `Community 44`?**
+  _High betweenness centrality (0.247) - this node is a cross-community bridge._
+- **Why does `GET()` connect `Community 0` to `Community 32`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 36`, `Community 8`, `Community 10`, `Community 42`, `Community 44`, `Community 15`, `Community 19`?**
+  _High betweenness centrality (0.128) - this node is a cross-community bridge._
+- **Are the 108 inferred relationships involving `stringify()` (e.g. with `buildAnalyzePrompt()` and `buildCriticPrompt()`) actually correct?**
+  _`stringify()` has 108 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 73 inferred relationships involving `has()` (e.g. with `validateAnalyzerResult()` and `findForbiddenKeyPath()`) actually correct?**
+  _`has()` has 73 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 61 inferred relationships involving `GET()` (e.g. with `getSafeRelativeRedirect()` and `createClient()`) actually correct?**
+  _`GET()` has 61 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 36 inferred relationships involving `POST()` (e.g. with `createClient()` and `isE2ERateLimitDisabled()`) actually correct?**
+  _`POST()` has 36 INFERRED edges - model-reasoned connections that need verification._

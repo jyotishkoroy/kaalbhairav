@@ -72,15 +72,18 @@ async function deleteOptionalTableRows(
   }
 }
 
+async function insertDeletedUserRecord(service: ServiceClient, displayName: string) {
+  const { error } = await service.from('deleted_users').insert({
+    name: displayName,
+    deletion_source: 'account_settings',
+  })
+  if (error) throw error
+}
+
 export async function deleteAccountAndUserData(params: DeleteAccountParams) {
   const displayName = resolveDisplayName(params)
 
-  await runOptionalQuery(
-    params.service.from('deleted_users').insert({
-      name: displayName,
-      deletion_source: 'account_settings',
-    }),
-  )
+  await insertDeletedUserRecord(params.service, displayName)
 
   const profileIds: string[] = []
   const calculationIds: string[] = []
