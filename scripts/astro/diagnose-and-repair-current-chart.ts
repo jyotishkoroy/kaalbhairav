@@ -6,6 +6,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildPublicChartFacts, extractDeterministicDashaFacts, validatePublicChartFacts } from "@/lib/astro/public-chart-facts";
+import { randomUUID } from "node:crypto";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -260,6 +261,17 @@ function isMissingCalculationIdColumnError(error: unknown): boolean {
   return message.includes("column chart_json_versions.calculation_id does not exist") || message.includes("could not find the 'calculation_id' column");
 }
 
+function isMissingChartVersionColumnError(error: unknown): boolean {
+  const message = queryErrorMessage(error).toLowerCase();
+  return message.includes("column chart_json_versions.chart_version does not exist") || message.includes("could not find the 'chart_version' column");
+}
+
+function isNotNullColumnError(error: unknown, columnName: string): boolean {
+  const message = queryErrorMessage(error).toLowerCase();
+  const normalized = columnName.toLowerCase();
+  return message.includes(`null value in column "${normalized}"`) || (message.includes(normalized) && message.includes("not-null constraint"));
+}
+
 async function discoverChartVersionColumnInfo(service: ServiceClient): Promise<ChartVersionColumnInfo> {
   const metadata = await discoverTableColumnMetadata(service, "chart_json_versions");
   if (!metadata) return { columns: new Set<string>(), requiredInsertColumns: new Set<string>(), discoveryUnavailable: true };
@@ -438,6 +450,146 @@ async function fetchSelectedChartVersionCalculationId(service: ServiceClient, se
   return { calculationId: calculationId ?? null, safeNotes };
 }
 
+async function loadSelectedChartVersionFullRow(
+  service: ServiceClient,
+  selectedVersionId: string,
+): Promise<{ row: Record<string, unknown> | null; safeNotes: string[] }> {
+  const result = await service
+    .from("chart_json_versions")
+    .select("*")
+    .eq("id", selectedVersionId)
+    .maybeSingle();
+
+  if (result.error) {
+    return {
+      row: null,
+      safeNotes: [`source_full_row_lookup_failed:${queryErrorMessage(result.error)}`],
+    };
+  }
+
+  return { row: (result.data as Record<string, unknown> | null) ?? null, safeNotes: [] };
+}
+
+async function loadSelectedCalculationFullRow(
+  service: ServiceClient,
+  selectedCalculationId: string,
+): Promise<{ row: Record<string, unknown> | null; safeNotes: string[] }> {
+  const result = await service
+    .from("chart_calculations")
+    .select("*")
+    .eq("id", selectedCalculationId)
+    .maybeSingle();
+
+  if (result.error) {
+    return {
+      row: null,
+      safeNotes: [`source_calculation_lookup_failed:${queryErrorMessage(result.error)}`],
+    };
+  }
+
+  return { row: (result.data as Record<string, unknown> | null) ?? null, safeNotes: [] };
+}
+
+async function resolveNextRepairChartVersion(
+  service: ServiceClient,
+  profileId: string,
+  selectedVersion: ChartVersionRow,
+): Promise<{ chartVersion: number | null; safeNotes: string[] }> {
+  const safeNotes: string[] = [];
+  const selectedValue = Number((selectedVersion as Record<string, unknown>).chart_version);
+  const selectedNumeric = Number.isFinite(selectedValue) ? selectedValue : null;
+
+  const result = await service
+    .from("chart_json_versions")
+    .select("chart_version")
+    .eq("profile_id", profileId);
+
+  if (result.error) {
+    if (isSchemaMissingColumnError(result.error) || isMissingChartVersionColumnError(result.error)) {
+      safeNotes.push("source_missing_column:chart_json_versions.chart_version");
+      return { chartVersion: null, safeNotes };
+    }
+
+    safeNotes.push(`chart_version_lookup_failed:${queryErrorMessage(result.error)}`);
+    if (selectedNumeric !== null) {
+      return { chartVersion: selectedNumeric + 1, safeNotes };
+    }
+
+    return { chartVersion: null, safeNotes };
+  }
+
+  const rows = Array.isArray(result.data) ? result.data : [];
+  const versions = rows
+    .map((row) => Number((row as Record<string, unknown>).chart_version))
+    .filter((value) => Number.isFinite(value));
+
+  if (versions.length > 0) {
+    return { chartVersion: Math.max(...versions) + 1, safeNotes };
+  }
+
+  if (selectedNumeric !== null) {
+    return { chartVersion: selectedNumeric + 1, safeNotes };
+  }
+
+  return { chartVersion: null, safeNotes };
+}
+
+function buildRepairInsertPayloadFromSource(params: {
+  sourceRow: Record<string, unknown> | null;
+  profileId: string;
+  profileUserId: string | null;
+  insertUserId: boolean;
+  insertCalculationId: boolean;
+  lookedUpCalculationId: string | null;
+  insertChartVersion: boolean;
+  repairChartVersion: number | null;
+  repairedChartJson: Record<string, unknown>;
+  now: string;
+}): Record<string, unknown> {
+  const payload = { ...(params.sourceRow ?? {}) };
+  delete (payload as Record<string, unknown>).id;
+  delete (payload as Record<string, unknown>).updated_at;
+  if ("is_current" in payload) (payload as Record<string, unknown>).is_current = true;
+  if ("status" in payload) (payload as Record<string, unknown>).status = "completed";
+  if ("created_at" in payload && (payload as Record<string, unknown>).created_at == null) (payload as Record<string, unknown>).created_at = params.now;
+  (payload as Record<string, unknown>).profile_id = params.profileId;
+  if (params.insertUserId) (payload as Record<string, unknown>).user_id = params.profileUserId;
+  if (params.insertCalculationId) (payload as Record<string, unknown>).calculation_id = params.lookedUpCalculationId;
+  if (params.insertChartVersion) (payload as Record<string, unknown>).chart_version = params.repairChartVersion;
+  (payload as Record<string, unknown>).chart_json = params.repairedChartJson;
+  return payload;
+}
+
+async function markRepairedChartCurrent(
+  service: ServiceClient,
+  profileId: string,
+  newChartVersionId: string,
+  now: string,
+  hasChartVersionColumn: (name: string) => boolean,
+  birthProfiles: Set<string>,
+) {
+  const updates = await Promise.all([
+    hasChartVersionColumn("is_current")
+      ? service.from("chart_json_versions").update({ is_current: false }).eq("profile_id", profileId)
+      : Promise.resolve({ error: null }),
+    hasChartVersionColumn("is_current") || hasChartVersionColumn("status") || hasChartVersionColumn("updated_at")
+      ? service.from("chart_json_versions").update({
+          ...(hasChartVersionColumn("is_current") ? { is_current: true } : {}),
+          ...(hasChartVersionColumn("status") ? { status: "completed" } : {}),
+          ...(hasChartVersionColumn("updated_at") ? { updated_at: now } : {}),
+        }).eq("id", newChartVersionId)
+      : Promise.resolve({ error: null }),
+    birthProfiles.has("current_chart_version_id")
+      ? service.from("birth_profiles").update({ current_chart_version_id: newChartVersionId }).eq("id", profileId)
+      : Promise.resolve({ error: null }),
+  ]);
+  for (const result of updates) {
+    if (result && typeof result === "object" && "error" in result && result.error) {
+      throw new Error(String((result.error as { message?: string } | null)?.message ?? result.error));
+    }
+  }
+}
+
 function chartVersionColumnPresence(rows: ChartVersionRow[]): Set<string> {
   const present = new Set<string>();
   for (const row of rows) {
@@ -584,10 +736,25 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   if ((chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable) && !lookedUpCalculationId) {
     throw new Error("missing_required_insert_value:chart_json_versions.calculation_id");
   }
+  const chartVersionColumnAvailable = chartVersionSchema.columns.has("chart_version");
+  const assumeChartVersionRequired = chartVersionSchema.discoveryUnavailable;
+  const insertChartVersion = chartVersionColumnAvailable || assumeChartVersionRequired;
+  const chartVersionLookup = insertChartVersion
+    ? await resolveNextRepairChartVersion(service, profileId, selected.version)
+    : { chartVersion: null, safeNotes: [] as string[] };
+  const repairChartVersion = chartVersionLookup.chartVersion;
+  if (insertChartVersion && repairChartVersion === null) {
+    throw new Error("missing_required_insert_value:chart_json_versions.chart_version");
+  }
+  const sourceRowLookup = await loadSelectedChartVersionFullRow(service, String(selected.version.id));
+  const sourceRow = sourceRowLookup.row;
+  const insertCalculationId = chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable;
+  const repairCalculationLookup = insertCalculationId && lookedUpCalculationId
+    ? await loadSelectedCalculationFullRow(service, lookedUpCalculationId)
+    : { row: null, safeNotes: [] as string[] };
 
   if (mode === "dry-run") {
     const insertUserId = chartVersionSchema.columns.has("user_id") || (chartVersionSchema.discoveryUnavailable && profileUserId !== undefined);
-    const insertCalculationId = chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable;
     return {
       selectedVersionId: String(selected.version.id),
       selectedClass: selected.className,
@@ -599,6 +766,10 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
         ...(chartVersionSchema.discoveryUnavailable && profileUserId !== undefined ? ["assuming_required_column:chart_json_versions.user_id"] : []),
         ...calculationIdSafeNotes,
         ...(chartVersionSchema.discoveryUnavailable ? ["assuming_required_column:chart_json_versions.calculation_id"] : []),
+        ...(chartVersionSchema.discoveryUnavailable ? ["assuming_required_column:chart_json_versions.chart_version"] : []),
+        ...chartVersionLookup.safeNotes,
+        ...sourceRowLookup.safeNotes,
+        ...repairCalculationLookup.safeNotes,
       ],
       facts: enrichedFacts,
       plan: {
@@ -606,6 +777,8 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
         createRepairedChartVersion: selected.className === "repairable_missing_dasha",
         insertUserId,
         insertCalculationId,
+        insertChartVersion,
+        repairChartVersion,
         updateProfilePointer: columns.birthProfiles.has("current_chart_version_id"),
       },
       versions: versionSummaries,
@@ -615,66 +788,80 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   const now = new Date().toISOString();
   const hasChartVersionColumn = (name: string) => chartVersionColumns.has(name);
   const insertUserId = chartVersionSchema.columns.has("user_id") || chartVersionSchema.discoveryUnavailable;
-  const insertCalculationId = chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable;
+  const repairCalculationId = insertCalculationId ? randomUUID() : lookedUpCalculationId;
+  if (insertChartVersion && repairChartVersion === null) {
+    throw new Error("missing_required_insert_value:chart_json_versions.chart_version");
+  }
   if (insertUserId && !profileUserId) {
     throw new Error("missing_required_insert_value:chart_json_versions.user_id");
   }
   if (insertCalculationId && !lookedUpCalculationId) {
     throw new Error("missing_required_insert_value:chart_json_versions.calculation_id");
   }
-  const insertPayload: Record<string, unknown> = {
-    profile_id: profileId,
-    ...(insertUserId ? { user_id: profileUserId } : {}),
-    ...(insertCalculationId ? { calculation_id: lookedUpCalculationId } : {}),
-    chart_json: {
-      ...(typeof selected.version.chart_json === "object" && selected.version.chart_json ? selected.version.chart_json as Record<string, unknown> : {}),
-      public_facts: {
-        ...(typeof selected.version.chart_json === "object" && selected.version.chart_json && typeof (selected.version.chart_json as Record<string, unknown>).public_facts === "object" ? (selected.version.chart_json as Record<string, unknown>).public_facts as Record<string, unknown> : {}),
-        mahadasha: enrichedFacts.mahadasha,
-        mahadasha_start: enrichedFacts.mahadashaStart ?? null,
-        mahadasha_end: enrichedFacts.mahadashaEnd ?? null,
-        antardasha_now: enrichedFacts.antardashaNow ?? null,
-        antardasha_start: enrichedFacts.antardashaStart ?? null,
-        antardasha_end: enrichedFacts.antardashaEnd ?? null,
-      },
+  const repairedChartJson = {
+    ...(typeof selected.version.chart_json === "object" && selected.version.chart_json ? selected.version.chart_json as Record<string, unknown> : {}),
+    public_facts: {
+      ...(typeof selected.version.chart_json === "object" && selected.version.chart_json && typeof (selected.version.chart_json as Record<string, unknown>).public_facts === "object" ? (selected.version.chart_json as Record<string, unknown>).public_facts as Record<string, unknown> : {}),
+      mahadasha: enrichedFacts.mahadasha,
+      mahadasha_start: enrichedFacts.mahadashaStart ?? null,
+      mahadasha_end: enrichedFacts.mahadashaEnd ?? null,
+      antardasha_now: enrichedFacts.antardashaNow ?? null,
+      antardasha_start: enrichedFacts.antardashaStart ?? null,
+      antardasha_end: enrichedFacts.antardashaEnd ?? null,
     },
-    created_at: now,
   };
-  if (hasChartVersionColumn("chart_version")) insertPayload.chart_version = Number(selected.version.chart_version ?? 0) + 1000;
-  if (hasChartVersionColumn("input_hash")) insertPayload.input_hash = selected.version.input_hash ?? null;
-  if (hasChartVersionColumn("settings_hash")) insertPayload.settings_hash = selected.version.settings_hash ?? null;
-  if (hasChartVersionColumn("is_current")) insertPayload.is_current = true;
-  if (hasChartVersionColumn("status")) insertPayload.status = "completed";
-  if (hasChartVersionColumn("updated_at")) insertPayload.updated_at = now;
+  const insertPayload = buildRepairInsertPayloadFromSource({
+    sourceRow,
+    profileId,
+    profileUserId: profileUserId ?? null,
+    insertUserId,
+    insertCalculationId,
+    lookedUpCalculationId: repairCalculationId,
+    insertChartVersion,
+    repairChartVersion,
+    repairedChartJson,
+    now,
+  });
+  if (hasChartVersionColumn("input_hash")) insertPayload.input_hash = sourceRow?.input_hash ?? selected.version.input_hash ?? null;
+  if (hasChartVersionColumn("settings_hash")) insertPayload.settings_hash = sourceRow?.settings_hash ?? selected.version.settings_hash ?? null;
   if (hasChartVersionColumn("repaired_from_chart_version_id")) insertPayload.repaired_from_chart_version_id = String(selected.version.id);
+  if (insertCalculationId && repairCalculationLookup.row) {
+    const calculationClone = { ...repairCalculationLookup.row };
+    delete calculationClone.id;
+    const calculationInsertResult = await service.from("chart_calculations").insert({
+      ...calculationClone,
+      id: repairCalculationId,
+      status: "completed",
+      completed_at: now,
+    }).select("id").single();
+    if (calculationInsertResult.error) {
+      throw new Error(String((calculationInsertResult.error as { message?: string } | null)?.message ?? calculationInsertResult.error));
+    }
+  }
   const insertResult = await service.from("chart_json_versions").insert(insertPayload).select("id").single();
   if (insertResult.error) {
+    if (insertChartVersion && isMissingChartVersionColumnError(insertResult.error)) {
+      const fallbackPayload = { ...insertPayload };
+      delete fallbackPayload.chart_version;
+      const retryResult = await service.from("chart_json_versions").insert(fallbackPayload).select("id").single();
+      if (retryResult.error) throw new Error(String((retryResult.error as { message?: string } | null)?.message ?? retryResult.error));
+      const newChartVersionId = String((retryResult.data as Record<string, unknown>).id);
+      await markRepairedChartCurrent(service, profileId, newChartVersionId, now, hasChartVersionColumn, columns.birthProfiles);
+      return {
+        selectedVersionId: newChartVersionId,
+        selectedClass: selected.className,
+        dashaSource: dashaSource.source,
+        dashaSourcesChecked: dashaLookup.checked,
+        facts: enrichedFacts,
+      };
+    }
     if (insertCalculationId && isMissingCalculationIdColumnError(insertResult.error)) {
       const fallbackPayload = { ...insertPayload };
       delete fallbackPayload.calculation_id;
       const retryResult = await service.from("chart_json_versions").insert(fallbackPayload).select("id").single();
       if (retryResult.error) throw new Error(String((retryResult.error as { message?: string } | null)?.message ?? retryResult.error));
       const newChartVersionId = String((retryResult.data as Record<string, unknown>).id);
-      const updates = await Promise.all([
-        hasChartVersionColumn("is_current")
-          ? service.from("chart_json_versions").update({ is_current: false }).eq("profile_id", profileId)
-          : Promise.resolve({ error: null }),
-        hasChartVersionColumn("is_current") || hasChartVersionColumn("status") || hasChartVersionColumn("updated_at")
-          ? service.from("chart_json_versions").update({
-              ...(hasChartVersionColumn("is_current") ? { is_current: true } : {}),
-              ...(hasChartVersionColumn("status") ? { status: "completed" } : {}),
-              ...(hasChartVersionColumn("updated_at") ? { updated_at: now } : {}),
-            }).eq("id", newChartVersionId)
-          : Promise.resolve({ error: null }),
-        columns.birthProfiles.has("current_chart_version_id")
-          ? service.from("birth_profiles").update({ current_chart_version_id: newChartVersionId }).eq("id", profileId)
-          : Promise.resolve({ error: null }),
-      ]);
-      for (const result of updates) {
-        if (result && typeof result === "object" && "error" in result && result.error) {
-          throw new Error(String((result.error as { message?: string } | null)?.message ?? result.error));
-        }
-      }
+      await markRepairedChartCurrent(service, profileId, newChartVersionId, now, hasChartVersionColumn, columns.birthProfiles);
 
       return {
         selectedVersionId: newChartVersionId,
@@ -690,26 +877,7 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
       const retryResult = await service.from("chart_json_versions").insert(fallbackPayload).select("id").single();
       if (retryResult.error) throw new Error(String((retryResult.error as { message?: string } | null)?.message ?? retryResult.error));
       const newChartVersionId = String((retryResult.data as Record<string, unknown>).id);
-      const updates = await Promise.all([
-        hasChartVersionColumn("is_current")
-          ? service.from("chart_json_versions").update({ is_current: false }).eq("profile_id", profileId)
-          : Promise.resolve({ error: null }),
-        hasChartVersionColumn("is_current") || hasChartVersionColumn("status") || hasChartVersionColumn("updated_at")
-          ? service.from("chart_json_versions").update({
-              ...(hasChartVersionColumn("is_current") ? { is_current: true } : {}),
-              ...(hasChartVersionColumn("status") ? { status: "completed" } : {}),
-              ...(hasChartVersionColumn("updated_at") ? { updated_at: now } : {}),
-            }).eq("id", newChartVersionId)
-          : Promise.resolve({ error: null }),
-        columns.birthProfiles.has("current_chart_version_id")
-          ? service.from("birth_profiles").update({ current_chart_version_id: newChartVersionId }).eq("id", profileId)
-          : Promise.resolve({ error: null }),
-      ]);
-      for (const result of updates) {
-        if (result && typeof result === "object" && "error" in result && result.error) {
-          throw new Error(String((result.error as { message?: string } | null)?.message ?? result.error));
-        }
-      }
+      await markRepairedChartCurrent(service, profileId, newChartVersionId, now, hasChartVersionColumn, columns.birthProfiles);
 
       return {
         selectedVersionId: newChartVersionId,
@@ -719,29 +887,17 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
         facts: enrichedFacts,
       };
     }
+    if (
+      isNotNullColumnError(insertResult.error, "chart_version") ||
+      isNotNullColumnError(insertResult.error, "calculation_id") ||
+      isNotNullColumnError(insertResult.error, "user_id")
+    ) {
+      throw new Error(String((insertResult.error as { message?: string } | null)?.message ?? insertResult.error));
+    }
     throw new Error(String((insertResult.error as { message?: string } | null)?.message ?? insertResult.error));
   }
   const newChartVersionId = String((insertResult.data as Record<string, unknown>).id);
-  const updates = await Promise.all([
-    hasChartVersionColumn("is_current")
-      ? service.from("chart_json_versions").update({ is_current: false }).eq("profile_id", profileId)
-      : Promise.resolve({ error: null }),
-    hasChartVersionColumn("is_current") || hasChartVersionColumn("status") || hasChartVersionColumn("updated_at")
-      ? service.from("chart_json_versions").update({
-          ...(hasChartVersionColumn("is_current") ? { is_current: true } : {}),
-          ...(hasChartVersionColumn("status") ? { status: "completed" } : {}),
-          ...(hasChartVersionColumn("updated_at") ? { updated_at: now } : {}),
-        }).eq("id", newChartVersionId)
-      : Promise.resolve({ error: null }),
-    columns.birthProfiles.has("current_chart_version_id")
-      ? service.from("birth_profiles").update({ current_chart_version_id: newChartVersionId }).eq("id", profileId)
-      : Promise.resolve({ error: null }),
-  ]);
-  for (const result of updates) {
-    if (result && typeof result === "object" && "error" in result && result.error) {
-      throw new Error(String((result.error as { message?: string } | null)?.message ?? result.error));
-    }
-  }
+  await markRepairedChartCurrent(service, profileId, newChartVersionId, now, hasChartVersionColumn, columns.birthProfiles);
 
   return {
     selectedVersionId: newChartVersionId,
