@@ -13,6 +13,7 @@ type CliMode = "dry-run" | "apply";
 
 type CliArgs = {
   email?: string;
+  findEmail?: string;
   profileId?: string;
   mode?: CliMode;
   verbose: boolean;
@@ -77,6 +78,7 @@ function parseArgs(argv: string[]): CliArgs {
   for (let i = 0; i < argv.length; i += 1) {
     const current = argv[i];
     if (current === "--email") args.email = argv[++i];
+    else if (current === "--find-email") args.findEmail = argv[++i];
     else if (current === "--profile-id") args.profileId = argv[++i];
     else if (current === "--dry-run") args.mode = "dry-run";
     else if (current === "--apply") args.mode = "apply";
@@ -89,54 +91,85 @@ function safeLog(label: string, value: unknown) {
   console.log(`${label}: ${typeof value === "string" ? value : JSON.stringify(value, null, 2)}`);
 }
 
-async function fetchBirthProfile(service: ServiceClient, args: CliArgs, columns: { birthProfiles: Set<string> }): Promise<Record<string, unknown>> {
-  const filters: Array<{ column: string; value: string }> = [];
-  if (args.profileId) filters.push({ column: "id", value: args.profileId });
-  if (args.email) {
-    if (columns.birthProfiles.has("google_email")) filters.push({ column: "google_email", value: args.email });
-    if (columns.birthProfiles.has("email")) filters.push({ column: "email", value: args.email });
-    if (columns.birthProfiles.has("user_email")) filters.push({ column: "user_email", value: args.email });
-  }
-
-  if (filters.length === 0) throw new Error("no_lookup_key_provided");
-
-  const selectCols = Array.from([
-    "id", "user_id", "status", "canonical_profile", "current_chart_version_id",
-    "google_email", "email", "birth_date", "birth_time", "birth_time_known",
-    "birth_time_unknown", "birth_place_name", "timezone", "latitude", "longitude",
-    "encrypted_birth_data",
-  ].filter((col) => columns.birthProfiles.has(col) || ["id", "user_id", "status"].includes(col))).join(", ");
-
-  let candidates: Record<string, unknown>[] = [];
-  for (const filter of filters) {
-    const { data } = await service.from("birth_profiles").select(selectCols).eq(filter.column, filter.value);
-    candidates = candidates.concat((data ?? []) as unknown as Record<string, unknown>[]);
-  }
-
-  if (candidates.length === 0) throw new Error("profile_not_found");
-
-  const canonical = candidates.filter((row) => asBool(row.canonical_profile) ?? false);
-  const active = candidates.filter((row) => String(row.status ?? "") === "active");
-  const selected = (canonical[0] ?? active[0] ?? candidates[0]) as Record<string, unknown>;
-  return selected;
-}
+const DIRECT_PROFILE_SELECT = "id,user_id,display_name,google_email,google_name,canonical_profile,created_at,updated_at,current_chart_version_id,date_of_birth,time_of_birth,place_of_birth,birth_timezone,birth_latitude,birth_longitude,birth_time_unknown";
+const DIRECT_PROFILE_BASE_SELECT = "id,user_id,display_name,google_email,google_name,canonical_profile,created_at,updated_at,current_chart_version_id";
 
 function summarizeProfile(profile: Record<string, unknown>): SafeProfileSummary {
-  const summary: SafeProfileSummary = {
+  return {
     profileId: String(profile.id ?? ""),
     userId: redactId(String(profile.user_id ?? "")),
     googleEmail: asString(profile.google_email),
-    email: asString(profile.email) ?? asString(profile.google_email),
-    dateOfBirth: asString(profile.birth_date),
-    birthTime: asString(profile.birth_time),
-    birthTimeUnknown: asBool(profile.birth_time_unknown) ?? !asBool(profile.birth_time_known),
-    placeName: asString(profile.birth_place_name),
-    timezone: asString(profile.timezone),
-    latitude: roundCoord(profile.latitude),
-    longitude: roundCoord(profile.longitude),
+    email: asString(profile.google_email) ?? asString(profile.email),
+    dateOfBirth: asString(profile.date_of_birth),
+    birthTime: asString(profile.time_of_birth),
+    birthTimeUnknown: asBool(profile.birth_time_unknown),
+    placeName: asString(profile.place_of_birth),
+    timezone: asString(profile.birth_timezone),
+    latitude: roundCoord(profile.birth_latitude),
+    longitude: roundCoord(profile.birth_longitude),
     currentChartVersionId: asString(profile.current_chart_version_id),
   };
-  return summary;
+}
+
+function queryErrorCode(error: unknown): string {
+  const message = String((error as { message?: string } | null)?.message ?? error ?? "").toLowerCase();
+  if (message.includes("missing column") || message.includes("does not exist") || message.includes("column")) return "schema_missing_column";
+  return "profile_query_failed";
+}
+
+async function selectBirthProfileById(service: ServiceClient, profileId: string): Promise<Record<string, unknown>> {
+  const baseQuery = () => service.from("birth_profiles").select(DIRECT_PROFILE_BASE_SELECT).eq("id", profileId).maybeSingle();
+  const primary = await service.from("birth_profiles").select(DIRECT_PROFILE_SELECT).eq("id", profileId).maybeSingle();
+  if (primary.error) {
+    if (queryErrorCode(primary.error) === "schema_missing_column") {
+      const fallback = await baseQuery();
+      if (fallback.error) throw new Error("schema_missing_column");
+      if (!fallback.data) throw new Error("profile_not_found");
+      return fallback.data as Record<string, unknown>;
+    }
+    throw new Error("profile_query_failed");
+  }
+  if (!primary.data) throw new Error("profile_not_found");
+  return primary.data as Record<string, unknown>;
+}
+
+async function resolveBirthProfilesByEmail(service: ServiceClient, email: string): Promise<Record<string, unknown>[]> {
+  const trimmed = email.trim();
+  const userIds = new Set<string>();
+  const authLookup = await service.from("auth.users").select("id,email").eq("email", trimmed).maybeSingle();
+  if (authLookup.data) {
+    const id = asString((authLookup.data as Record<string, unknown>).id);
+    if (id) userIds.add(id);
+  }
+
+  const profileSelect = DIRECT_PROFILE_BASE_SELECT;
+  const queries = [
+    service.from("birth_profiles").select(profileSelect).eq("google_email", trimmed).maybeSingle(),
+    service.from("birth_profiles").select(profileSelect).eq("email", trimmed).maybeSingle(),
+    ...Array.from(userIds, (userId) => service.from("birth_profiles").select(profileSelect).eq("user_id", userId).maybeSingle()),
+  ];
+  const results = await Promise.all(queries);
+  const unique = new Map<string, Record<string, unknown>>();
+  for (const result of results) {
+    if (result.error || !result.data) continue;
+    const rows = Array.isArray(result.data) ? result.data : [result.data];
+    for (const rowValue of rows) {
+      const row = rowValue as Record<string, unknown>;
+      const id = asString(row.id);
+      if (id && !unique.has(id)) unique.set(id, row);
+    }
+  }
+  return Array.from(unique.values());
+}
+
+async function fetchBirthProfile(service: ServiceClient, args: CliArgs): Promise<Record<string, unknown>> {
+  if (args.profileId) return selectBirthProfileById(service, args.profileId);
+  const email = args.findEmail ?? args.email;
+  if (!email) throw new Error("no_lookup_key_provided");
+  const candidates = await resolveBirthProfilesByEmail(service, email);
+  if (candidates.length === 0) throw new Error("profile_not_found");
+  if (args.verbose) safeLog("candidate_profiles", candidates.map(summarizeProfile));
+  return candidates[0] as Record<string, unknown>;
 }
 
 function validateExpectedFacts(facts: ReturnType<typeof buildPublicChartFacts>) {
@@ -247,19 +280,31 @@ export async function main(argv = process.argv.slice(2)) {
   if (!args.mode || (args.mode !== "dry-run" && args.mode !== "apply")) {
     throw new Error("provide exactly one of --dry-run or --apply");
   }
-  if (!!args.email === !!args.profileId) {
-    throw new Error("provide exactly one of --email or --profile-id");
+  if ((args.profileId ? 1 : 0) + (args.email || args.findEmail ? 1 : 0) !== 1) {
+    throw new Error("provide exactly one of --profile-id or --email/--find-email");
   }
 
   const missingEnv = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].filter((name) => !process.env[name]);
   if (missingEnv.length > 0) throw new Error(`missing_required_env: ${missingEnv.join(", ")}`);
 
   const service = createServiceClient();
+  if (args.verbose) {
+    safeLog("parsed_args", {
+      mode: args.mode,
+      profileId: args.profileId ? redactId(args.profileId) : undefined,
+      email: args.email ? `${shortHash(args.email)}@redacted` : undefined,
+      findEmail: args.findEmail ? `${shortHash(args.findEmail)}@redacted` : undefined,
+      verbose: args.verbose,
+    });
+    safeLog("lookup_mode", args.profileId ? "profile-id" : "email");
+  }
+
   const birthCols = new Set<string>(["id", "user_id", "status", "canonical_profile", "current_chart_version_id", "google_email", "email", "birth_date", "birth_time", "birth_time_known", "birth_time_unknown", "birth_place_name", "timezone", "latitude", "longitude"]);
   const chartCols = new Set<string>(["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"]);
   const columns = { birthProfiles: birthCols, chartVersions: chartCols };
 
-  const profile = await fetchBirthProfile(service, args, columns);
+  const profile = await fetchBirthProfile(service, args);
+  if (args.verbose) safeLog("selected_profile_id", redactId(String(profile.id ?? "")));
   const summary = summarizeProfile(profile);
   safeLog("profile_summary", summary);
 
