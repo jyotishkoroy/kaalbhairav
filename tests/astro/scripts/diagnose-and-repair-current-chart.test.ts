@@ -267,7 +267,7 @@ describe("diagnose-and-repair-current-chart", () => {
     expect(code).toBe(0);
   });
 
-  it("does not select chart_json_versions.prediction_summary when absent", async () => {
+  it("does not select chart_json_versions.updated_at when absent", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
     const service: ServiceMock = makeServiceMock({
@@ -282,16 +282,16 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"] },
     });
     createServiceClientMock.mockReturnValue(service);
     const code = await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"]);
     expect(code).toBe(0);
     const chartSelect = service.queries.chartQuery.select.mock.calls[0]?.[0] as string;
-    expect(chartSelect).toBe("id, profile_id, created_at, chart_version, input_hash, settings_hash, is_current, status, chart_json, updated_at");
+    expect(chartSelect).toBe("id, profile_id, created_at, chart_json");
   });
 
-  it("missing chart_json_versions.prediction_summary does not crash dry-run", async () => {
+  it("missing chart_json_versions.updated_at does not crash dry-run", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
     const service: ServiceMock = makeServiceMock({
@@ -306,11 +306,29 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4, mahadasha: "Jupiter" }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"], prediction_ready_summaries: null },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"], prediction_ready_summaries: null },
     });
     createServiceClientMock.mockReturnValue(service);
     const code = await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"]);
     expect(code).toBe(0);
+  });
+
+  it("schema discovery failure falls back to required chart_json_versions columns", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: { data: { id: "p1", user_id: "u1", display_name: "Jyotishko Roy", canonical_profile: true, current_chart_version_id: null }, error: null },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4, mahadasha: "Jupiter" } },
+      }],
+      tableDiscovery: { chart_json_versions: null, prediction_ready_summaries: null },
+    });
+    createServiceClientMock.mockReturnValue(service);
+    const code = await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"]);
+    expect(code).toBe(0);
+    expect(service.queries.chartQuery.select.mock.calls[0]?.[0]).toBe("id, profile_id, created_at, chart_json");
   });
 
   it("missing prediction_ready_summaries table does not crash dry-run", async () => {
@@ -328,7 +346,7 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"], prediction_ready_summaries: null },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"], prediction_ready_summaries: null },
     });
     createServiceClientMock.mockReturnValue(service);
     await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"])).resolves.toBe(0);
@@ -357,7 +375,7 @@ describe("diagnose-and-repair-current-chart", () => {
         current_timing_summary: "Mahadasha: Jupiter. Antardasha: Ketu",
       }],
       tableDiscovery: {
-        chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"],
+        chart_json_versions: ["id", "profile_id", "created_at", "chart_json"],
         prediction_ready_summaries: ["id", "profile_id", "created_at"],
       },
     });
@@ -381,7 +399,7 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"] },
     });
     createServiceClientMock.mockReturnValue(service);
     await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"])).resolves.toBe(0);
@@ -402,7 +420,7 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"] },
     });
     createServiceClientMock.mockReturnValue(service);
     await expect(main(["--profile-id", "different-profile", "--dry-run"])).rejects.toThrow();
@@ -423,7 +441,7 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"] },
     });
     createServiceClientMock.mockReturnValue(service);
     await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"])).rejects.toThrow();
@@ -444,7 +462,7 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Virgo", moon_sign: "Gemini", moon_house: 10, sun_sign: "Taurus", sun_house: 9 } },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"] },
     });
     createServiceClientMock.mockReturnValue(service);
     await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"])).rejects.toThrow();
@@ -479,6 +497,40 @@ describe("diagnose-and-repair-current-chart", () => {
     createServiceClientMock.mockReturnValue(service);
     await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"]);
     expect(service.queries.chartQuery.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("apply only writes optional chart_json_versions columns when present", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          user_id: "u1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+          google_email: "jyotiskaroy25@gmail.com",
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"], birth_profiles: ["id", "user_id", "current_chart_version_id"] },
+    });
+    createServiceClientMock.mockReturnValue(service);
+    await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"]);
+    const payload = service.queries.chartQuery.insert.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ profile_id: "p1", created_at: expect.any(String), chart_json: expect.any(Object) });
+    expect(payload).not.toHaveProperty("chart_version");
+    expect(payload).not.toHaveProperty("input_hash");
+    expect(payload).not.toHaveProperty("settings_hash");
+    expect(payload).not.toHaveProperty("is_current");
+    expect(payload).not.toHaveProperty("status");
+    expect(payload).not.toHaveProperty("updated_at");
   });
 
   it("does not print raw chart_json or secrets", async () => {
@@ -521,7 +573,7 @@ describe("diagnose-and-repair-current-chart", () => {
         status: "completed",
         chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } }, raw_report_text: "token=abc123" },
       }],
-      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] },
+      tableDiscovery: { chart_json_versions: ["id", "profile_id", "created_at", "chart_json"] },
     });
     createServiceClientMock.mockReturnValue(service);
     await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"]);
