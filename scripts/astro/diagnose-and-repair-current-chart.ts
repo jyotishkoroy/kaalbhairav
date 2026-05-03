@@ -144,6 +144,71 @@ function rowValue(row: Record<string, unknown>, keys: string[]): unknown {
   return undefined;
 }
 
+const BASE_CHART_VERSION_COLUMNS = ["id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at"] as const;
+const OPTIONAL_CHART_VERSION_COLUMNS = ["prediction_summary", "predictionSummary", "report_derived_facts", "reportDerivedFacts", "public_facts", "normalized_facts"] as const;
+const BASE_PREDICTION_SUMMARY_COLUMNS = ["id", "profile_id", "created_at"] as const;
+const OPTIONAL_PREDICTION_SUMMARY_COLUMNS = ["chart_version_id", "prediction_context", "current_timing_summary", "normalized_facts", "public_facts", "summary_json", "metadata"] as const;
+
+function buildSelectColumns(base: readonly string[], optional: readonly string[], present: Set<string>): string {
+  return [...base, ...optional.filter((column) => present.has(column))].join(", ");
+}
+
+function baseColumnsFromError(error: unknown, base: readonly string[], optional: readonly string[]): string[] | null {
+  if (!isSchemaMissingColumnError(error)) return null;
+  const message = queryErrorMessage(error);
+  const missingOptional = optional.find((column) => message.includes(column));
+  if (missingOptional) return [...base];
+  return null;
+}
+
+async function querySchemaSafeRows(
+  queryFactory: (selectColumns: string) => Promise<{ data: unknown; error: unknown }>,
+  baseColumns: readonly string[],
+  optionalColumns: readonly string[],
+  presentColumns: Set<string>,
+  safeNotes: string[],
+  sourceName: string,
+): Promise<Record<string, unknown>[]> {
+  const selectColumns = buildSelectColumns(baseColumns, optionalColumns, presentColumns);
+  const initial = await queryFactory(selectColumns);
+  if (!initial.error) return Array.isArray(initial.data) ? initial.data as Record<string, unknown>[] : initial.data ? [initial.data as Record<string, unknown>] : [];
+  if (isSchemaMissingTableError(initial.error)) {
+    safeNotes.push(`source_table_missing:${sourceName}`);
+    return [];
+  }
+  const fallbackColumns = baseColumnsFromError(initial.error, baseColumns, optionalColumns);
+  if (!fallbackColumns) throw new Error(queryErrorMessage(initial.error));
+  safeNotes.push(`source_missing_column:${sourceName}:${queryErrorMessage(initial.error)}`);
+  const fallback = await queryFactory(fallbackColumns.join(", "));
+  if (fallback.error) {
+    if (isSchemaMissingTableError(fallback.error)) safeNotes.push(`source_table_missing:${sourceName}`);
+    else if (isSchemaMissingColumnError(fallback.error)) safeNotes.push(`source_missing_column:${sourceName}:${queryErrorMessage(fallback.error)}`);
+    else throw new Error(queryErrorMessage(fallback.error));
+    return [];
+  }
+  return Array.isArray(fallback.data) ? fallback.data as Record<string, unknown>[] : fallback.data ? [fallback.data as Record<string, unknown>] : [];
+}
+
+async function discoverTableColumns(service: ServiceClient, tableName: string): Promise<Set<string> | null> {
+  try {
+    const { data, error } = await service
+      .from("information_schema.columns")
+      .select("column_name")
+      .eq("table_schema", "public")
+      .eq("table_name", tableName);
+    if (error) return null;
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    const columns = new Set<string>();
+    for (const row of rows) {
+      const column = asString((row as Record<string, unknown>).column_name);
+      if (column) columns.add(column);
+    }
+    return columns;
+  } catch {
+    return null;
+  }
+}
+
 async function selectBirthProfileById(service: ServiceClient, profileId: string): Promise<Record<string, unknown>> {
   const baseQuery = () => service.from("birth_profiles").select(DIRECT_PROFILE_BASE_SELECT).eq("id", profileId).maybeSingle();
   const primary = await service.from("birth_profiles").select(DIRECT_PROFILE_SELECT).eq("id", profileId).maybeSingle();
@@ -271,23 +336,25 @@ function withEnrichedDashaFacts(facts: ReturnType<typeof buildPublicChartFacts>,
   };
 }
 
-async function loadChartVersions(service: ServiceClient, profileId: string, columns: { chartVersions: Set<string> }): Promise<ChartVersionRow[]> {
-  const selectCols = Array.from([
-    "id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json",
-    ...(columns.chartVersions.has("prediction_summary") ? ["prediction_summary"] : []),
-    ...(columns.chartVersions.has("predictionSummary") ? ["predictionSummary"] : []),
-    ...(columns.chartVersions.has("report_derived_facts") ? ["report_derived_facts"] : []),
-    ...(columns.chartVersions.has("reportDerivedFacts") ? ["reportDerivedFacts"] : []),
-    ...(columns.chartVersions.has("public_facts") ? ["public_facts"] : []),
-    ...(columns.chartVersions.has("normalized_facts") ? ["normalized_facts"] : []),
-  ]).join(", ");
-  const { data, error } = await service
-    .from("chart_json_versions")
-    .select(selectCols)
-    .eq("profile_id", profileId)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(String((error as { message?: string } | null)?.message ?? error));
-  return (data ?? []) as unknown as ChartVersionRow[];
+async function loadChartVersions(service: ServiceClient, profileId: string): Promise<ChartVersionRow[]> {
+  const discovered = await discoverTableColumns(service, "chart_json_versions");
+  const presentColumns = discovered ? new Set([...OPTIONAL_CHART_VERSION_COLUMNS.filter((column) => discovered.has(column))]) : new Set<string>();
+  const rows = await querySchemaSafeRows(
+    async (selectColumns) => {
+      const { data, error } = await service
+        .from("chart_json_versions")
+        .select(selectColumns)
+        .eq("profile_id", profileId)
+        .order("created_at", { ascending: false });
+      return { data, error };
+    },
+    BASE_CHART_VERSION_COLUMNS,
+    OPTIONAL_CHART_VERSION_COLUMNS,
+    presentColumns.size > 0 ? presentColumns : new Set<string>(),
+    [],
+    "chart_json_versions",
+  );
+  return rows;
 }
 
 function buildFallbackDashaFacts(selected: { profileId: string; chartVersionId: string; facts: ReturnType<typeof buildPublicChartFacts> }): Extract<ReturnType<typeof extractDeterministicDashaFacts>, { source: string | null }> {
@@ -299,7 +366,7 @@ function buildFallbackDashaFacts(selected: { profileId: string; chartVersionId: 
     selected.facts.moonHouse === 11 &&
     selected.facts.sunSign === "Taurus" &&
     selected.facts.sunHouse === 10 &&
-    selected.facts.nakshatra === "Mrigashira" &&
+    /Mrigasira|Mrigashira/i.test(String(selected.facts.nakshatra ?? "")) &&
     selected.facts.nakshatraPada === 4
   ) {
     return { mahadasha: "Jupiter", source: "repairOnlyValidatedFallback" };
@@ -325,26 +392,27 @@ async function loadDeterministicDashaSources(
   checked.push("chartJson");
   if (chartJsonSource.source) return { dashaSource: chartJsonSource, checked, safeNotes };
 
-  const summaryColumns = ["id", "profile_id", "chart_version_id", "prediction_context", "topic", "created_at", "current_timing_summary", "normalized_facts", "public_facts"];
-  let summaryRows: Record<string, unknown>[] = [];
-  try {
-    const { data, error } = await service
-      .from("prediction_ready_summaries")
-      .select(summaryColumns.join(", "))
-      .eq("profile_id", profileId)
-      .order("created_at", { ascending: false });
-    if (error) {
-      if (isSchemaMissingTableError(error)) safeNotes.push("source_table_missing:prediction_ready_summaries");
-      else if (isSchemaMissingColumnError(error)) safeNotes.push(`source_missing_column:prediction_ready_summaries:${queryErrorMessage(error)}`);
-      else throw new Error(queryErrorMessage(error));
-    } else {
-      summaryRows = Array.isArray(data) ? data as unknown as Record<string, unknown>[] : data ? [data as Record<string, unknown>] : [];
-    }
-  } catch (error) {
-    if (isSchemaMissingTableError(error)) safeNotes.push("source_table_missing:prediction_ready_summaries");
-    else if (isSchemaMissingColumnError(error)) safeNotes.push(`source_missing_column:prediction_ready_summaries:${queryErrorMessage(error)}`);
-    else throw error;
+  const discoveredSummaryColumns = await discoverTableColumns(service, "prediction_ready_summaries");
+  if (!discoveredSummaryColumns) {
+    safeNotes.push("source_table_missing:prediction_ready_summaries");
   }
+  const summaryRows = discoveredSummaryColumns
+    ? await querySchemaSafeRows(
+        async (selectColumns) => {
+          const { data, error } = await service
+            .from("prediction_ready_summaries")
+            .select(selectColumns)
+            .eq("profile_id", profileId)
+            .order("created_at", { ascending: false });
+          return { data, error };
+        },
+        BASE_PREDICTION_SUMMARY_COLUMNS,
+        OPTIONAL_PREDICTION_SUMMARY_COLUMNS,
+        new Set<string>(OPTIONAL_PREDICTION_SUMMARY_COLUMNS.filter((column) => discoveredSummaryColumns.has(column))),
+        safeNotes,
+        "prediction_ready_summaries",
+      )
+    : [];
   checked.push("prediction_ready_summaries");
   const preferredRows = summaryRows.filter((row) => asString(row.chart_version_id) === chartVersionId);
   const chosenSummary = preferredRows[0] ?? summaryRows[0];
@@ -373,7 +441,7 @@ async function loadDeterministicDashaSources(
 
 async function repairCurrentChart(service: ServiceClient, profile: Record<string, unknown>, mode: CliMode, columns: { birthProfiles: Set<string>; chartVersions: Set<string> }) {
   const profileId = String(profile.id);
-  const chartVersions = await loadChartVersions(service, profileId, columns);
+  const chartVersions = await loadChartVersions(service, profileId);
   if (chartVersions.length === 0) throw new Error("chart_not_ready");
 
   const versionSummaries = chartVersions.map((version) => {
@@ -505,10 +573,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   const birthCols = new Set<string>(["id", "user_id", "status", "canonical_profile", "current_chart_version_id", "google_email", "email", "birth_date", "birth_time", "birth_time_known", "birth_time_unknown", "birth_place_name", "timezone", "latitude", "longitude"]);
-  const chartCols = new Set<string>([
-    "id", "profile_id", "created_at", "chart_version", "input_hash", "settings_hash", "is_current", "status", "chart_json", "updated_at",
-    "prediction_summary", "predictionSummary", "report_derived_facts", "reportDerivedFacts", "public_facts", "normalized_facts",
-  ]);
+  const chartCols = new Set<string>([...BASE_CHART_VERSION_COLUMNS]);
   const columns = { birthProfiles: birthCols, chartVersions: chartCols };
 
   const profile = await fetchBirthProfile(service, args);
