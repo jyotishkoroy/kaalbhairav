@@ -72,6 +72,8 @@ describe("answerExactChartFactQuestion", () => {
       expect(result.answer).toContain("Chart basis:");
       expect(result.answer).not.toContain("provider");
       expect(result.answer).not.toContain("model");
+      expect(result.answer).not.toContain("profile_id");
+      expect(result.answer).not.toContain("chart_version_id");
     }
   });
 });

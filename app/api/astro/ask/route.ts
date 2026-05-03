@@ -10,6 +10,7 @@ import { guardOneShotAstroQuestion } from '@/lib/astro/app/one-shot-question-gua
 import { analyzeQuestionQuality } from '@/lib/astro/app/question-quality'
 import { answerCanonicalAstroQuestion } from '@/lib/astro/ask/answer-canonical-astro-question'
 import { buildAstroChartContext } from '@/lib/astro/chart-context'
+import { buildNormalizedChartFacts } from '@/lib/astro/normalized-chart-facts'
 import { sha256Canonical } from '@/lib/astro/hashing'
 import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from '@/lib/security/e2e-rate-limit'
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from '@/lib/security/request-guards'
@@ -98,14 +99,40 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { data: latestChart } = await service
+  const chartResponse = await service
     .from('chart_json_versions')
-    .select('id, chart_json')
+    .select('id, chart_json, chart_version, created_at')
     .eq('profile_id', activeProfile.id)
     .order('chart_version', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(10)
+
+  let normalizedChartRows: Array<Record<string, unknown>> = [];
+  const chartRows = chartResponse && typeof chartResponse === 'object' && 'data' in chartResponse
+    ? (chartResponse as { data?: unknown }).data
+    : chartResponse;
+  if (Array.isArray(chartRows)) {
+    normalizedChartRows = chartRows as Array<Record<string, unknown>>;
+  } else if (chartRows && typeof chartRows === 'object') {
+    const maybeChartRows = chartRows as Record<string, unknown> & { data?: unknown; maybeSingle?: () => Promise<{ data?: unknown }> };
+    if (Array.isArray(maybeChartRows.data)) {
+      normalizedChartRows = maybeChartRows.data as Array<Record<string, unknown>>;
+    } else if (maybeChartRows.chart_json) {
+      normalizedChartRows = [maybeChartRows];
+    } else if (typeof maybeChartRows.maybeSingle === 'function') {
+      const single = await maybeChartRows.maybeSingle();
+      if (single?.data && typeof single.data === 'object') normalizedChartRows = [single.data as Record<string, unknown>];
+    }
+  }
+  const latestChart: any = normalizedChartRows.map((row) => {
+    const normalizedFacts = buildNormalizedChartFacts({ chartJson: row.chart_json })
+    return { ...row, normalizedFacts }
+  }).sort((a, b) => {
+    const aScore = (a.normalizedFacts.lagnaSign ? 2 : 0) + (a.normalizedFacts.moonSign ? 1 : 0) + (a.normalizedFacts.mahadasha ? 1 : 0)
+    const bScore = (b.normalizedFacts.lagnaSign ? 2 : 0) + (b.normalizedFacts.moonSign ? 1 : 0) + (b.normalizedFacts.mahadasha ? 1 : 0)
+    if (bScore !== aScore) return bScore - aScore
+    return String((b as any).created_at ?? '').localeCompare(String((a as any).created_at ?? ''))
+  })[0]
 
   if (!latestChart) {
     return NextResponse.json({
