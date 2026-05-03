@@ -6,7 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { deleteAccount } from './actions'
+import { DeleteAccountButton } from './DeleteAccountButton'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -30,18 +30,10 @@ export default async function SettingsPage() {
         <div className="p-6 bg-red-950/20 border border-red-900/30 rounded-lg">
           <h2 className="text-xl mb-2 text-red-300">Delete account</h2>
           <p className="text-white/60 text-sm mb-4">
-            This will mark your account for deletion. Your profile, birth chart, journal entries,
-            and conversations may be removed permanently. This cannot be undone.
+            This permanently deletes your account data. Your profile, birth chart, journal entries,
+            and conversations will be removed. This cannot be undone.
           </p>
-
-          <form action={deleteAccount}>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-red-700 rounded hover:bg-red-600 text-sm"
-            >
-              Delete my account
-            </button>
-          </form>
+          <DeleteAccountButton />
         </div>
       </div>
     </main>
