@@ -71,33 +71,6 @@ export function AstroOneShotClient() {
     }}>
       <div style={{ width: '100%', maxWidth: '640px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-        {/* aadesh — answer window */}
-        <section aria-label="aadesh" style={{
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.10)',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          minHeight: '160px',
-        }}>
-          <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(240,232,216,0.45)', marginBottom: '0.75rem' }}>
-            aadesh
-          </p>
-          {submittedQuestion && (
-            <p style={{ fontSize: '0.8rem', color: 'rgba(240,232,216,0.45)', marginBottom: '0.75rem', fontStyle: 'italic' }}>
-              {submittedQuestion}
-            </p>
-          )}
-          {isLoading && !answer ? (
-            <p style={{ color: 'rgba(240,232,216,0.45)', fontSize: '0.95rem' }}>…</p>
-          ) : error ? (
-            <p style={{ color: '#e07070', fontSize: '0.95rem' }}>{error}</p>
-          ) : answer ? (
-            <p style={{ fontSize: '1rem', lineHeight: '1.7', color: '#f0e8d8', whiteSpace: 'pre-wrap' }}>{answer}</p>
-          ) : (
-            <p style={{ color: 'rgba(240,232,216,0.28)', fontSize: '0.95rem' }}>Your guidance will appear here.</p>
-          )}
-        </section>
-
         {/* Ask Guru — input window */}
         <section aria-label="Ask Guru">
           <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(240,232,216,0.45)', marginBottom: '0.75rem' }}>
@@ -151,6 +124,33 @@ export function AstroOneShotClient() {
               {isLoading ? 'Receiving…' : 'Ask'}
             </button>
           </form>
+        </section>
+
+        {/* aadesh — answer window */}
+        <section aria-label="aadesh" style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: '12px',
+          padding: '1.5rem',
+          minHeight: '160px',
+        }}>
+          <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(240,232,216,0.45)', marginBottom: '0.75rem' }}>
+            aadesh
+          </p>
+          {submittedQuestion && (
+            <p style={{ fontSize: '0.8rem', color: 'rgba(240,232,216,0.45)', marginBottom: '0.75rem', fontStyle: 'italic' }}>
+              {submittedQuestion}
+            </p>
+          )}
+          {isLoading && !answer ? (
+            <p style={{ color: 'rgba(240,232,216,0.45)', fontSize: '0.95rem' }}>…</p>
+          ) : error ? (
+            <p style={{ color: '#e07070', fontSize: '0.95rem' }}>{error}</p>
+          ) : answer ? (
+            <p style={{ fontSize: '1rem', lineHeight: '1.7', color: '#f0e8d8', whiteSpace: 'pre-wrap' }}>{answer}</p>
+          ) : (
+            <p style={{ color: 'rgba(240,232,216,0.28)', fontSize: '0.95rem' }}>Your guidance will appear here.</p>
+          )}
         </section>
 
       </div>

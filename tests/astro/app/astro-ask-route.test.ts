@@ -41,9 +41,11 @@ function makeSupabaseMock(user: unknown) {
 function makeServiceMock({
   profile,
   chart,
+  predictionSummary,
 }: {
   profile?: unknown
   chart?: unknown
+  predictionSummary?: unknown
 }) {
   const profileQuery = {
     select: vi.fn().mockReturnThis(),
@@ -57,10 +59,18 @@ function makeServiceMock({
     limit: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue({ data: chart ?? null }),
   }
+  const summaryQuery = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: predictionSummary ?? null }),
+  }
   return {
     from: vi.fn((table: string) => {
       if (table === 'birth_profiles') return profileQuery
       if (table === 'chart_json_versions') return chartQuery
+      if (table === 'prediction_ready_summaries') return summaryQuery
       return profileQuery
     }),
   }
@@ -99,9 +109,9 @@ describe('POST /api/astro/ask', () => {
 
     const req = makeRequest({ question: 'What is my Lagna?' })
     const resp = await POST(req)
-    expect(resp.status).toBe(404)
+    expect(resp.status).toBe(200)
     const body = await resp.json()
-    expect(body.error).toBe('setup_required')
+    expect(body.answer).toContain('chart context is not ready')
   })
 
   it('returns safe answer when question is blocked by guard (model question)', async () => {
@@ -124,14 +134,14 @@ describe('POST /api/astro/ask', () => {
   it('calls V2 handler with server-resolved userId and profileId, ignoring client-supplied values', async () => {
     const mockUser = { id: 'real-user-id', email: 'real@test.com', user_metadata: {} }
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock(mockUser) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'real-profile-id' }, chart: { id: 'real-chart-id' } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'real-profile-id' }, chart: { id: 'real-chart-id', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
     vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
       new Response(JSON.stringify({ answer: 'Your Lagna is Leo.' }), { status: 200 })
     )
 
     // Client tries to supply fake user/profile ids — must be ignored
     const req = makeRequest({
-      question: 'What is my Lagna?',
+      question: 'What about my career?',
       userId: 'evil-injected-user',
       profileId: 'evil-injected-profile',
       chartVersionId: 'evil-injected-chart',
@@ -148,7 +158,7 @@ describe('POST /api/astro/ask', () => {
 
   it('strips followUpQuestion and followUpAnswer from response', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1' } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
     vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
       new Response(JSON.stringify({
         answer: 'Career answer.',
@@ -161,7 +171,7 @@ describe('POST /api/astro/ask', () => {
     const req = makeRequest({ question: 'What about my career?' })
     const resp = await POST(req)
     const body = await resp.json()
-    expect(body.answer).toBe('Career answer.')
+    expect(body.answer).toContain('Career answer.')
     expect(body.followUpQuestion).toBeUndefined()
     expect(body.followUpAnswer).toBeUndefined()
     expect(body.meta).toBeUndefined()
@@ -169,12 +179,12 @@ describe('POST /api/astro/ask', () => {
 
   it('sets oneShot/disableFollowUps/disableMemory in V2 request metadata', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1' } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
     vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
       new Response(JSON.stringify({ answer: 'Your answer.' }), { status: 200 })
     )
 
-    const req = makeRequest({ question: 'What is my Lagna?', requestId: 'test-req-1' })
+    const req = makeRequest({ question: 'What about my career?', requestId: 'test-req-1' })
     await POST(req)
 
     const callArg = vi.mocked(handleAstroV2ReadingRequest).mock.calls[0][0]
@@ -187,12 +197,12 @@ describe('POST /api/astro/ask', () => {
 
   it('returns error when V2 handler returns non-ok', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1' } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
     vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
       new Response(JSON.stringify({ error: 'reading_failed' }), { status: 500 })
     )
 
-    const req = makeRequest({ question: 'What is my Lagna?' })
+    const req = makeRequest({ question: 'What about my career?' })
     const resp = await POST(req)
     expect(resp.status).toBe(500)
     const body = await resp.json()

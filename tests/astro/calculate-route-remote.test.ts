@@ -108,9 +108,23 @@ vi.mock('../../lib/supabase/server', () => ({
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                error: null,
+              })),
               single: vi.fn(async () => ({
                 data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
                 error: null,
+              })),
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                  error: null,
+                })),
+                single: vi.fn(async () => ({
+                  data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                  error: null,
+                })),
               })),
             })),
           })),
@@ -121,9 +135,23 @@ vi.mock('../../lib/supabase/server', () => ({
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' },
+                error: null,
+              })),
               single: vi.fn(async () => ({
                 data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' },
                 error: null,
+              })),
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' },
+                  error: null,
+                })),
+                single: vi.fn(async () => ({
+                  data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'sidereal_365.25' },
+                  error: null,
+                })),
               })),
             })),
           })),

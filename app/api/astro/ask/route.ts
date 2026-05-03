@@ -9,6 +9,9 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { guardOneShotAstroQuestion } from '@/lib/astro/app/one-shot-question-guard'
 import { analyzeQuestionQuality } from '@/lib/astro/app/question-quality'
 import { handleAstroV2ReadingRequest } from '@/lib/astro/rag/astro-v2-reading-handler'
+import { buildAstroChartContext, formatChartBasisForAnswer } from '@/lib/astro/chart-context'
+import { answerExactChartFactQuestion } from '@/lib/astro/exact-chart-facts'
+import { ensureChartGroundedAnswer } from '@/lib/astro/answer-grounding'
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
@@ -93,17 +96,47 @@ export async function POST(req: NextRequest) {
 
   const { data: latestChart } = await service
     .from('chart_json_versions')
-    .select('id')
+    .select('id, chart_json')
     .eq('profile_id', activeProfile.id)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (!latestChart) {
-    return NextResponse.json(
-      { error: 'setup_required', message: 'Chart is not ready. Please complete setup and wait for calculation.' },
-      { status: 404 },
-    )
+    return NextResponse.json({
+      answer: 'aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering.',
+    })
+  }
+
+  const { data: latestPredictionSummary } = await service
+    .from('prediction_ready_summaries')
+    .select('id, chart_version_id, prediction_context, topic, created_at')
+    .eq('profile_id', activeProfile.id)
+    .eq('chart_version_id', latestChart.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const chartContext = buildAstroChartContext({
+    profileId: activeProfile.id,
+    chartVersionId: latestChart.id,
+    chartJson: latestChart.chart_json,
+    predictionSummary: latestPredictionSummary?.prediction_context,
+  })
+
+  if (!chartContext.ready) {
+    return NextResponse.json({
+      answer: 'aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering.',
+    })
+  }
+
+  const exactFactAnswer = answerExactChartFactQuestion({
+    question,
+    chartContext,
+  })
+
+  if (exactFactAnswer.matched) {
+    return NextResponse.json({ answer: exactFactAnswer.answer })
   }
 
   const v2Body = {
@@ -113,11 +146,15 @@ export async function POST(req: NextRequest) {
     userId: user.id,
     profileId: activeProfile.id,
     chartVersionId: latestChart.id,
+    chartContext: chartContext.compactPromptContext,
+    deterministicChartFacts: chartContext.publicFacts,
+    predictionSummary: latestPredictionSummary?.prediction_context ?? null,
     metadata: {
       source: 'astro-canonical-page',
       oneShot: true,
       disableFollowUps: true,
       disableMemory: true,
+      requireChartGrounding: true,
       requestId,
     },
   }
@@ -142,14 +179,21 @@ export async function POST(req: NextRequest) {
 
   if (!v2Response.ok || typeof v2Data.answer !== 'string') {
     const errMsg = typeof v2Data.error === 'string' ? v2Data.error : 'Unable to generate a reading right now. Please try again.'
-    return NextResponse.json({ error: errMsg }, { status: v2Response.ok ? 500 : v2Response.status })
+    return NextResponse.json({
+      answer: `aadesh: ${formatChartBasisForAnswer(chartContext)}\n\nI could not complete a deeper reading right now, but based on the saved chart context, avoid taking the result as certainty. Please try again shortly.`,
+      error: errMsg,
+    }, { status: v2Response.ok ? 500 : v2Response.status })
   }
 
   // Prefix with spelling correction notice if any
-  let answer = v2Data.answer
+  let answer = ensureChartGroundedAnswer({
+    answer: typeof v2Data.answer === 'string' ? v2Data.answer : '',
+    chartContext,
+  })
   if (quality.warnings.length > 0) {
-    const notice = `aadesh: ${quality.warnings.join(' ')} `
-    answer = notice + answer
+    answer = answer.startsWith('aadesh:')
+      ? `${answer}\n\n${quality.warnings.join(' ')}`
+      : `aadesh: ${quality.warnings.join(' ')} ${answer}`
   }
 
   // Return only { answer } — no metadata, model, provider, server, profileId, etc.
