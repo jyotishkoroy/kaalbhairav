@@ -151,7 +151,7 @@ function rowValue(row: Record<string, unknown>, keys: string[]): unknown {
 }
 
 const REQUIRED_CHART_VERSION_COLUMNS = ["id", "profile_id", "created_at", "chart_json"] as const;
-const OPTIONAL_CHART_VERSION_COLUMNS = ["chart_version", "input_hash", "settings_hash", "is_current", "status", "updated_at", "repaired_from_chart_version_id", "prediction_summary", "predictionSummary", "report_derived_facts", "reportDerivedFacts", "public_facts", "normalized_facts"] as const;
+const OPTIONAL_CHART_VERSION_COLUMNS = ["chart_version", "input_hash", "settings_hash", "is_current", "status", "updated_at", "repaired_from_chart_version_id", "prediction_summary", "predictionSummary", "report_derived_facts", "reportDerivedFacts", "public_facts", "normalized_facts", "calculation_id"] as const;
 const BASE_PREDICTION_SUMMARY_COLUMNS = ["id", "profile_id", "created_at"] as const;
 const OPTIONAL_PREDICTION_SUMMARY_COLUMNS = ["chart_version_id", "prediction_context", "current_timing_summary", "normalized_facts", "public_facts", "summary_json", "metadata"] as const;
 
@@ -253,6 +253,11 @@ type ChartVersionColumnInfo = {
 function isMissingUserIdColumnError(error: unknown): boolean {
   const message = queryErrorMessage(error).toLowerCase();
   return message.includes("column chart_json_versions.user_id does not exist") || message.includes("could not find the 'user_id' column");
+}
+
+function isMissingCalculationIdColumnError(error: unknown): boolean {
+  const message = queryErrorMessage(error).toLowerCase();
+  return message.includes("column chart_json_versions.calculation_id does not exist") || message.includes("could not find the 'calculation_id' column");
 }
 
 async function discoverChartVersionColumnInfo(service: ServiceClient): Promise<ChartVersionColumnInfo> {
@@ -417,6 +422,22 @@ async function loadChartVersions(service: ServiceClient, profileId: string): Pro
   return { rows, safeNotes };
 }
 
+async function fetchSelectedChartVersionCalculationId(service: ServiceClient, selectedVersionId: string): Promise<{ calculationId: string | null; safeNotes: string[] }> {
+  const safeNotes: string[] = [];
+  const result = await service
+    .from("chart_json_versions")
+    .select("calculation_id")
+    .eq("id", selectedVersionId)
+    .maybeSingle();
+  if (result.error) {
+    if (isSchemaMissingColumnError(result.error)) return { calculationId: null, safeNotes };
+    safeNotes.push(`chart_json_versions_calculation_id_lookup_failed:${queryErrorMessage(result.error)}`);
+    return { calculationId: null, safeNotes };
+  }
+  const calculationId = asString((result.data as Record<string, unknown> | null | undefined)?.calculation_id);
+  return { calculationId: calculationId ?? null, safeNotes };
+}
+
 function chartVersionColumnPresence(rows: ChartVersionRow[]): Set<string> {
   const present = new Set<string>();
   for (const row of rows) {
@@ -514,7 +535,6 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   if (chartVersions.length === 0) throw new Error("chart_not_ready");
   const chartVersionColumns = chartVersionColumnPresence(chartVersions);
   const chartVersionSchema = await discoverChartVersionColumnInfo(service);
-
   const versionSummaries = chartVersions.map((version) => {
     const facts = buildPublicChartFacts({
       profileId,
@@ -549,12 +569,25 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   if (!finalValidation.ok || failures.length > 0) throw new Error(["calculation_or_source_validation_failed", ...failures].join("; "));
 
   const profileUserId = asString(profile.user_id);
+  const selectedCalculationId = asString(selected.version.calculation_id);
+  const chartVersionCalculationIdAvailable = chartVersionSchema.columns.has("calculation_id");
+  let lookedUpCalculationId: string | null = selectedCalculationId ?? null;
+  let calculationIdSafeNotes: string[] = [];
+  if (!lookedUpCalculationId && !chartVersionCalculationIdAvailable) {
+    const lookup = await fetchSelectedChartVersionCalculationId(service, String(selected.version.id));
+    lookedUpCalculationId = lookup.calculationId;
+    calculationIdSafeNotes = lookup.safeNotes;
+  }
   if (chartVersionSchema.discoveryUnavailable && !profileUserId) {
     throw new Error("missing_required_insert_value:chart_json_versions.user_id");
+  }
+  if ((chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable) && !lookedUpCalculationId) {
+    throw new Error("missing_required_insert_value:chart_json_versions.calculation_id");
   }
 
   if (mode === "dry-run") {
     const insertUserId = chartVersionSchema.columns.has("user_id") || (chartVersionSchema.discoveryUnavailable && profileUserId !== undefined);
+    const insertCalculationId = chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable;
     return {
       selectedVersionId: String(selected.version.id),
       selectedClass: selected.className,
@@ -564,12 +597,15 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
         ...chartVersionsResult.safeNotes,
         ...dashaLookup.safeNotes,
         ...(chartVersionSchema.discoveryUnavailable && profileUserId !== undefined ? ["assuming_required_column:chart_json_versions.user_id"] : []),
+        ...calculationIdSafeNotes,
+        ...(chartVersionSchema.discoveryUnavailable ? ["assuming_required_column:chart_json_versions.calculation_id"] : []),
       ],
       facts: enrichedFacts,
       plan: {
         markAllChartVersionsNotCurrent: chartVersionColumns.has("is_current"),
         createRepairedChartVersion: selected.className === "repairable_missing_dasha",
         insertUserId,
+        insertCalculationId,
         updateProfilePointer: columns.birthProfiles.has("current_chart_version_id"),
       },
       versions: versionSummaries,
@@ -579,12 +615,17 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   const now = new Date().toISOString();
   const hasChartVersionColumn = (name: string) => chartVersionColumns.has(name);
   const insertUserId = chartVersionSchema.columns.has("user_id") || chartVersionSchema.discoveryUnavailable;
+  const insertCalculationId = chartVersionSchema.columns.has("calculation_id") || chartVersionSchema.discoveryUnavailable;
   if (insertUserId && !profileUserId) {
     throw new Error("missing_required_insert_value:chart_json_versions.user_id");
+  }
+  if (insertCalculationId && !lookedUpCalculationId) {
+    throw new Error("missing_required_insert_value:chart_json_versions.calculation_id");
   }
   const insertPayload: Record<string, unknown> = {
     profile_id: profileId,
     ...(insertUserId ? { user_id: profileUserId } : {}),
+    ...(insertCalculationId ? { calculation_id: lookedUpCalculationId } : {}),
     chart_json: {
       ...(typeof selected.version.chart_json === "object" && selected.version.chart_json ? selected.version.chart_json as Record<string, unknown> : {}),
       public_facts: {
@@ -608,6 +649,41 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   if (hasChartVersionColumn("repaired_from_chart_version_id")) insertPayload.repaired_from_chart_version_id = String(selected.version.id);
   const insertResult = await service.from("chart_json_versions").insert(insertPayload).select("id").single();
   if (insertResult.error) {
+    if (insertCalculationId && isMissingCalculationIdColumnError(insertResult.error)) {
+      const fallbackPayload = { ...insertPayload };
+      delete fallbackPayload.calculation_id;
+      const retryResult = await service.from("chart_json_versions").insert(fallbackPayload).select("id").single();
+      if (retryResult.error) throw new Error(String((retryResult.error as { message?: string } | null)?.message ?? retryResult.error));
+      const newChartVersionId = String((retryResult.data as Record<string, unknown>).id);
+      const updates = await Promise.all([
+        hasChartVersionColumn("is_current")
+          ? service.from("chart_json_versions").update({ is_current: false }).eq("profile_id", profileId)
+          : Promise.resolve({ error: null }),
+        hasChartVersionColumn("is_current") || hasChartVersionColumn("status") || hasChartVersionColumn("updated_at")
+          ? service.from("chart_json_versions").update({
+              ...(hasChartVersionColumn("is_current") ? { is_current: true } : {}),
+              ...(hasChartVersionColumn("status") ? { status: "completed" } : {}),
+              ...(hasChartVersionColumn("updated_at") ? { updated_at: now } : {}),
+            }).eq("id", newChartVersionId)
+          : Promise.resolve({ error: null }),
+        columns.birthProfiles.has("current_chart_version_id")
+          ? service.from("birth_profiles").update({ current_chart_version_id: newChartVersionId }).eq("id", profileId)
+          : Promise.resolve({ error: null }),
+      ]);
+      for (const result of updates) {
+        if (result && typeof result === "object" && "error" in result && result.error) {
+          throw new Error(String((result.error as { message?: string } | null)?.message ?? result.error));
+        }
+      }
+
+      return {
+        selectedVersionId: newChartVersionId,
+        selectedClass: selected.className,
+        dashaSource: dashaSource.source,
+        dashaSourcesChecked: dashaLookup.checked,
+        facts: enrichedFacts,
+      };
+    }
     if (insertUserId && isMissingUserIdColumnError(insertResult.error)) {
       const fallbackPayload = { ...insertPayload };
       delete fallbackPayload.user_id;
