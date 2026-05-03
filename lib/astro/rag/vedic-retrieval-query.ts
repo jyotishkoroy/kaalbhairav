@@ -26,6 +26,6 @@ export function buildVedicRetrievalQuery(input: { question: string; topic: Vedic
   if (input.topic === "foreign") parts.push("9th house 12th house Rahu");
   if (input.topic === "teaching" || input.topic === "spiritual") parts.push("9th house Jupiter Mercury");
   if (input.topic === "remedies") parts.push("remedies safe practical");
-  if (input.topic === "dasha" || input.topic === "timing") parts.push("dasha antardasha mahadasha");
+  if (input.topic === "dasha" || input.topic === "annual_timing") parts.push("dasha antardasha mahadasha");
   return parts.join(" ").replace(/\s+/g, " ").trim().slice(0, 400);
 }

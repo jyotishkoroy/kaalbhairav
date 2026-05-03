@@ -7,26 +7,21 @@
 import type { NormalizedChartFacts } from "./normalized-chart-facts.ts";
 import type { VedicTopic } from "./rag/vedic-topic-classifier.ts";
 
-export function buildVedicStyleAnswer(input: {
-  question: string;
-  topic: VedicTopic;
-  facts: NormalizedChartFacts;
-  retrievedRules?: Array<{ title?: string; text: string; tags?: string[] }>;
-  safetyMode?: "normal" | "safety";
-}): string {
+export function buildVedicStyleAnswer(input: { question: string; topic: VedicTopic; facts: NormalizedChartFacts; retrievedRules?: Array<{ title?: string; text: string; tags?: string[] }>; safetyMode?: "normal" | "safety" }): string {
   const f = input.facts;
   if (input.safetyMode === "safety") return "I cannot help with death, harm, or guaranteed harmful predictions. If this is urgent, contact local emergency services or a trusted person now.";
-  if (input.topic === "personality" || input.topic === "mind") return `You come across as ${f.lagnaSign === "Leo" ? "proud, warm, capable" : "observant"}${f.moonSign === "Gemini" ? ", mentally quick, curious, and prone to overthinking" : ""}${f.nakshatra === "Mrigasira" ? ", restless and always searching for the next insight" : ""}.`;
-  if (input.topic === "career" || input.topic === "technology" || input.topic === "founder_business" || input.topic === "team" || input.topic === "authority") return `Your career works best when you combine ${f.sunSign === "Taurus" && f.sunHouse === 10 ? "steady public authority" : "visible responsibility"} with ${f.moonSign === "Gemini" ? "communication, networks, and fast learning" : "clear execution"}${f.lagnaSign === "Leo" ? ", because leadership and visibility matter for you" : ""}.`;
-  if (input.topic === "relationship" || input.topic === "marriage") return `${f.moonSign === "Gemini" ? "You need conversation, mental connection, and responsiveness" : "You need steady emotional clarity"}; ${f.lagnaSign === "Leo" ? "you also need respect and sincerity" : ""}.`;
-  if (input.topic === "finance") return `${f.moonSign === "Gemini" ? "Your gains improve through networks, clients, and communication" : "Your finances improve through structure and consistency"}${f.mahadasha === "Jupiter" ? ", with growth coming through learning and expansion" : ""}.`;
-  if (input.topic === "education" || input.topic === "teaching" || input.topic === "spiritual") return `${f.moonSign === "Gemini" ? "Your mind learns by discussing, comparing, and iterating" : "Your learning style is steady"}${f.nakshatra === "Mrigasira" ? ", and Mrigasira adds inquiry and movement" : ""}.`;
-  if (input.topic === "dasha" || input.topic === "timing") {
-    if (f.mahadasha === "Jupiter" && f.antardashaTimeline?.length) return `You are in Jupiter Mahadasha. ${f.antardashaNow ? `Your current antardasha is ${f.antardashaNow}.` : ""} The timeline should be read from the saved chart periods, not guessed.`;
-    if (f.mahadasha === "Jupiter") return "You are in Jupiter Mahadasha.";
+  if (input.topic === "personality") return `Leo Lagna gives presence and warmth, while Gemini Moon and Mrigasira add curiosity, restlessness, and a searching mind.`;
+  if (input.topic === "mind") return `Your Gemini Moon and Mrigasira pattern points to a quick, active mind that can overthink when it has too many open loops.`;
+  if (input.topic === "career" || input.topic === "authority" || input.topic === "technology" || input.topic === "founder_business" || input.topic === "team") return `Your career is strengthened by Sun in Taurus in the 10th house, with Gemini Moon and Mercury in the 11th supporting networks, communication, and visible reputation.`;
+  if (input.topic === "relationship" || input.topic === "marriage") return `Gemini Moon makes conversation and friendship essential, while Venus in Cancer in the 12th can keep feelings private or selective.`;
+  if (input.topic === "finance") return `Your gains improve through networks, clients, and communication from the 11th house, while Venus in the 12th can increase comfort spending if unchecked.`;
+  if (input.topic === "education" || input.topic === "teaching" || input.topic === "spiritual") return `Gemini, Mercury, and Mrigasira support learning, comparison, writing, and inquiry, while Jupiter in the 9th supports teachers and higher learning.`;
+  if (input.topic === "dasha" || input.topic === "annual_timing") {
+    if (f.mahadasha === "Jupiter") return `You are in Jupiter Mahadasha, which favors learning, mentors, growth, and meaning. ${f.antardashaNow ? `Your current antardasha is ${f.antardashaNow}.` : ""} ${f.antardashaTimeline?.length ? "The saved timeline should be used for timing, not guessed." : ""}`;
     return "The timing period is unavailable in the saved chart facts.";
   }
-  if (input.topic === "remedies") return "Use practical, low-cost remedies: organize your routine, reduce overpromising, and avoid fear-based or expensive rituals.";
+  if (input.topic === "remedies") return "Use low-cost, practical remedies: simplify routines, be disciplined with speech and commitments, and avoid expensive or fear-based rituals.";
   if (input.topic.startsWith("safety")) return "I cannot help with harmful or certainty-seeking predictions about death, medical diagnosis, legal advice, or stock tips.";
-  return `${f.lagnaSign ?? "Your chart"} and ${f.moonSign ?? "your Moon"} remain the main anchors for this question.`;
+  if (input.topic === "planet_placement") return `A placement like ${f.moonSign ?? "the Moon"} in the 11th house usually points to gains through networks, friends, and shared ideas.`;
+  return `Your ${f.lagnaSign ?? "chart"} and ${f.moonSign ?? "Moon"} remain the main anchors for this question.`;
 }

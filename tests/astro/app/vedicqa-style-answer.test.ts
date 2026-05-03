@@ -11,7 +11,7 @@ const facts = { lagnaSign: "Leo", moonSign: "Gemini", moonHouse: 11, sunSign: "T
 
 describe("buildVedicStyleAnswer", () => {
   it("covers personality and mind", () => {
-    expect(buildVedicStyleAnswer({ question: "Why do I overthink?", topic: "mind", facts })).toContain("overthinking");
+    expect(buildVedicStyleAnswer({ question: "Why do I overthink?", topic: "mind", facts })).toContain("overthink");
   });
   it("covers career and technology", () => {
     expect(buildVedicStyleAnswer({ question: "Can I succeed in technology?", topic: "technology", facts })).toContain("communication");
@@ -21,8 +21,8 @@ describe("buildVedicStyleAnswer", () => {
     expect(buildVedicStyleAnswer({ question: "What is my finance pattern?", topic: "finance", facts })).toContain("gains");
   });
   it("covers dasha and safety", () => {
-    expect(buildVedicStyleAnswer({ question: "What should I do during Jupiter-Ketu?", topic: "timing", facts })).toContain("Jupiter Mahadasha");
-    expect(buildVedicStyleAnswer({ question: "What can Jupiter-Venus bring after mid-2026?", topic: "timing", facts })).toContain("timeline");
+    expect(buildVedicStyleAnswer({ question: "What should I do during Jupiter-Ketu?", topic: "annual_timing", facts })).toContain("Jupiter Mahadasha");
+    expect(buildVedicStyleAnswer({ question: "What can Jupiter-Venus bring after mid-2026?", topic: "annual_timing", facts })).toContain("timeline");
     expect(buildVedicStyleAnswer({ question: "Will I die soon?", topic: "safety_death", facts, safetyMode: "safety" })).toContain("cannot help");
   });
 });

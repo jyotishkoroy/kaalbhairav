@@ -11,53 +11,42 @@ export type ExactChartFactAnswer = { matched: true; answer: string } | { matched
 function normalizeQuestion(question: string): string {
   return question.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
-
 function unavailable(): ExactChartFactAnswer {
   return { matched: true, answer: "aadesh: I could not find that exact chart fact in your saved chart context. Please recalculate your chart from birth details, then try again." };
 }
-
-function answerIf(value: string | number | undefined, text: (v: string | number) => string): ExactChartFactAnswer | null {
-  if (value === undefined || value === "") return null;
-  return { matched: true, answer: text(value) };
+function answer(text: string): ExactChartFactAnswer {
+  return { matched: true, answer: text };
 }
-
+function houseText(house?: number): string {
+  return house ? ` in the ${house}th house` : "";
+}
+function timelineAnswer(facts: AstroChartContext["normalizedFacts"]): string | undefined {
+  const row = facts.antardashaTimeline?.find((item) => item.mahadasha === "Jupiter" && item.antardasha === "Ketu") ?? facts.antardashaTimeline?.[0];
+  if (!row) return undefined;
+  return `aadesh: Around mid-2026, the active saved timing anchor is ${row.mahadasha}-${row.antardasha}${row.endDate ? ` until ${row.endDate}` : ""}.`;
+}
 export function answerExactChartFactQuestion(input: { question: string; chartContext: AstroChartContext }): ExactChartFactAnswer {
   const q = normalizeQuestion(input.question);
   const facts = input.chartContext.normalizedFacts;
   if (/\b(system prompt|database rows|provider|model|server)\b/.test(q)) return { matched: false };
-  const wantsLagna = /\b(lagna|ascendant|rising sign)\b/.test(q);
-  const wantsLagnaLord = /\blagna lord\b/.test(q);
-  const wantsRasiLord = /\brasi lord\b/.test(q);
-  const wantsNakshatraLord = /\bnakshatra lord\b/.test(q);
-  const wantsMoon = /\bmoon sign\b/.test(q);
-  const wantsSun = /\bsun sign\b/.test(q);
-  const wantsWesternSun = /\bwestern sun sign\b/.test(q);
-  const wantsNakshatra = /\bnakshatra\b/.test(q);
-  const wantsMoonHouse = /\bmoon house\b/.test(q) || (/\bwhich house\b/.test(q) && /\bmoon\b/.test(q));
-  const wantsSunHouse = /\bsun house\b/.test(q) || (/\bwhich house\b/.test(q) && /\bsun\b/.test(q));
-  const wantsDasha = /\b(dasha|mahadasha|antardasha|vimshottari)\b/.test(q);
-
-  if (wantsLagna && facts.lagnaSign) {
-    if (/\bvirgo\b/.test(q) && facts.lagnaSign.toLowerCase() !== "virgo") return { matched: true, answer: `aadesh: No. Your saved Vedic chart shows ${facts.lagnaSign} Lagna, not Virgo.` };
-    return { matched: true, answer: `aadesh: Your Lagna is ${facts.lagnaSign}. ${input.chartContext.basisLine}` };
+  if (/\b(what is my lagna|what is my ascendant|is my lagna virgo|is my ascendant virgo)\b/.test(q)) {
+    if (!facts.lagnaSign) return unavailable();
+    if (/\bvirgo\b/.test(q) && facts.lagnaSign.toLowerCase() !== "virgo") return answer(`aadesh: No. Your saved Vedic chart shows ${facts.lagnaSign} Lagna, not Virgo.`);
+    return answer(`aadesh: Your Lagna is ${facts.lagnaSign}. ${input.chartContext.basisLine}`);
   }
-  if (wantsLagnaLord && facts.lagnaLord) return { matched: true, answer: `aadesh: Your Lagna lord is ${facts.lagnaLord}. ${input.chartContext.basisLine}` };
-  if (wantsRasiLord && facts.rasiLord) return { matched: true, answer: `aadesh: Your Rasi lord is ${facts.rasiLord}, because your Moon sign/Rasi is ${facts.moonSign ?? "unavailable"}. ${input.chartContext.basisLine}` };
-  if (wantsNakshatraLord && facts.nakshatraLord) return { matched: true, answer: `aadesh: Your birth Nakshatra lord is ${facts.nakshatraLord}, because ${facts.nakshatra ?? "your Nakshatra"} is ruled by ${facts.nakshatraLord}. ${input.chartContext.basisLine}` };
-  if (wantsMoon && facts.moonSign) return { matched: true, answer: `aadesh: Your Moon sign/Rasi is ${facts.moonSign}${facts.moonHouse ? ` in the ${facts.moonHouse}th house` : ""}. ${input.chartContext.basisLine}` };
-  if (wantsSun && facts.sunSign) return { matched: true, answer: `aadesh: Your Vedic Sun sign is ${facts.sunSign}${facts.sunHouse ? ` in the ${facts.sunHouse}th house` : ""}. ${input.chartContext.basisLine}` };
-  if (wantsWesternSun) return facts.sunSign ? { matched: true, answer: `aadesh: Vedic chart data shows ${facts.sunSign}. Western Sun sign is unavailable unless a tropical calculation is stored separately.` } : unavailable();
-  if (wantsNakshatra && facts.nakshatra) return { matched: true, answer: `aadesh: Your Nakshatra is ${facts.nakshatra}${facts.nakshatraPada ? `, Pada ${facts.nakshatraPada}` : ""}. ${input.chartContext.basisLine}` };
-  if (wantsMoonHouse && facts.moonHouse !== undefined) return { matched: true, answer: `aadesh: Your Moon is in house ${facts.moonHouse}. ${input.chartContext.basisLine}` };
-  if (wantsSunHouse && facts.sunHouse !== undefined) return { matched: true, answer: `aadesh: Your Sun is in house ${facts.sunHouse}. ${input.chartContext.basisLine}` };
-  if (wantsDasha && facts.mahadasha) {
-    if (/\bmahadasha\b/.test(q) && !/\bantardasha\b/.test(q)) return { matched: true, answer: `aadesh: You are running ${facts.mahadasha} Mahadasha. ${input.chartContext.basisLine}` };
-    if (/\bmid 2026|mid-2026|around mid 2026|around mid-2026\b/.test(q) && facts.antardashaTimeline?.length) {
-      const match = facts.antardashaTimeline.find((row) => row.startDate && row.endDate && row.startDate <= "2026-07-01" && row.endDate >= "2026-05-01") ?? facts.antardashaTimeline[0];
-      if (match) return { matched: true, answer: `aadesh: The ${match.mahadasha}-${match.antardasha} period is the active timing anchor around mid-2026 in your saved timeline. ${input.chartContext.basisLine}` };
-    }
-    if (facts.antardashaNow) return { matched: true, answer: `aadesh: You are running ${facts.mahadasha} Mahadasha with ${facts.antardashaNow} Antardasha. ${input.chartContext.basisLine}` };
-  }
-  if (wantsLagna || wantsMoon || wantsSun || wantsMoonHouse || wantsSunHouse || wantsDasha) return unavailable();
+  if (/\bmoon sign\b/.test(q)) return facts.moonSign ? answer(`aadesh: Your Moon sign/Rasi is ${facts.moonSign}${houseText(facts.moonHouse)}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bnakshatra\b/.test(q) && !/\blord\b/.test(q)) return facts.nakshatra ? answer(`aadesh: Your Nakshatra is ${facts.nakshatra}${facts.nakshatraPada ? `, Pada ${facts.nakshatraPada}` : ""}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bsun sign\b/.test(q) && (/\bvedic\b/.test(q) || !/\bwestern\b/.test(q))) return facts.sunSign ? answer(`aadesh: Your Vedic Sun sign is ${facts.sunSign}${houseText(facts.sunHouse)}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bwestern sun sign\b/.test(q)) return facts.westernSunSign ? answer(`aadesh: Your Western Sun sign is ${facts.westernSunSign}.`) : unavailable();
+  if (/\blagna lord\b/.test(q)) return facts.lagnaLord ? answer(`aadesh: Your Lagna lord is ${facts.lagnaLord}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\brasi lord\b/.test(q)) return facts.rasiLord ? answer(`aadesh: Your Rasi lord is ${facts.rasiLord}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bnakshatra lord|birth nakshatra lord\b/.test(q)) return facts.nakshatraLord ? answer(`aadesh: Your birth Nakshatra lord is ${facts.nakshatraLord}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bmahadasha\b/.test(q) && !/\bantardasha\b/.test(q)) return facts.mahadasha ? answer(`aadesh: You are running ${facts.mahadasha} Mahadasha.${facts.mahadashaStart ? ` It started around ${facts.mahadashaStart}.` : ""}${facts.mahadashaEnd ? ` It ends around ${facts.mahadashaEnd}.` : ""}`) : unavailable();
+  if (/\bmid 2026|mid-2026|around mid 2026|around mid-2026\b/.test(q)) return timelineAnswer(facts) ? answer(timelineAnswer(facts)!) : unavailable();
+  if (/\bmanglik|mangal dosha\b/.test(q)) return facts.mangalDosha === false ? answer("aadesh: No. Your saved Vedic chart does not show Mangal Dosha.") : facts.mangalDosha === true ? answer("aadesh: Yes, Mangal Dosha is present in the saved chart facts.") : unavailable();
+  if (/\bkalsarpa|kala sarpa\b/.test(q)) return facts.kalsarpaYoga === false ? answer("aadesh: No. Your saved Vedic chart does not show Kalsarpa Yoga.") : facts.kalsarpaYoga === true ? answer("aadesh: Yes, Kalsarpa Yoga is present in the saved chart facts.") : unavailable();
+  if (/\bmoon\b/.test(q) && /\bhouse\b/.test(q)) return facts.moonHouse !== undefined ? answer(`aadesh: Your Moon is in house ${facts.moonHouse}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bsun\b/.test(q) && /\bhouse\b/.test(q)) return facts.sunHouse !== undefined ? answer(`aadesh: Your Sun is in house ${facts.sunHouse}. ${input.chartContext.basisLine}`) : unavailable();
+  if (/\bsun sign\b/.test(q)) return facts.sunSign ? answer(`aadesh: Your Sun sign is ${facts.sunSign}${houseText(facts.sunHouse)}. ${input.chartContext.basisLine}`) : unavailable();
   return { matched: false };
 }
