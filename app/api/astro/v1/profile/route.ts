@@ -20,14 +20,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
   }
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
+
+  // CSRF/origin check — only relevant for authenticated requests
   const originCheck = assertSameOriginRequest(req as unknown as Request)
   if (!originCheck.ok) {
     return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
   }
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
 
   // Rate limit: 5 requests/hour per user
   const rl = checkRateLimit(`profile:${user.id}`, 5, 60 * 60_000)

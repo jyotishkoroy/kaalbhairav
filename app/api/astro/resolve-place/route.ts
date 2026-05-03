@@ -13,15 +13,16 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const originCheck = assertSameOriginRequest(req as unknown as Request)
-  if (!originCheck.ok) {
-    return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
-  }
-
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
+  }
+
+  // CSRF/origin check — only relevant for authenticated requests
+  const originCheck = assertSameOriginRequest(req as unknown as Request)
+  if (!originCheck.ok) {
+    return NextResponse.json({ error: originCheck.error }, { status: originCheck.status })
   }
 
   const ip = getClientIp(req as unknown as Request)
