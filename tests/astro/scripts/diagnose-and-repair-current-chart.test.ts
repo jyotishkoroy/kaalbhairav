@@ -17,6 +17,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { main } from "@/scripts/astro/diagnose-and-repair-current-chart";
 
 type QueryResult = { data: unknown; error: { message: string } | null };
+type InsertResult = QueryResult;
 
 function makeResolvedChain(result: QueryResult) {
   return {
@@ -40,6 +41,7 @@ function makeServiceMock(options: {
   chartSelectError?: (select: string) => QueryResult | null;
   summarySelectError?: (select: string) => QueryResult | null;
   tableDiscovery?: Record<string, string[] | null>;
+  insertResult?: (payload: Record<string, unknown>) => InsertResult;
 } = {}) {
   const birthProfileLookup = options.birthProfileLookup ?? { data: null, error: null };
   const birthProfileFallback = options.birthProfileFallback ?? { data: null, error: null };
@@ -61,7 +63,7 @@ function makeServiceMock(options: {
         insert: vi.fn((payload: Record<string, unknown>) => ({
           payload,
           select: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({ data: { id: "new-chart-version-id" }, error: null }),
+          single: vi.fn().mockResolvedValue(options.insertResult?.(payload) ?? { data: { id: "new-chart-version-id" }, error: null }),
         })),
         maybeSingle: vi.fn().mockResolvedValue({ data: Array.isArray(chartRows) ? chartRows[0] ?? null : chartRows ?? null, error: null }),
         then: (resolve: (value: QueryResult) => void) => Promise.resolve(errorResult ?? { data: chartRows, error: null }).then(resolve),
@@ -73,7 +75,7 @@ function makeServiceMock(options: {
     insert: vi.fn((payload: Record<string, unknown>) => ({
       payload,
       select: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { id: "new-chart-version-id" }, error: null }),
+      single: vi.fn().mockResolvedValue(options.insertResult?.(payload) ?? { data: { id: "new-chart-version-id" }, error: null }),
     })),
     maybeSingle: vi.fn().mockResolvedValue({ data: Array.isArray(chartRows) ? chartRows[0] ?? null : chartRows ?? null, error: null }),
     then: (resolve: (value: QueryResult) => void) => Promise.resolve({ data: chartRows, error: null }).then(resolve),
@@ -560,6 +562,71 @@ describe("diagnose-and-repair-current-chart", () => {
     expect(printed).toContain('"insertUserId": true');
   });
 
+  it("dry-run sets insertUserId true when chart_json_versions discovery is unavailable and profile.user_id exists", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          user_id: "u1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_version: 8,
+        input_hash: "ih8",
+        settings_hash: "sh8",
+        is_current: false,
+        status: "completed",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: null, prediction_ready_summaries: null },
+    });
+    createServiceClientMock.mockReturnValue(service);
+
+    const result = await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"]);
+    expect(result).toBe(0);
+    const printed = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(printed).toContain('"insertUserId": true');
+    expect(printed).toContain("assuming_required_column:chart_json_versions.user_id");
+  });
+
+  it("dry-run throws missing_required_insert_value when discovery is unavailable and profile.user_id is missing", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    createServiceClientMock.mockReturnValue(makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_version: 8,
+        input_hash: "ih8",
+        settings_hash: "sh8",
+        is_current: false,
+        status: "completed",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: null, prediction_ready_summaries: null },
+    }));
+
+    await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--dry-run"])).rejects.toThrow("missing_required_insert_value:chart_json_versions.user_id");
+  });
+
   it("apply includes user_id when chart_json_versions.user_id exists", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
@@ -591,6 +658,143 @@ describe("diagnose-and-repair-current-chart", () => {
     await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"]);
     const payload = service.queries.chartQuery.insert.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(payload).toMatchObject({ profile_id: "p1", user_id: "u1" });
+  });
+
+  it("apply includes user_id when chart_json_versions discovery is unavailable", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          user_id: "u1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_version: 8,
+        input_hash: "ih8",
+        settings_hash: "sh8",
+        is_current: false,
+        status: "completed",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: null, birth_profiles: ["id", "user_id", "current_chart_version_id"], prediction_ready_summaries: null },
+    });
+    createServiceClientMock.mockReturnValue(service);
+
+    await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"]);
+    const payload = service.queries.chartQuery.insert.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ profile_id: "p1", user_id: "u1" });
+  });
+
+  it("apply retries without user_id only when the error says the user_id column is missing", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const insertResults = [
+      { data: null, error: { message: "column chart_json_versions.user_id does not exist" } },
+      { data: { id: "new-chart-version-id" }, error: null },
+    ];
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          user_id: "u1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_version: 8,
+        input_hash: "ih8",
+        settings_hash: "sh8",
+        is_current: false,
+        status: "completed",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: null, birth_profiles: ["id", "user_id", "current_chart_version_id"], prediction_ready_summaries: null },
+      insertResult: () => insertResults.shift() ?? { data: { id: "unused" }, error: null },
+    });
+    createServiceClientMock.mockReturnValue(service);
+
+    await main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"]);
+    expect(service.queries.chartQuery.insert).toHaveBeenCalledTimes(2);
+    expect(service.queries.chartQuery.insert.mock.calls[1]?.[0]).not.toHaveProperty("user_id");
+  });
+
+  it("apply does not retry when user_id fails with NOT NULL violation", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          user_id: "u1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_version: 8,
+        input_hash: "ih8",
+        settings_hash: "sh8",
+        is_current: false,
+        status: "completed",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: null, birth_profiles: ["id", "user_id", "current_chart_version_id"], prediction_ready_summaries: null },
+      insertResult: () => ({ data: null, error: { message: "null value in column \"user_id\" of relation \"chart_json_versions\" violates not-null constraint" } }),
+    });
+    createServiceClientMock.mockReturnValue(service);
+
+    await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"])).rejects.toThrow(/not-null constraint/);
+    expect(service.queries.chartQuery.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("apply does not retry on permission error", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "secret";
+    const service: ServiceMock = makeServiceMock({
+      birthProfileLookup: {
+        data: {
+          id: "p1",
+          user_id: "u1",
+          display_name: "Jyotishko Roy",
+          canonical_profile: true,
+          current_chart_version_id: null,
+        },
+        error: null,
+      },
+      chartRows: [{
+        id: "cv1",
+        created_at: "2026-04-27T00:00:00Z",
+        chart_version: 8,
+        input_hash: "ih8",
+        settings_hash: "sh8",
+        is_current: false,
+        status: "completed",
+        chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigashira", moon_pada: 4 }, dasha: { current: { mahadasha: "Jupiter", antardasha: "Ketu" } } },
+      }],
+      tableDiscovery: { chart_json_versions: null, birth_profiles: ["id", "user_id", "current_chart_version_id"], prediction_ready_summaries: null },
+      insertResult: () => ({ data: null, error: { message: "permission denied for table chart_json_versions" } }),
+    });
+    createServiceClientMock.mockReturnValue(service);
+
+    await expect(main(["--profile-id", "b64406d3-04b2-431b-a7f6-cb9b728fc4da", "--apply"])).rejects.toThrow(/permission denied/i);
+    expect(service.queries.chartQuery.insert).toHaveBeenCalledTimes(1);
   });
 
   it("apply fails before insert when chart_json_versions.user_id exists but profile.user_id is missing", async () => {
