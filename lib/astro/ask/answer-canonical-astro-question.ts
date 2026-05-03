@@ -4,23 +4,60 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
-import { buildAstroChartContext } from "../chart-context.ts";
+import { buildPublicChartFacts, validatePublicChartFacts, type PublicChartFacts } from "../public-chart-facts.ts";
 import { answerExactChartFactQuestion } from "../exact-chart-facts.ts";
-import { ensureChartGroundedAnswer } from "../answer-grounding.ts";
 import { classifyVedicTopic } from "../rag/vedic-topic-classifier.ts";
-import { buildVedicRetrievalQuery } from "../rag/vedic-retrieval-query.ts";
-import { buildVedicStyleAnswer } from "../vedicqa-style-answer.ts";
-import { enforceFinalAnswerChartConsistency } from "../final-answer-chart-consistency.ts";
+import { buildAstroAnswerPlan } from "../answer-plan/astro-answer-plan.ts";
+import { renderAstroAnswerPlan } from "../answer-plan/astro-answer-renderer.ts";
+import { classifySafety } from "../answer-plan/astro-answer-policy.ts";
+import { finalizeAstroAnswer } from "../finalize-astro-answer.ts";
+import { buildAstroChartContext } from "../chart-context.ts";
 
-export async function answerCanonicalAstroQuestion(input: { question: string; userId: string; profileId: string; chartVersionId: string; chartJson: unknown; predictionSummary?: unknown; aboutSelf?: string; requestId?: string }): Promise<{ answer: string }> {
-  if (/(death|lifespan|suicide|self-harm)/i.test(input.question)) return { answer: "aadesh: I cannot help predict an exact death date or lifespan. If this is about safety or distress, please contact local emergency services or a trusted person right now." };
+export async function answerCanonicalAstroQuestion(input: {
+  question: string;
+  userId: string;
+  profileId: string;
+  chartVersionId: string;
+  chartJson: unknown;
+  predictionSummary?: unknown;
+  publicChartFacts?: PublicChartFacts;
+  aboutSelf?: string;
+  requestId?: string;
+}): Promise<{ answer: string }> {
+  // Safety precheck
+  const safety = classifySafety(input.question);
+  if (safety.blocked) return { answer: safety.answer! };
+
+  // Use provided facts or build them
+  const facts: PublicChartFacts = input.publicChartFacts ?? buildPublicChartFacts({
+    profileId: input.profileId,
+    chartVersionId: input.chartVersionId,
+    chartJson: input.chartJson,
+    predictionSummary: input.predictionSummary,
+  });
+
+  // Validate facts
+  const valid = validatePublicChartFacts(facts);
+  if (!valid.ok) {
+    return { answer: "aadesh: Your birth chart context needs recalculation before I can answer this reliably. Please update your birth details once and try again." };
+  }
+
+  // Exact fact detection via legacy chart context path
   const chartContext = buildAstroChartContext({ profileId: input.profileId, chartVersionId: input.chartVersionId, chartJson: input.chartJson, predictionSummary: input.predictionSummary });
-  if (!chartContext.ready) return { answer: "aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering." };
-  const exact = answerExactChartFactQuestion({ question: input.question, chartContext });
-  if (exact.matched) return { answer: exact.answer };
+  if (chartContext.ready) {
+    const exact = answerExactChartFactQuestion({ question: input.question, chartContext });
+    if (exact.matched) {
+      const finalized = finalizeAstroAnswer({ answer: exact.answer, facts });
+      return { answer: finalized.answer };
+    }
+  }
+
+  // Topic classification and dynamic answer plan
   const topic = classifyVedicTopic(input.question);
-  const retrievalQuery = buildVedicRetrievalQuery({ question: input.question, topic, chartFacts: chartContext.publicFacts });
-  const answer = buildVedicStyleAnswer({ question: input.question, topic, facts: chartContext.normalizedFacts, safetyMode: topic.startsWith("safety") || topic === "security" ? "safety" : "normal" });
-  const grounded = ensureChartGroundedAnswer({ answer: `aadesh: ${chartContext.basisLine} ${answer} Retrieval cue: ${retrievalQuery}.`, chartContext });
-  return { answer: enforceFinalAnswerChartConsistency({ answer: grounded, facts: chartContext.normalizedFacts }).answer };
+  const plan = buildAstroAnswerPlan({ question: input.question, topic, facts });
+  const drafted = renderAstroAnswerPlan(plan);
+
+  // Finalize: sanitize, check consistency, ensure no leaks
+  const finalized = finalizeAstroAnswer({ answer: drafted, facts });
+  return { answer: finalized.answer };
 }

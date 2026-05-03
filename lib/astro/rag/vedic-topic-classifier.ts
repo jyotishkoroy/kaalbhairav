@@ -27,6 +27,10 @@ export type VedicTopic =
   | "annual_timing"
   | "sade_sati"
   | "panoti"
+  | "health"
+  | "family"
+  | "general"
+  | "unknown"
   | "safety_death"
   | "safety_medical"
   | "safety_legal"
@@ -43,6 +47,8 @@ export function classifyVedicTopic(question: string): VedicTopic {
   if (/\b(manglik|mangal dosha|kalsarpa|kala sarpa)\b/.test(q)) return "dosha";
   if (/\b(what should the app answer if i ask about death|what should the app answer if i ask for medical diagnosis|what should the app answer if i ask for legal advice|what should the app answer if i ask for guaranteed stock tips|am i doomed)\b/.test(q)) return q.includes("doomed") ? "safety_death" : q.includes("medical") ? "safety_medical" : q.includes("legal") ? "safety_legal" : "safety_financial";
   if (/\b(what is my lagna|is my lagna virgo|what is my moon sign|what is my nakshatra|what is my sun sign in the vedic chart|what is my western sun sign|what is my lagna lord|what is my rasi lord|what is my birth nakshatra lord|which mahadasha am i running now|what antardasha am i in)\b/.test(q)) return "exact_fact";
+  if (/\b(verify my|confirm my|check my|show me my|what is my|is my)\b/.test(q) && /\b(lagna|ascendant|moon sign|rasi|rashi|nakshatra|sun sign|mahadasha|antardasha|mangal dosha|kalsarpa|lagna lord|rasi lord)\b/.test(q)) return "exact_fact";
+  if (/\b(lagna|ascendant|rising sign)\b/.test(q) && /\b(verify|confirm|check|is it|is my)\b/.test(q)) return "exact_fact";
   if (/\b(jupiter-ketu|jupiter-venus|mahadasha|antardasha|dasha|timing|mid-2026|around mid-2026)\b/.test(q)) return "dasha";
   if (/\b(career|job|work|promotion|profession|authority|government job)\b/.test(q)) return /\b(authority|government job)\b/.test(q) ? "authority" : "career";
   if (/\b(technology|tech|software|app|product)\b/.test(q)) return "technology";
@@ -55,8 +61,12 @@ export function classifyVedicTopic(question: string): VedicTopic {
   if (/\b(marriage|spouse|wedding|relationship|partner|love|dating)\b/.test(q)) return /\b(marriage|spouse|wedding)\b/.test(q) ? "marriage" : "relationship";
   if (/\b(finance|money|income|salary|wealth|debt)\b/.test(q)) return "finance";
   if (/\b(personality|nature|character|strength|weakness|who am i)\b/.test(q)) return "personality";
-  if (/\b(overthink|anxious|restless|mind|thoughts|mental)\b/.test(q)) return "mind";
+  if (/\b(overthink|anxious|restless|thoughts|mental|emotional|emotionally|feeling blocked|feel blocked|feel stuck|feeling stuck|inner|introspect)\b/.test(q) || /\boverthink|\bfeel anxious|\brestore my mind|\bmy mind\b/.test(q)) return "mind";
   if (/\b(mercury in gemini in the 11th|moon in gemini in the 11th|sun in taurus in the 10th)\b/.test(q)) return "planet_placement";
   if (/\b(planet in|sun in|moon in|mercury in|venus in|mars in|jupiter in|saturn in)\b/.test(q)) return "planet_placement";
-  return "career";
+  if (/\b(sade sati|sadesati|panoti)\b/.test(q)) return "sade_sati";
+  if (/\b(health|body|energy|tired|fatigue|wellness|vitality|immune)\b/.test(q)) return "health";
+  if (/\b(family|parents|mother|father|children|siblings|home|household)\b/.test(q)) return "family";
+  if (/\b(today|this week|this month|this year|right now|currently|what should i|how should i|what can i|advice|focus|guidance)\b/.test(q)) return "general";
+  return "general";
 }

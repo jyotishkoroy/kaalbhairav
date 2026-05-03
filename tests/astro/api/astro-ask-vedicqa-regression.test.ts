@@ -57,6 +57,7 @@ describe("astro ask regression", () => {
     expect(sun.answer).toContain("10");
     expect(dasha.answer).toContain("Jupiter Mahadasha");
     expect(placement.answer).toContain("communication");
-    expect(medical.answer.toLowerCase()).toContain("medical");
+    expect(medical.answer.toLowerCase()).toContain("safety boundary");
+    expect(medical.answer.toLowerCase()).not.toContain("retrieval cue");
   });
 });

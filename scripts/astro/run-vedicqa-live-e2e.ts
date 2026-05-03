@@ -18,7 +18,10 @@ const liveUrl = resolveLiveUrl();
 const delayMs = Number(process.env.VEDICQA_E2E_DELAY_MS ?? "100");
 const questionTimeoutMs = Number(process.env.VEDICQA_E2E_QUESTION_TIMEOUT_MS ?? "45000");
 const idleTimeoutMs = Number(process.env.VEDICQA_E2E_IDLE_TIMEOUT_MS ?? "90000");
-const maxConsecutiveFailures = Number(process.env.VEDICQA_E2E_MAX_CONSECUTIVE_FAILURES ?? "10");
+const disableConsecutiveFailureStop = process.env.VEDICQA_E2E_DISABLE_CONSECUTIVE_FAILURE_STOP === "true";
+const maxConsecutiveFailures = disableConsecutiveFailureStop
+  ? limit  // effectively unlimited
+  : Number(process.env.VEDICQA_E2E_MAX_CONSECUTIVE_FAILURES ?? String(limit));
 const rateLimitBackoffMs = Number(process.env.VEDICQA_E2E_RATE_LIMIT_BACKOFF_MS ?? "5000");
 const maxRateLimitRetries = Number(process.env.VEDICQA_E2E_MAX_RATE_LIMIT_RETRIES ?? "3");
 const traceOutput = process.env.VEDICQA_TRACE_OUTPUT ?? "artifacts/vedicqa-live-e2e-trace.jsonl";
@@ -72,7 +75,10 @@ async function runQuestion(page: Page, question: string): Promise<{ actual: stri
   const delta = pageEvents.splice(beforeCount).map((event) => sanitizeEvent({ method: event.method, url: event.url, status: event.status, requestBody: event.requestBody, responseBody: event.responseBody, latencyMs: Date.now() - start }));
   networkEvents.push(...delta);
   const rateLimited = isRateLimited(actual);
-  if (outcome === "timeout" || !actual) return { actual: actual || "aadesh: answer_timeout", notes, networkEvents, rateLimited, status: "timeout" };
+  if (outcome === "timeout" || !actual) {
+    // Always write a trace row even on timeout/fail
+    return { actual: actual || "aadesh: answer_timeout", notes, networkEvents, rateLimited, status: "timeout" };
+  }
   const score = scoreAnswerMatch({ actual, expected: question });
   return { actual, notes, networkEvents, rateLimited, status: score.matched ? "pass" : "fail" };
 }
@@ -108,15 +114,21 @@ async function run(): Promise<{ status: "completed" | "blocked" | "partial"; rea
       page = await getLivePage(context, page);
       if (!page.isClosed()) { try { await page.bringToFront(); } catch { /* ignore */ } }
       const item = items[index];
-      const result = await runQuestion(page, item.question);
+      let result: Awaited<ReturnType<typeof runQuestion>>;
+      try {
+        result = await runQuestion(page, item.question);
+      } catch (err) {
+        // Ensure a trace row is written even if runQuestion throws
+        result = { actual: "aadesh: answer_timeout", notes: ["exception"], networkEvents: [], rateLimited: false, status: "timeout" };
+      }
       const score = scoreAnswerMatch({ actual: result.actual, expected: item.expectedAnswer });
       const row: E2ETraceRow = { timestamp: new Date().toISOString(), runId, questionId: item.id, question: item.question, expectedAnswerHash: hashText(item.expectedAnswer), expectedAnswerExcerpt: excerptText(item.expectedAnswer), pageUrl: sanitizeUrlPath(page.url()), network: result.networkEvents, actualAnswer: result.actual, match: score, safety: { blocked: result.rateLimited, reason: result.rateLimited ? "rate_limited" : null }, providers: { groqObserved: "unknown", ollamaObserved: "unknown", supabaseObserved: "production-via-app" }, notes: result.notes };
       assertNoSecretLeaks(JSON.stringify(row));
       rows.push(row);
       consecutiveFailures = score.matched ? 0 : consecutiveFailures + 1;
-      console.log(`q=${index + 1} status=${result.status} score=${score.semanticScore.toFixed(2)} latencyMs=${Math.max(0, Date.now() - lastActivity)}`);
-      if (result.status === "timeout") return { status: "partial", reason: "answer_timeout", browser, context, page };
-      if (consecutiveFailures >= maxConsecutiveFailures) return { status: "partial", reason: "max_consecutive_failures", browser, context, page };
+      // Use score.matched (same value as in trace row) for progress output
+      console.log(`q=${index + 1} status=${result.status} matched=${score.matched} score=${score.semanticScore.toFixed(2)} consecutiveFailures=${consecutiveFailures} latencyMs=${Math.max(0, Date.now() - lastActivity)}`);
+      if (!disableConsecutiveFailureStop && consecutiveFailures >= maxConsecutiveFailures) return { status: "partial", reason: "max_consecutive_failures", browser, context, page };
       if (delayMs > 0) await page.waitForTimeout(delayMs);
     }
     return { status: "completed", browser, context, page };

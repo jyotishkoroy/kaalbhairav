@@ -224,14 +224,23 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
       const sections = normalizeSections((result as { sections?: unknown }).sections);
       const filteredSections = sections ? Object.fromEntries(Object.entries(sections).filter(([k]) => k !== 'suggested_follow_up')) : undefined;
       const rawOneShotAnswer = typeof result.answer === "string" ? result.answer.trim() : "";
-      const groundedOneShotAnswer = chartContextText && !rawOneShotAnswer.toLowerCase().startsWith("aadesh:")
-        ? `aadesh: ${chartContextText}\n\n${rawOneShotAnswer}`
-        : rawOneShotAnswer;
+      // Never prefix raw chartContextText — use only safe public basis from metadata
+      const publicChartBasis = typeof (metadata as Record<string, unknown>)?.publicChartBasis === "string" ? (metadata as Record<string, unknown>).publicChartBasis as string : undefined;
+      function prefixSafe(ans: string): string {
+        const clean = ans.replace(/Retrieval cue:[\s\S]*?(?=\n\n|\n[A-Z]|$)/gi, "").trim();
+        if (clean.toLowerCase().startsWith("aadesh:")) return clean;
+        if (publicChartBasis) return `aadesh: ${publicChartBasis}\n\n${clean}`;
+        // Only add prefix if chart context was active (preserve original conditional behavior)
+        if (chartContextText) return `aadesh: ${clean}`;
+        return clean;
+      }
+      const groundedOneShotAnswer = prefixSafe(rawOneShotAnswer);
       return NextResponse.json({ answer: groundedOneShotAnswer, followUpQuestion: null, followUpAnswer: null, sections: filteredSections, meta: responseMeta });
     }
     const rawAnswer = typeof result.answer === "string" ? result.answer.trim() : "";
-    const finalAnswer = chartContextText && !rawAnswer.toLowerCase().startsWith("aadesh:")
-      ? `aadesh: ${chartContextText}\n\n${rawAnswer}`
+    const publicChartBasisFull = typeof (metadata as Record<string, unknown>)?.publicChartBasis === "string" ? (metadata as Record<string, unknown>).publicChartBasis as string : undefined;
+    const finalAnswer = (chartContextText || publicChartBasisFull) && !rawAnswer.toLowerCase().startsWith("aadesh:")
+      ? publicChartBasisFull ? `aadesh: ${publicChartBasisFull}\n\n${rawAnswer}` : `aadesh: ${rawAnswer}`
       : rawAnswer;
     return NextResponse.json({ answer: finalAnswer, followUpQuestion: result.meta?.followUpQuestion, followUpAnswer: result.meta?.followUpAnswer, sections: normalizeSections((result as { sections?: unknown }).sections), meta: responseMeta });
   } catch (error) { console.error("Astro V2 reading route failed", error); return NextResponse.json({ error: "Unable to generate a reading right now. Please try again." }, { status: 500 }); }

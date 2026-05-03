@@ -12,13 +12,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn(),
 }))
 
-// Mock V2 handler
-vi.mock('@/lib/astro/rag/astro-v2-reading-handler', () => ({
-  handleAstroV2ReadingRequest: vi.fn(),
+vi.mock('@/lib/astro/ask/answer-canonical-astro-question', () => ({
+  answerCanonicalAstroQuestion: vi.fn(),
 }))
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { handleAstroV2ReadingRequest } from '@/lib/astro/rag/astro-v2-reading-handler'
+import { answerCanonicalAstroQuestion } from '@/lib/astro/ask/answer-canonical-astro-question'
 import { POST } from '@/app/api/astro/ask/route'
 import { NextRequest } from 'next/server'
 
@@ -78,6 +77,7 @@ function makeServiceMock({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'aadesh: Leo Lagna answer.' })
 })
 
 describe('POST /api/astro/ask', () => {
@@ -117,28 +117,18 @@ describe('POST /api/astro/ask', () => {
   it('returns safe answer when question is blocked by guard (model question)', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com' }) as never)
     vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1' } }) as never)
-    // V2 handler should NOT be called for blocked questions
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
-      new Response(JSON.stringify({ answer: 'should not appear' }), { status: 200 })
-    )
-
     const req = makeRequest({ question: 'Which AI model do you use?' })
     const resp = await POST(req)
     expect(resp.status).toBe(200)
     const body = await resp.json()
     expect(body.answer).toContain('aadesh')
-    // V2 handler must not be called for blocked questions
-    expect(vi.mocked(handleAstroV2ReadingRequest)).not.toHaveBeenCalled()
+    expect(vi.mocked(answerCanonicalAstroQuestion)).not.toHaveBeenCalled()
   })
 
-  it('calls V2 handler with server-resolved userId and profileId, ignoring client-supplied values', async () => {
+  it('calls canonical handler with server-resolved userId and profileId, ignoring client-supplied values', async () => {
     const mockUser = { id: 'real-user-id', email: 'real@test.com', user_metadata: {} }
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock(mockUser) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'real-profile-id' }, chart: { id: 'real-chart-id', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
-      new Response(JSON.stringify({ answer: 'Your Lagna is Leo.' }), { status: 200 })
-    )
-
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'real-profile-id' }, chart: { id: 'real-chart-id', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
     // Client tries to supply fake user/profile ids — must be ignored
     const req = makeRequest({
       question: 'What about my career?',
@@ -149,8 +139,7 @@ describe('POST /api/astro/ask', () => {
     const resp = await POST(req)
     expect(resp.status).toBe(200)
 
-    const callArg = vi.mocked(handleAstroV2ReadingRequest).mock.calls[0][0]
-    const callBody = await callArg.json()
+    const callBody = vi.mocked(answerCanonicalAstroQuestion).mock.calls[0][0]
     expect(callBody.userId).toBe('real-user-id')
     expect(callBody.profileId).toBe('real-profile-id')
     expect(callBody.chartVersionId).toBe('real-chart-id')
@@ -158,15 +147,8 @@ describe('POST /api/astro/ask', () => {
 
   it('strips followUpQuestion and followUpAnswer from response', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
-      new Response(JSON.stringify({
-        answer: 'Career answer.',
-        followUpQuestion: 'Do you want more?',
-        followUpAnswer: 'More details here.',
-        meta: { engine: 'rag' },
-      }), { status: 200 })
-    )
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'Career answer.' })
 
     const req = makeRequest({ question: 'What about my career?' })
     const resp = await POST(req)
@@ -177,35 +159,27 @@ describe('POST /api/astro/ask', () => {
     expect(body.meta).toBeUndefined()
   })
 
-  it('sets oneShot/disableFollowUps/disableMemory in V2 request metadata', async () => {
+  it('passes requestId into canonical handler metadata and does not expose it', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
-      new Response(JSON.stringify({ answer: 'Your answer.' }), { status: 200 })
-    )
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'Your answer.' })
 
     const req = makeRequest({ question: 'What about my career?', requestId: 'test-req-1' })
     await POST(req)
 
-    const callArg = vi.mocked(handleAstroV2ReadingRequest).mock.calls[0][0]
-    const callBody = await callArg.json()
-    expect(callBody.metadata.oneShot).toBe(true)
-    expect(callBody.metadata.disableFollowUps).toBe(true)
-    expect(callBody.metadata.disableMemory).toBe(true)
-    expect(callBody.metadata.requestId).toBe('test-req-1')
+    const callBody = vi.mocked(answerCanonicalAstroQuestion).mock.calls[0][0]
+    expect(callBody.requestId).toBe('test-req-1')
   })
 
-  it('returns error when V2 handler returns non-ok', async () => {
+  it('returns sanitized canonical answer', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { ascendant: { sign: 'Leo' } } } }) as never)
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(
-      new Response(JSON.stringify({ error: 'reading_failed' }), { status: 500 })
-    )
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'profile_id=abc123 Your answer.' })
 
     const req = makeRequest({ question: 'What about my career?' })
     const resp = await POST(req)
-    expect(resp.status).toBe(500)
+    expect(resp.status).toBe(200)
     const body = await resp.json()
-    expect(body.error).toBeTruthy()
+    expect(body.answer).not.toContain('profile_id')
   })
 })

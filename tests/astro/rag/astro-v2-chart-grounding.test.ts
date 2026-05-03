@@ -70,7 +70,7 @@ describe("astro-v2 chart grounding", () => {
     const resp = await handleAstroV2ReadingRequest(request({
       question: "How will my today be in the field of relationship?",
       chartContext: "Chart basis: Leo Lagna.",
-      metadata: { oneShot: true, disableFollowUps: true, disableMemory: true, requireChartGrounding: true },
+      metadata: { oneShot: true, disableFollowUps: true, disableMemory: true, requireChartGrounding: true, publicChartBasis: "Chart basis: Leo Lagna." },
     }));
     const body = await resp.json();
     expect(body.answer).toContain("Chart basis: Leo Lagna.");
