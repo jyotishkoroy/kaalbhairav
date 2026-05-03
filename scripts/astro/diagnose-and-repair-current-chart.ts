@@ -35,6 +35,12 @@ type SafeProfileSummary = {
 };
 
 type ChartVersionRow = Record<string, unknown>;
+type ColumnMetadata = {
+  column_name: string;
+  is_nullable: string | null;
+  column_default: string | null;
+  is_generated?: string | null;
+};
 type ChartCandidateClass = "invalid_wrong_chart" | "repairable_missing_dasha" | "valid_current_candidate";
 type ChartCandidate = {
   version: ChartVersionRow;
@@ -213,6 +219,47 @@ async function discoverTableColumns(service: ServiceClient, tableName: string): 
   } catch {
     return null;
   }
+}
+
+async function discoverTableColumnMetadata(service: ServiceClient, tableName: string): Promise<ColumnMetadata[] | null> {
+  try {
+    const { data, error } = await service
+      .from("information_schema.columns")
+      .select("column_name,is_nullable,column_default,is_generated")
+      .eq("table_schema", "public")
+      .eq("table_name", tableName);
+    if (error) return null;
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    return rows.map((row) => {
+      const record = row as Record<string, unknown>;
+      return {
+        column_name: asString(record.column_name) ?? "",
+        is_nullable: asString(record.is_nullable) ?? null,
+        column_default: asString(record.column_default) ?? null,
+        is_generated: asString(record.is_generated) ?? null,
+      };
+    }).filter((row) => row.column_name);
+  } catch {
+    return null;
+  }
+}
+
+type ChartVersionColumnInfo = {
+  columns: Set<string>;
+  requiredInsertColumns: Set<string>;
+  discoveryUnavailable: boolean;
+};
+
+async function discoverChartVersionColumnInfo(service: ServiceClient): Promise<ChartVersionColumnInfo> {
+  const metadata = await discoverTableColumnMetadata(service, "chart_json_versions");
+  if (!metadata) return { columns: new Set<string>(), requiredInsertColumns: new Set<string>(), discoveryUnavailable: true };
+  const columns = new Set(metadata.map((row) => row.column_name));
+  const requiredInsertColumns = new Set(
+    metadata
+      .filter((row) => row.is_nullable === "NO" && row.column_default === null && row.is_generated !== "ALWAYS" && row.column_name !== "id" && row.column_name !== "created_at")
+      .map((row) => row.column_name),
+  );
+  return { columns, requiredInsertColumns, discoveryUnavailable: false };
 }
 
 async function selectBirthProfileById(service: ServiceClient, profileId: string): Promise<Record<string, unknown>> {
@@ -461,6 +508,7 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
   const chartVersions = chartVersionsResult.rows;
   if (chartVersions.length === 0) throw new Error("chart_not_ready");
   const chartVersionColumns = chartVersionColumnPresence(chartVersions);
+  const chartVersionSchema = await discoverChartVersionColumnInfo(service);
 
   const versionSummaries = chartVersions.map((version) => {
     const facts = buildPublicChartFacts({
@@ -506,6 +554,7 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
       plan: {
         markAllChartVersionsNotCurrent: chartVersionColumns.has("is_current"),
         createRepairedChartVersion: selected.className === "repairable_missing_dasha",
+        insertUserId: chartVersionSchema.columns.has("user_id"),
         updateProfilePointer: columns.birthProfiles.has("current_chart_version_id"),
       },
       versions: versionSummaries,
@@ -514,8 +563,13 @@ async function repairCurrentChart(service: ServiceClient, profile: Record<string
 
   const now = new Date().toISOString();
   const hasChartVersionColumn = (name: string) => chartVersionColumns.has(name);
+  const insertUserId = chartVersionSchema.columns.has("user_id");
+  if (insertUserId && !asString(profile.user_id)) {
+    throw new Error("missing_required_insert_value:chart_json_versions.user_id");
+  }
   const insertPayload: Record<string, unknown> = {
     profile_id: profileId,
+    ...(insertUserId ? { user_id: asString(profile.user_id) } : {}),
     chart_json: {
       ...(typeof selected.version.chart_json === "object" && selected.version.chart_json ? selected.version.chart_json as Record<string, unknown> : {}),
       public_facts: {
