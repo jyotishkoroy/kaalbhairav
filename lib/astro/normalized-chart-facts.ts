@@ -55,6 +55,25 @@ function getPath(root: unknown, path: string[]): unknown {
   }
   return current;
 }
+function canonicalizeSign(value: string | undefined): string | undefined {
+  const normalized = normalizeName(value);
+  if (!normalized) return undefined;
+  const map: Record<string, string> = {
+    aries: "Aries",
+    taurus: "Taurus",
+    gemini: "Gemini",
+    cancer: "Cancer",
+    leo: "Leo",
+    virgo: "Virgo",
+    libra: "Libra",
+    scorpio: "Scorpio",
+    sagittarius: "Sagittarius",
+    capricorn: "Capricorn",
+    aquarius: "Aquarius",
+    pisces: "Pisces",
+  };
+  return map[normalized.toLowerCase()] ?? normalized;
+}
 function getString(root: unknown, paths: string[][]): string | undefined {
   for (const path of paths) {
     const value = asString(getPath(root, path));
@@ -122,12 +141,29 @@ function extractPlacements(container: unknown, lagnaSign?: string): Record<strin
 function readPlanetContainer(root: unknown): unknown {
   return getPath(root, ["public_facts", "planets"]) ?? getPath(root, ["publicFacts", "planets"]) ?? getPath(root, ["d1", "planets"]) ?? getPath(root, ["d1_chart", "placements"]) ?? getPath(root, ["planets"]);
 }
-function collectSources(values: Array<{ value?: string; source: string }>): { value?: string; sourcePriority: string[]; warning?: string } {
-  const filtered = values.filter((item): item is { value: string; source: string } => Boolean(item.value));
-  if (!filtered.length) return { sourcePriority: [] };
-  const selected = filtered[0];
-  const warning = filtered.some((item) => item.value.toLowerCase() !== selected.value.toLowerCase()) ? "conflicting_lagna_sources" : undefined;
-  return { value: selected.value, sourcePriority: filtered.map((item) => item.source), warning };
+function chooseTrustedSign(input: Array<{ value?: string; source: string }>): { value?: string; sourcePriority: string[]; warning?: string } {
+  const prioritized = input
+    .map((item) => ({ ...item, value: canonicalizeSign(item.value) }))
+    .filter((item): item is { value: string; source: string } => Boolean(item.value));
+  if (!prioritized.length) return { sourcePriority: [] };
+  const trustedOrder = [
+    "reportDerivedFacts",
+    "predictionSummary.public_facts",
+    "predictionSummary.normalizedFacts",
+    "chartJson.public_facts",
+    "chartJson.publicFacts",
+    "chartJson.d1",
+    "chartJson.rashi",
+    "chartJson.rasi",
+    "chartJson.vedic",
+    "chartJson.sidereal",
+    "genericAscendant",
+  ];
+  const selected = [...trustedOrder]
+    .map((source) => prioritized.find((item) => item.source === source))
+    .find((item): item is { value: string; source: string } => Boolean(item));
+  const warning = prioritized.some((item) => item.value !== selected?.value) ? "conflicting_lagna_sources" : undefined;
+  return { value: selected?.value, sourcePriority: prioritized.map((item) => item.source), warning };
 }
 
 export function extractReportDerivedChartFacts(input: unknown): Partial<NormalizedChartFacts> {
@@ -140,10 +176,20 @@ export function extractReportDerivedChartFacts(input: unknown): Partial<Normaliz
   const reportPlanets = readPlanetContainer(report);
   const chartPlanets = readPlanetContainer(chart);
 
-  const lagnaValue = getString(report, [["lagnaSign"], ["lagna"], ["ascendant"], ["ascendantSign"], ["rashi"], ["d1", "lagna", "sign"]]) ?? getString(chart, [["public_facts", "lagna_sign"], ["publicFacts", "lagnaSign"], ["d1", "lagna", "sign"], ["d1", "ascendant", "sign"], ["rashi", "lagna", "sign"], ["lagna", "sign"], ["ascendant", "sign"], ["vedic", "lagna", "sign"], ["sidereal", "lagna", "sign"]]);
-  facts.lagnaSign = normalizeName(lagnaValue);
+  const reportLagna = getString(report, [["lagnaSign"], ["lagna"], ["ascendant"], ["ascendantSign"], ["rashi"], ["d1", "lagna", "sign"]]);
+  const summaryLagna = getString(summary, [["public_facts", "lagna_sign"], ["publicFacts", "lagnaSign"], ["normalizedFacts", "lagnaSign"], ["lagna_sign"], ["lagnaSign"], ["lagna"], ["ascendant"]]);
+  const chartLagna = getString(chart, [["public_facts", "lagna_sign"], ["publicFacts", "lagnaSign"], ["d1", "lagna", "sign"], ["d1", "ascendant", "sign"], ["rashi", "lagna", "sign"], ["lagna", "sign"], ["ascendant", "sign"], ["vedic", "lagna", "sign"], ["sidereal", "lagna", "sign"]]);
+  const genericLagna = getString(chart, [["ascendant", "sign"], ["tropical", "ascendant", "sign"]]);
+  const lagnaChoice = chooseTrustedSign([
+    { value: reportLagna, source: "reportDerivedFacts" },
+    { value: summaryLagna, source: "predictionSummary.public_facts" },
+    { value: getString(summary, [["normalizedFacts", "lagnaSign"], ["normalizedFacts", "lagna", "sign"]]), source: "predictionSummary.normalizedFacts" },
+    { value: chartLagna, source: "chartJson.public_facts" },
+    { value: genericLagna, source: "genericAscendant" },
+  ]);
+  facts.lagnaSign = lagnaChoice.value;
   const moonSignValue = getString(report, [["moonSign"], ["moon", "sign"], ["rasi", "sign"]]) ?? getString(reportPlanets, [["Moon", "sign"], ["moon", "sign"], ["Chandra", "sign"]]) ?? getString(chart, [["public_facts", "moon_sign"], ["publicFacts", "moonSign"], ["moon", "sign"], ["planets", "Moon", "sign"]]) ?? getString(chartPlanets, [["Moon", "sign"], ["moon", "sign"], ["Chandra", "sign"]]);
-  facts.moonSign = normalizeName(moonSignValue);
+  facts.moonSign = canonicalizeSign(moonSignValue);
   facts.moonHouse = getNumber(report, [["moonHouse"], ["moon", "house"]]) ?? getNumber(reportPlanets, [["Moon", "house"], ["moon", "house"], ["Chandra", "house"]]) ?? getNumber(chart, [["public_facts", "moon_house"], ["publicFacts", "moonHouse"], ["moon", "house"], ["planets", "Moon", "house"]]) ?? getNumber(chartPlanets, [["Moon", "house"], ["moon", "house"], ["Chandra", "house"]]);
   const sunSignValue = getString(report, [["sunSign"], ["sun", "sign"], ["vedicSunSign"]]) ?? getString(reportPlanets, [["Sun", "sign"], ["sun", "sign"], ["Surya", "sign"]]) ?? getString(chart, [["public_facts", "sun_sign"], ["publicFacts", "sunSign"], ["sun", "sign"], ["planets", "Sun", "sign"]]) ?? getString(chartPlanets, [["Sun", "sign"], ["sun", "sign"], ["Surya", "sign"]]);
   facts.sunSign = normalizeName(sunSignValue);
@@ -155,7 +201,7 @@ export function extractReportDerivedChartFacts(input: unknown): Partial<Normaliz
   facts.nakshatraLord = normalizeName(getString(report, [["nakshatraLord"], ["nakshatra_lord"]]) ?? getString(chart, [["nakshatraLord"], ["nakshatra_lord"], ["public_facts", "nakshatra_lord"], ["publicFacts", "nakshatraLord"]]));
   facts.lagnaLord = normalizeName(getString(report, [["lagnaLord"], ["lagna_lord"]]) ?? getString(chart, [["lagnaLord"], ["lagna_lord"], ["public_facts", "lagna_lord"], ["publicFacts", "lagnaLord"]]));
   facts.rasiLord = normalizeName(getString(report, [["rasiLord"], ["rasi_lord"]]) ?? getString(chart, [["rasiLord"], ["rasi_lord"], ["public_facts", "rasi_lord"], ["publicFacts", "rasiLord"]]));
-  const mahadashaValue = getString(report, [["mahadasha"], ["currentMahadasha"]]) ?? getString(summary, [["mahadasha"]]) ?? getString(chart, [["mahadasha"], ["currentMahadasha"], ["prediction_ready_summaries", "mahadasha"]]) ?? (() => {
+  const mahadashaValue = getString(report, [["mahadasha"], ["currentMahadasha"]]) ?? getString(summary, [["mahadasha"]]) ?? getString(chart, [["mahadasha"], ["currentMahadasha"], ["public_facts", "mahadasha"], ["publicFacts", "mahadasha"], ["prediction_ready_summaries", "mahadasha"]]) ?? (() => {
     const timing = getString(summary, [["current_timing_summary"]]) ?? getString(chart, [["prediction_ready_summaries", "current_timing_summary"]]);
     return timing?.match(/\b(Jupiter|Saturn|Mercury|Venus|Mars|Sun|Moon|Rahu|Ketu)\b/i)?.[1];
   })();
@@ -164,29 +210,26 @@ export function extractReportDerivedChartFacts(input: unknown): Partial<Normaliz
   facts.mahadashaEnd = getString(report, [["mahadashaEnd"], ["mahadasha_end"]]) ?? getString(summary, [["mahadashaEnd"], ["mahadasha_end"]]);
   const antardashaNowValue = getString(report, [["antardashaNow"], ["currentAntardasha"]]) ?? getString(chart, [["antardashaNow"], ["currentAntardasha"], ["prediction_ready_summaries", "current_timing_summary"]]);
   facts.antardashaNow = normalizeName(antardashaNowValue);
-  facts.antardashaTimeline = getTimeline(report).length ? getTimeline(report) : getTimeline(summary);
-  facts.mangalDosha = getBoolean(report, [["mangalDosha"], ["manglik"]]) ?? getBoolean(chart, [["mangalDosha"], ["manglik"]]);
-  facts.kalsarpaYoga = getBoolean(report, [["kalsarpaYoga"], ["kalsarpa"]]) ?? getBoolean(chart, [["kalsarpaYoga"], ["kalsarpa"]]);
+  facts.antardashaTimeline = getTimeline(report).length ? getTimeline(report) : getTimeline(summary).length ? getTimeline(summary) : getTimeline(chart);
+  facts.mangalDosha = getBoolean(report, [["mangalDosha"], ["manglik"]]) ?? getBoolean(chart, [["mangalDosha"], ["manglik"], ["public_facts", "mangalDosha"], ["publicFacts", "mangalDosha"]]);
+  facts.kalsarpaYoga = getBoolean(report, [["kalsarpaYoga"], ["kalsarpa"]]) ?? getBoolean(chart, [["kalsarpaYoga"], ["kalsarpa"], ["public_facts", "kalsarpaYoga"], ["publicFacts", "kalsarpaYoga"]]);
   facts.placements = extractPlacements(reportPlanets ?? chartPlanets ?? chart, facts.lagnaSign);
 
-  const summaryLagna = normalizeName(getString(summary, [["public_facts", "lagna_sign"], ["publicFacts", "lagnaSign"], ["normalizedFacts", "lagnaSign"], ["lagna_sign"], ["lagnaSign"], ["lagna"], ["ascendant"]]));
-  const chartLagna = normalizeName(getString(input.chartJson, [["public_facts", "lagna_sign"], ["publicFacts", "lagnaSign"], ["d1", "lagna", "sign"], ["d1", "ascendant", "sign"], ["rashi", "lagna", "sign"], ["lagna", "sign"], ["ascendant", "sign"], ["vedic", "lagna", "sign"], ["sidereal", "lagna", "sign"]]));
-  const genericLagna = normalizeName(getString(input.chartJson, [["ascendant", "sign"], ["tropical", "ascendant", "sign"]]));
-
-  const chosenLagna = collectSources([
+  const summaryLagnaChoice = normalizeName(getString(summary, [["public_facts", "lagna_sign"], ["publicFacts", "lagnaSign"], ["normalizedFacts", "lagnaSign"], ["lagna_sign"], ["lagnaSign"], ["lagna"], ["ascendant"]]));
+  const chosenLagna = chooseTrustedSign([
     { value: facts.lagnaSign, source: "reportDerivedFacts" },
-    { value: summaryLagna, source: "predictionSummary.public_facts" },
-    { value: normalizeName(getString(summary, [["normalizedFacts", "lagnaSign"], ["normalizedFacts", "lagna", "sign"]])), source: "predictionSummary.normalizedFacts" },
+    { value: summaryLagnaChoice, source: "predictionSummary.public_facts" },
+    { value: getString(summary, [["normalizedFacts", "lagnaSign"], ["normalizedFacts", "lagna", "sign"]]), source: "predictionSummary.normalizedFacts" },
     { value: chartLagna, source: "chartJson.public_facts" },
-    { value: genericLagna, source: "chartJson.genericAscendant" },
+    { value: genericLagna, source: "genericAscendant" },
   ]);
   if (chosenLagna.value) facts.lagnaSign = chosenLagna.value;
   facts.sourcePriority = chosenLagna.sourcePriority;
   facts.warnings = chosenLagna.warning ? [chosenLagna.warning] : [];
 
-  if (!facts.moonSign) facts.moonSign = normalizeName(getString(summary, [["public_facts", "moon_sign"], ["publicFacts", "moonSign"], ["normalizedFacts", "moonSign"], ["moonSign"]]));
+  if (!facts.moonSign) facts.moonSign = canonicalizeSign(getString(summary, [["public_facts", "moon_sign"], ["publicFacts", "moonSign"], ["normalizedFacts", "moonSign"], ["moonSign"]]));
   if (!facts.moonHouse) facts.moonHouse = getNumber(summary, [["public_facts", "moon_house"], ["publicFacts", "moonHouse"], ["normalizedFacts", "moonHouse"], ["moonHouse"]]);
-  if (!facts.sunSign) facts.sunSign = normalizeName(getString(summary, [["public_facts", "sun_sign"], ["publicFacts", "sunSign"], ["normalizedFacts", "sunSign"], ["sunSign"]]));
+  if (!facts.sunSign) facts.sunSign = canonicalizeSign(getString(summary, [["public_facts", "sun_sign"], ["publicFacts", "sunSign"], ["normalizedFacts", "sunSign"], ["sunSign"]]));
   if (!facts.sunHouse) facts.sunHouse = getNumber(summary, [["public_facts", "sun_house"], ["publicFacts", "sunHouse"], ["normalizedFacts", "sunHouse"], ["sunHouse"]]);
   if (!facts.westernSunSign) facts.westernSunSign = normalizeName(getString(summary, [["westernSunSign"], ["western_sun_sign"]]));
   if (!facts.nakshatra) facts.nakshatra = normalizeName(getString(summary, [["nakshatra"], ["moonNakshatra"]]));

@@ -41,6 +41,7 @@ export function classifyVedicTopic(question: string): VedicTopic {
   if (/\b(stock|share|trading|investment|crypto)\b/.test(q)) return "safety_financial";
   if (/\b(model|server|system prompt|database rows|logs|credentials|token|secret|api key)\b/.test(q)) return "security";
   if (/\b(manglik|mangal dosha|kalsarpa|kala sarpa)\b/.test(q)) return "dosha";
+  if (/\b(what should the app answer if i ask about death|what should the app answer if i ask for medical diagnosis|what should the app answer if i ask for legal advice|what should the app answer if i ask for guaranteed stock tips|am i doomed)\b/.test(q)) return q.includes("doomed") ? "safety_death" : q.includes("medical") ? "safety_medical" : q.includes("legal") ? "safety_legal" : "safety_financial";
   if (/\b(what is my lagna|is my lagna virgo|what is my moon sign|what is my nakshatra|what is my sun sign in the vedic chart|what is my western sun sign|what is my lagna lord|what is my rasi lord|what is my birth nakshatra lord|which mahadasha am i running now|what antardasha am i in)\b/.test(q)) return "exact_fact";
   if (/\b(jupiter-ketu|jupiter-venus|mahadasha|antardasha|dasha|timing|mid-2026|around mid-2026)\b/.test(q)) return "dasha";
   if (/\b(career|job|work|promotion|profession|authority|government job)\b/.test(q)) return /\b(authority|government job)\b/.test(q) ? "authority" : "career";

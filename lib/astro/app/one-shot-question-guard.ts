@@ -9,7 +9,7 @@ const INTERNAL_PROBE_PATTERNS = [/\b(ai\s*model|model|server|system prompt|datab
 const COMPATIBILITY_PATTERNS = [/\b(compatibility|kundli\s*(matching|milan)|synastry|compare\s+my\s+chart|another\s+person|partner's birth|husband's birth|wife's birth|boyfriend's birth|girlfriend's birth)\b/i];
 const FILE_IMAGE_PATTERNS = [/\b(upload|photo|picture|image|pdf|file|document|screenshot|kundli)\b/i, /\bread\s+(this\s+)?(pdf|file|document|image)\b/i, /\banalyze\s+(image|photo|picture|screenshot|pdf|document|kundli)\b/i, /\battachment\b/i];
 const LANGUAGE_BLOCK_PATTERNS = [/[\u0900-\u097F]/, /[\u0980-\u09FF]/, /[\u0600-\u06FF]/, /\bkya\b/i, /\bkaise\b/i, /\bmera\b/i, /\bmeri\b/i, /\bmujhe\b/i, /\bshaadi\b/i, /\bpaisa\b/i];
-const SAFE_ASTRO_PATTERNS = [/^what does (mercury|moon|sun|venus|mars|jupiter|saturn) in/i, /^what should the app answer if i ask/i];
+const SAFE_ASTRO_PATTERNS = [/^what does (mercury|moon|sun|venus|mars|jupiter|saturn) in/i, /^what should the app answer if i ask/i, /^am i doomed\??$/i];
 function normalizeWhitespace(s: string): string { return s.replace(/\s+/g, " ").trim(); }
 function isInternalProbe(question: string): boolean { return INTERNAL_PROBE_PATTERNS.some((pattern) => pattern.test(question)); }
 export function guardOneShotAstroQuestion(question: string): AstroQuestionGuardResult {

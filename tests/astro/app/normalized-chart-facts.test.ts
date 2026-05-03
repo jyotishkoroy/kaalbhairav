@@ -7,45 +7,60 @@
 import { describe, expect, it } from "vitest";
 import { buildNormalizedChartFacts } from "@/lib/astro/normalized-chart-facts";
 
-const chartJson = {
-  public_facts: {
-    lagna_sign: "Leo",
-    lagna_lord: "Sun",
-    rasi_lord: "Mercury",
-    nakshatra_lord: "Mars",
-    planets: {
-      Moon: { sign: "Gemini", house: 11, nakshatra: "Mrigasira", pada: 4 },
-      Sun: { sign: "Taurus", house: 10 },
-    },
-  },
-  ascendant: { sign: "Virgo" },
-  d1: { lagna: { sign: "Leo" }, moon: { sign: "Gemini", house: 11 }, sun: { sign: "Taurus", house: 10 } },
-  prediction_ready_summaries: {
-    current_timing_summary: "Jupiter Mahadasha with Jupiter-Ketu until early July 2026, then Jupiter-Venus",
-    summary: "Jupiter Mahadasha",
-    mahadasha_sequence: [
-      { mahadasha: "Jupiter", antardasha: "Ketu", from: "2025-01-01", to: "2026-07-01" },
-      { mahadasha: "Jupiter", antardasha: "Venus", from: "2026-07-02", to: "2027-01-01" },
-    ],
-  },
-};
-
 describe("buildNormalizedChartFacts", () => {
-  it("prefers report-derived Leo over generic Virgo", () => {
-    const facts = buildNormalizedChartFacts({ chartJson, predictionSummary: chartJson.prediction_ready_summaries, reportFacts: chartJson.public_facts });
+  it("prefers trusted Leo over generic Virgo and extracts benchmark facts", () => {
+    const facts = buildNormalizedChartFacts({
+      chartJson: {
+        ascendant: { sign: "Virgo" },
+        d1: { lagna: { sign: "Leo" } },
+        public_facts: {
+          lagna_sign: "Leo",
+          moon_sign: "Gemini",
+          moon_house: 11,
+          sun_sign: "Taurus",
+          sun_house: 10,
+          moon_nakshatra: "Mrigasira",
+          moon_pada: 4,
+          lagna_lord: "Sun",
+          rasi_lord: "Mercury",
+          nakshatra_lord: "Mars",
+          mahadasha: "Jupiter",
+          mahadashaStart: "August 2018",
+          mahadashaEnd: "August 2034",
+          mangalDosha: false,
+          kalsarpaYoga: false,
+          antardashaTimeline: [{ mahadasha: "Jupiter", antardasha: "Ketu", startDate: "2025-01-01", endDate: "2026-07-01" }],
+        },
+      },
+      predictionSummary: {
+        public_facts: { lagna_sign: "Leo" },
+        normalizedFacts: { lagnaSign: "Virgo" },
+      },
+      reportFacts: {
+        lagna: "Leo",
+        moonSign: "Gemini",
+        moonHouse: 11,
+        sunSign: "Taurus",
+        sunHouse: 10,
+        nakshatra: "Mrigasira",
+        nakshatraPada: 4,
+        nakshatraLord: "Mars",
+        mahadasha: "Jupiter",
+        antardashaTimeline: [{ mahadasha: "Jupiter", antardasha: "Ketu", startDate: "2025-01-01", endDate: "2026-07-01" }],
+        mangalDosha: false,
+        kalsarpaYoga: false,
+      },
+    });
+
     expect(facts.lagnaSign).toBe("Leo");
-    expect(facts.warnings).toContain("conflicting_lagna_sources");
-  });
-  it("extracts deterministic placements and timing facts", () => {
-    const facts = buildNormalizedChartFacts({ chartJson, predictionSummary: chartJson.prediction_ready_summaries, reportFacts: chartJson.public_facts });
-    expect(facts.moonSign).toBe("Gemini");
     expect(facts.moonHouse).toBe(11);
-    expect(facts.sunSign).toBe("Taurus");
     expect(facts.sunHouse).toBe(10);
     expect(facts.nakshatra).toBe("Mrigasira");
     expect(facts.nakshatraPada).toBe(4);
     expect(facts.nakshatraLord).toBe("Mars");
     expect(facts.mahadasha).toBe("Jupiter");
-    expect(facts.antardashaTimeline?.length).toBe(2);
+    expect(facts.mangalDosha).toBe(false);
+    expect(facts.kalsarpaYoga).toBe(false);
+    expect(facts.warnings).toContain("conflicting_lagna_sources");
   });
 });

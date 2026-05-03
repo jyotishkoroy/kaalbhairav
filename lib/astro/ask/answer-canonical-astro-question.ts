@@ -10,6 +10,7 @@ import { ensureChartGroundedAnswer } from "../answer-grounding.ts";
 import { classifyVedicTopic } from "../rag/vedic-topic-classifier.ts";
 import { buildVedicRetrievalQuery } from "../rag/vedic-retrieval-query.ts";
 import { buildVedicStyleAnswer } from "../vedicqa-style-answer.ts";
+import { enforceFinalAnswerChartConsistency } from "../final-answer-chart-consistency.ts";
 
 export async function answerCanonicalAstroQuestion(input: { question: string; userId: string; profileId: string; chartVersionId: string; chartJson: unknown; predictionSummary?: unknown; aboutSelf?: string; requestId?: string }): Promise<{ answer: string }> {
   if (/(death|lifespan|suicide|self-harm)/i.test(input.question)) return { answer: "aadesh: I cannot help predict an exact death date or lifespan. If this is about safety or distress, please contact local emergency services or a trusted person right now." };
@@ -20,5 +21,6 @@ export async function answerCanonicalAstroQuestion(input: { question: string; us
   const topic = classifyVedicTopic(input.question);
   const retrievalQuery = buildVedicRetrievalQuery({ question: input.question, topic, chartFacts: chartContext.publicFacts });
   const answer = buildVedicStyleAnswer({ question: input.question, topic, facts: chartContext.normalizedFacts, safetyMode: topic.startsWith("safety") || topic === "security" ? "safety" : "normal" });
-  return { answer: ensureChartGroundedAnswer({ answer: `aadesh: ${chartContext.basisLine} ${answer} Retrieval cue: ${retrievalQuery}.`, chartContext }) };
+  const grounded = ensureChartGroundedAnswer({ answer: `aadesh: ${chartContext.basisLine} ${answer} Retrieval cue: ${retrievalQuery}.`, chartContext });
+  return { answer: enforceFinalAnswerChartConsistency({ answer: grounded, facts: chartContext.normalizedFacts }).answer };
 }
