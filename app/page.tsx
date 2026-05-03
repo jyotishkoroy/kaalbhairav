@@ -14,19 +14,19 @@ import type { CSSProperties, PointerEvent, WheelEvent } from "react";
 const PRIMARY_LINKS = [
   {
     label: "Ask Guru",
-    href: "/sign-in?next=%2Fastro",
+    href: "/sign-in?next=/astro",
     eyebrow: "guidance",
     note: "Ask what your chart is trying to teach you.",
   },
   {
     label: "Still",
-    href: "/sign-in?next=%2Fstill",
+    href: "/sign-in?next=/astro",
     eyebrow: "practice",
     note: "One quiet page for reflection and daily steadiness.",
   },
   {
     label: "News",
-    href: "/sign-in?next=%2Fnews",
+    href: "/sign-in?next=/astro",
     eyebrow: "updates",
     note: "Astrology, culture, sky, and Tarayai notes.",
   },

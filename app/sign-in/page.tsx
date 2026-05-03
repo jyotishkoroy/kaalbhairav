@@ -1,20 +1,21 @@
 /*
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import SignInButton from './sign-in-button'
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getSafeRelativeRedirect } from "@/lib/security/safe-redirect";
+import SignInButton from "./sign-in-button";
 
 type Props = {
-  searchParams: Promise<{ next?: string }>
-}
+  searchParams?: Promise<{ next?: string }> | { next?: string };
+};
 
 export default async function SignInPage({ searchParams }: Props) {
-  const { next } = await searchParams
-  const safePath = next && next.startsWith('/') && !next.startsWith('//') ? next : '/astro'
+  const params = await searchParams;
+  const safePath = getSafeRelativeRedirect(params?.next, "/astro");
 
   const supabase = await createClient()
 

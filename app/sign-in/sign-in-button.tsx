@@ -1,12 +1,13 @@
-'use client'
+"use client"
 
 /*
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from "@/lib/supabase/client"
+import { getSafeRelativeRedirect } from "@/lib/security/safe-redirect"
 
 type Props = {
   nextPath?: string
@@ -15,12 +16,14 @@ type Props = {
 export default function SignInButton({ nextPath }: Props) {
   const handleSignIn = async () => {
     const supabase = createClient()
-    const safePath = nextPath && nextPath.startsWith('/') ? nextPath : '/astro'
+    const safePath = getSafeRelativeRedirect(nextPath, "/astro")
+    const callbackUrl = new URL("/auth/callback", window.location.origin)
+    callbackUrl.searchParams.set("next", safePath)
 
     await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safePath)}`,
+        redirectTo: callbackUrl.toString(),
       },
     })
   }
