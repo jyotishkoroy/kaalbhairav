@@ -30,7 +30,7 @@ export default async function AstroPage() {
   }
 
   if (!activeProfile.terms_accepted_at && !activeProfile.terms_accepted_version) {
-    redirect('/astro/setup?step=terms')
+    redirect('/astro/setup')
   }
 
   const { data: latestChart } = await service

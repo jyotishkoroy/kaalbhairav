@@ -10,6 +10,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { calculateRequestSchema } from '@/lib/astro/schemas/calculate'
 import { decryptJson } from '@/lib/astro/encryption'
 import { normalizeBirthInput } from '@/lib/astro/normalize'
+import { normalizeStoredBirthData } from '@/lib/astro/profile-birth-data'
 import { sha256Canonical } from '@/lib/astro/hashing'
 import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from '@/lib/astro/engine/version'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
@@ -20,6 +21,7 @@ import type { MasterAstroCalculationOutput } from '@/lib/astro/schemas/master'
 import type { ChartJson } from '@/lib/astro/types'
 import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart-json-adapter'
 import { mergeAvailableJyotishSectionsIntoChartJson } from '@/lib/astro/chart-json-persistence'
+import { DEFAULT_SETTINGS, hashSettings } from '@/lib/astro/settings'
 import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
@@ -111,6 +113,22 @@ async function persistCalculatedOutput(args: {
   return chartVersionId
 }
 
+function logCalculationFailure(stage: string, code: string, context: {
+  hasUser: boolean
+  hasProfile: boolean
+  hasSettings: boolean
+  hasEncryptedBirthData: boolean
+}) {
+  console.warn('[astro_chart_calculation_failed]', {
+    stage,
+    code,
+    hasUser: context.hasUser,
+    hasProfile: context.hasProfile,
+    hasSettings: context.hasSettings,
+    hasEncryptedBirthData: context.hasEncryptedBirthData,
+  })
+}
+
 export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
@@ -141,32 +159,59 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_input', issues: parsed.error.issues }, { status: 400 })
   }
 
-  const { profile_id, force_recalc } = parsed.data
+  const { profile_id: profileId, force_recalc } = parsed.data
   const service = createServiceClient()
 
   const { data: profile } = await service
     .from('birth_profiles')
-    .select('id, user_id, encrypted_birth_data, pii_encryption_key_version')
-    .eq('id', profile_id)
-    .single()
+    .select('id, user_id, encrypted_birth_data, pii_encryption_key_version, status')
+    .eq('id', profileId)
+    .eq('status', 'active')
+    .maybeSingle()
 
-  if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
-  // Ownership check — never trust client-supplied profileId without verifying owner
-  if (profile.user_id !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (!profile) {
+    logCalculationFailure('load_profile', 'profile_not_found', { hasUser: true, hasProfile: false, hasSettings: false, hasEncryptedBirthData: false })
+    return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
+  }
+  if (!profile.encrypted_birth_data) {
+    logCalculationFailure('load_profile', 'profile_birth_data_missing', { hasUser: true, hasProfile: true, hasSettings: false, hasEncryptedBirthData: false })
+    return NextResponse.json({ error: 'profile_birth_data_missing' }, { status: 400 })
+  }
+  if (profile.user_id !== user.id) {
+    logCalculationFailure('load_profile', 'profile_access_denied', { hasUser: true, hasProfile: true, hasSettings: false, hasEncryptedBirthData: Boolean(profile.encrypted_birth_data) })
+    return NextResponse.json({ error: 'profile_access_denied' }, { status: 404 })
+  }
 
-  const { data: settings } = await service
+  let { data: settings } = await service
     .from('astrology_settings')
     .select('*')
-    .eq('profile_id', profile_id)
-    .single()
+    .eq('profile_id', profileId)
+    .maybeSingle()
 
-  if (!settings) return NextResponse.json({ error: 'settings_not_found' }, { status: 400 })
+  if (!settings) {
+    const { data: insertedSettings, error: settingsInsertError } = await service
+      .from('astrology_settings')
+      .insert({
+        profile_id: profileId,
+        user_id: user.id,
+        ...DEFAULT_SETTINGS,
+        settings_hash: hashSettings(DEFAULT_SETTINGS),
+      })
+      .select('*')
+      .maybeSingle()
+    if (settingsInsertError || !insertedSettings) {
+      logCalculationFailure('load_settings', 'astrology_settings_missing', { hasUser: true, hasProfile: true, hasSettings: false, hasEncryptedBirthData: Boolean(profile.encrypted_birth_data) })
+      return NextResponse.json({ error: 'astrology_settings_missing' }, { status: 400 })
+    }
+    settings = insertedSettings
+  }
 
   let decryptedInput: BirthProfileInput
   try {
-    decryptedInput = decryptJson<BirthProfileInput>(profile.encrypted_birth_data)
+    decryptedInput = normalizeStoredBirthData(decryptJson<unknown>(profile.encrypted_birth_data))
   } catch {
-    return NextResponse.json({ error: 'decrypt_failed' }, { status: 500 })
+    logCalculationFailure('decrypt_birth_data', 'profile_birth_data_invalid', { hasUser: true, hasProfile: true, hasSettings: true, hasEncryptedBirthData: Boolean(profile.encrypted_birth_data) })
+    return NextResponse.json({ error: 'profile_birth_data_invalid' }, { status: 400 })
   }
 
   const normalized = normalizeBirthInput(decryptedInput)
@@ -191,7 +236,7 @@ export async function POST(req: NextRequest) {
 
   const runtime = {
     user_id: user.id,
-    profile_id,
+    profile_id: profileId,
     current_utc: new Date().toISOString(),
     production: process.env.NODE_ENV === 'production',
   }
@@ -221,7 +266,7 @@ export async function POST(req: NextRequest) {
     const { data: cached } = await service
       .from('chart_calculations')
       .select('id, current_chart_version_id')
-      .eq('profile_id', profile_id)
+      .eq('profile_id', profileId)
       .eq('input_hash', inputHash)
       .eq('settings_hash', settingsHash)
       .eq('engine_version', getRuntimeEngineVersion())
@@ -265,7 +310,7 @@ export async function POST(req: NextRequest) {
     .from('chart_calculations')
     .insert({
       user_id: user.id,
-      profile_id,
+      profile_id: profileId,
       status: 'running',
       input_hash: inputHash,
       settings_hash: settingsHash,
@@ -305,7 +350,7 @@ export async function POST(req: NextRequest) {
 
       await service.from('calculation_audit_logs').insert({
         user_id: user.id,
-        profile_id,
+        profile_id: profileId,
         calculation_id: calc.id,
         event: 'calculation_rejected',
         detail: { engine_version: getRuntimeEngineVersion(), status: output.calculation_status },
@@ -324,12 +369,12 @@ export async function POST(req: NextRequest) {
     const chartVersionId = randomUUID()
     const nextChartVersion = await getNextChartVersion({
       service,
-      profileId: profile_id,
+      profileId,
     })
     const chartJson = buildProfileChartJsonFromMasterOutput({
       output,
       userId: user.id,
-      profileId: profile_id,
+      profileId,
       calculationId: calc.id,
       chartVersionId,
       chartVersion: nextChartVersion,
@@ -357,20 +402,41 @@ export async function POST(req: NextRequest) {
       output as unknown as Record<string, unknown>,
     ) as MasterAstroCalculationOutput & Record<string, unknown>
 
-    const persistedChartVersionId = await persistCalculatedOutput({
-      service,
-      userId: user.id,
-      profileId: profile_id,
-      calcId: calc.id,
-      inputHash,
-      settingsHash,
-      chartVersion: nextChartVersion,
-      chartJson: mergedChartJson,
-      output,
-      runtimeEngineVersion: getRuntimeEngineVersion(),
-      runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
-      schemaVersion: SCHEMA_VERSION,
-    })
+    let persistedChartVersionId: string
+    try {
+      persistedChartVersionId = await persistCalculatedOutput({
+        service,
+        userId: user.id,
+        profileId,
+        calcId: calc.id,
+        inputHash,
+        settingsHash,
+        chartVersion: nextChartVersion,
+        chartJson: mergedChartJson,
+        output,
+        runtimeEngineVersion: getRuntimeEngineVersion(),
+        runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
+        schemaVersion: SCHEMA_VERSION,
+      })
+    } catch (persistError) {
+      const errorText = persistError instanceof Error ? persistError.message : 'unknown'
+      const code = errorText.startsWith('prediction_insert_failed') ? 'prediction_summary_save_failed' : 'chart_version_save_failed'
+      logCalculationFailure('persist_chart', code, {
+        hasUser: true,
+        hasProfile: true,
+        hasSettings: true,
+        hasEncryptedBirthData: true,
+      })
+      await service
+        .from('chart_calculations')
+        .update({
+          status: 'failed',
+          error_message: errorText,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', calc.id)
+      return NextResponse.json({ error: code }, { status: 500 })
+    }
 
     if (process.env.NODE_ENV !== 'production') {
       const rawAstronomicalData = mergedChartJson.astronomical_data && typeof mergedChartJson.astronomical_data === 'object'
@@ -431,9 +497,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(responsePayload)
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[astro-v1-calculate-error]', error)
-    }
+    logCalculationFailure('engine_or_persist', 'chart_engine_failed', {
+      hasUser: true,
+      hasProfile: true,
+      hasSettings: true,
+      hasEncryptedBirthData: true,
+    })
     await service
       .from('chart_calculations')
       .update({
@@ -447,6 +516,7 @@ export async function POST(req: NextRequest) {
         schema_version: SCHEMA_VERSION,
         calculation_status: 'rejected',
         rejection_reason: error instanceof Error ? error.message : 'unknown',
+        error: 'chart_engine_failed',
       } satisfies Partial<MasterAstroCalculationOutput>,
       { status: 500 },
     )

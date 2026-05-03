@@ -8,11 +8,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { BirthProfileForm } from '@/app/astro/components/BirthProfileForm'
 
-export default async function AstroSetupPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ step?: string; recalculate?: string }>
-}) {
+export default async function AstroSetupPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -28,8 +24,6 @@ export default async function AstroSetupPage({
     .eq('user_id', user.id)
     .eq('status', 'active')
     .maybeSingle()
-
-  const { step } = await searchParams
 
   const googleName =
     typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name :
@@ -106,7 +100,6 @@ export default async function AstroSetupPage({
           googleName={googleName}
           googleEmail={googleEmail}
           hasProfile={!!activeProfile}
-          initialStep={step}
         />
 
         <p style={{ marginTop: '1.5rem', fontSize: '0.78rem', color: 'rgba(240,232,216,0.35)', lineHeight: '1.6' }}>

@@ -68,6 +68,13 @@ describe('astro routing', () => {
     await expect(AstroPage()).rejects.toThrow('/astro/setup')
   })
 
+  it('does not redirect to terms from /astro when terms are missing', async () => {
+    state.user = { id: 'u1' }
+    state.activeProfile = null
+    const { default: AstroPage } = await import('@/app/astro/page')
+    await expect(AstroPage()).rejects.toThrow('/astro/setup')
+  })
+
   it('renders the page when a profile and chart exist', async () => {
     state.user = { id: 'u1' }
     state.activeProfile = { id: 'p1', terms_accepted_at: '2026-05-01T00:00:00.000Z', terms_accepted_version: '1' }
@@ -80,15 +87,23 @@ describe('astro routing', () => {
   it('redirects unauthenticated users from /astro/setup to sign-in with setup next', async () => {
     state.user = null
     const { default: AstroSetupPage } = await import('@/app/astro/setup/page')
-    await expect(AstroSetupPage({ searchParams: Promise.resolve({}) } as never)).rejects.toThrow('/sign-in?next=/astro/setup')
+    await expect(AstroSetupPage()).rejects.toThrow('/sign-in?next=/astro/setup')
   })
 
   it('renders the setup page for authenticated users', async () => {
     state.user = { id: 'u1', email: 'user@example.com', user_metadata: { name: 'User' } }
     state.activeProfile = null
     const { default: AstroSetupPage } = await import('@/app/astro/setup/page')
-    const html = renderToStaticMarkup(await AstroSetupPage({ searchParams: Promise.resolve({}) } as never))
+    const html = renderToStaticMarkup(await AstroSetupPage())
     expect(html).toContain('Your birth details')
     expect(html).toContain('BirthProfileForm')
+  })
+
+  it('renders setup without an immediate terms modal even with step=terms in the URL context', async () => {
+    state.user = { id: 'u1', email: 'user@example.com', user_metadata: { name: 'User' } }
+    state.activeProfile = null
+    const { default: AstroSetupPage } = await import('@/app/astro/setup/page')
+    const html = renderToStaticMarkup(await AstroSetupPage())
+    expect(html).not.toContain('Terms of use')
   })
 })

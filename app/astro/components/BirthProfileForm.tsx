@@ -9,6 +9,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PlaceAutocomplete } from './PlaceAutocomplete'
+import { normalizeDateForApi, normalizeTimeForApi } from '@/lib/astro/profile-input-normalize'
 
 type FormState = 'idle' | 'submitting' | 'calculating' | 'error'
 
@@ -24,7 +25,6 @@ type Props = {
   googleName: string
   googleEmail: string
   hasProfile: boolean
-  initialStep?: string
 }
 
 const TERMS_VERSION = 'tarayai-astro-v1-2026-05-03'
@@ -32,6 +32,14 @@ const TERMS_VERSION = 'tarayai-astro-v1-2026-05-03'
 function mapErrorCode(code: string): string {
   switch (code) {
     case 'unauthenticated': return 'Your session has expired. Please sign in again.'
+    case 'profile_not_found': return 'Your saved birth profile could not be found. Please refresh and try again.'
+    case 'profile_access_denied': return 'Your saved birth profile could not be accessed. Please sign in again.'
+    case 'profile_birth_data_missing':
+    case 'profile_birth_data_invalid': return 'Your birth details were saved but could not be read for chart calculation. Please review and update them.'
+    case 'astrology_settings_missing': return 'Your astrology settings could not be prepared. Please try again.'
+    case 'chart_engine_failed': return 'Chart calculation failed. Please check the birth date, time, and place.'
+    case 'chart_version_save_failed': return 'Your chart was calculated but could not be saved. Please try again.'
+    case 'prediction_summary_save_failed': return 'Your chart was saved but guidance preparation failed. Please try again.'
     case 'invalid_birth_date': return 'The birth date you entered is not valid. Please check the date format.'
     case 'invalid_birth_time': return 'The birth time you entered is not valid.'
     case 'place_resolution_failed': return 'Please select a valid place from the suggestions.'
@@ -49,11 +57,11 @@ function mapErrorCode(code: string): string {
   }
 }
 
-export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialStep }: Props) {
+export function BirthProfileForm({ googleName, googleEmail, hasProfile }: Props) {
   const router = useRouter()
   const [state, setState] = useState<FormState>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [showTerms, setShowTerms] = useState(initialStep === 'terms')
+  const [showTerms, setShowTerms] = useState(false)
   const [pendingPayload, setPendingPayload] = useState<null | Record<string, unknown>>(null)
   const [birthTimeUnknown, setBirthTimeUnknown] = useState(false)
   const [resolvedPlace, setResolvedPlace] = useState<ResolvedPlace | null>(null)
@@ -74,11 +82,12 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    const birthDate = String(formData.get('birth_date') || '')
-    const birthTime = birthTimeUnknown ? null : (String(formData.get('birth_time') || '') || null)
+    const birthDate = normalizeDateForApi(String(formData.get('birth_date') || ''))
+    const birthTime = birthTimeUnknown ? null : normalizeTimeForApi(String(formData.get('birth_time') || ''))
     const aboutSelf = String(formData.get('about_self') || '') || undefined
 
-    if (!birthDate) { setError('Birth date is required.'); return }
+    if (!birthDate) { setError('Birth date is required and must be valid.'); return }
+    if (!birthTimeUnknown && !birthTime) { setError('Birth time is required and must be valid.'); return }
     if (!resolvedPlace) {
       setError('Please select a valid place from the suggestions.')
       return
@@ -88,7 +97,7 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
       birth_date: birthDate,
       birth_time: birthTime || null,
       birth_time_known: !birthTimeUnknown && !!birthTime,
-      birth_time_precision: birthTimeUnknown ? 'unknown' : (birthTime ? 'exact' : 'unknown'),
+      birth_time_precision: birthTimeUnknown ? 'unknown' : 'exact',
       birth_place_name: resolvedPlace.label,
       latitude: resolvedPlace.latitude,
       longitude: resolvedPlace.longitude,
@@ -197,7 +206,7 @@ export function BirthProfileForm({ googleName, googleEmail, hasProfile, initialS
             </p>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
-                onClick={() => { setShowTerms(false); setPendingPayload(null) }}
+                onClick={() => { setShowTerms(false) }}
                 style={{
                   flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
                   borderRadius: '999px', padding: '0.6rem 1rem', color: 'rgba(240,232,216,0.7)',
