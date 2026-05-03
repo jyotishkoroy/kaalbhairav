@@ -8,10 +8,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { guardOneShotAstroQuestion } from '@/lib/astro/app/one-shot-question-guard'
 import { analyzeQuestionQuality } from '@/lib/astro/app/question-quality'
-import { handleAstroV2ReadingRequest } from '@/lib/astro/rag/astro-v2-reading-handler'
-import { buildAstroChartContext, formatChartBasisForAnswer } from '@/lib/astro/chart-context'
-import { answerExactChartFactQuestion } from '@/lib/astro/exact-chart-facts'
-import { ensureChartGroundedAnswer } from '@/lib/astro/answer-grounding'
+import { answerCanonicalAstroQuestion } from '@/lib/astro/ask/answer-canonical-astro-question'
+import { buildAstroChartContext } from '@/lib/astro/chart-context'
+import { sha256Canonical } from '@/lib/astro/hashing'
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from '@/lib/security/request-guards'
 
 export const runtime = 'nodejs'
@@ -98,6 +97,7 @@ export async function POST(req: NextRequest) {
     .from('chart_json_versions')
     .select('id, chart_json')
     .eq('profile_id', activeProfile.id)
+    .order('chart_version', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -124,72 +124,61 @@ export async function POST(req: NextRequest) {
     predictionSummary: latestPredictionSummary?.prediction_context,
   })
 
-  if (!chartContext.ready) {
-    return NextResponse.json({
-      answer: 'aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering.',
+  if (process.env.ASTRO_DEBUG_CHART_CONTEXT === 'true') {
+    const chartJsonRecord = latestChart.chart_json && typeof latestChart.chart_json === 'object' && !Array.isArray(latestChart.chart_json)
+      ? latestChart.chart_json as Record<string, unknown>
+      : {}
+    const chartVersionHash = sha256Canonical({
+      chartVersionId: latestChart.id,
+      chartVersion: chartJsonRecord.metadata && typeof chartJsonRecord.metadata === 'object'
+        ? (chartJsonRecord.metadata as Record<string, unknown>).chart_version
+        : null,
+      inputHash: chartJsonRecord.metadata && typeof chartJsonRecord.metadata === 'object'
+        ? (chartJsonRecord.metadata as Record<string, unknown>).input_hash
+        : null,
+      settingsHash: chartJsonRecord.metadata && typeof chartJsonRecord.metadata === 'object'
+        ? (chartJsonRecord.metadata as Record<string, unknown>).settings_hash
+        : null,
+    }).slice(0, 12)
+    const chartFactsFound = chartContext.ready ? chartContext.basisFacts.map((fact) => fact.split(':')[0].replace(/\s+/g, '')) : []
+    const chartJsonAscendantPathsFound = [
+      ['public_facts', 'lagna_sign'],
+      ['publicFacts', 'lagnaSign'],
+      ['d1', 'lagna', 'sign'],
+      ['d1', 'ascendant', 'sign'],
+      ['ascendant', 'sign'],
+      ['lagna', 'sign'],
+    ].filter((path) => {
+      let current: unknown = latestChart.chart_json
+      for (const part of path) {
+        if (!current || typeof current !== 'object' || Array.isArray(current)) return false
+        current = (current as Record<string, unknown>)[part]
+      }
+      return typeof current === 'string' && current.trim().length > 0
+    }).map((path) => path.join('.'))
+    console.log('[astro_chart_context_debug]', {
+      hasProfile: true,
+      chartVersionSelected: chartVersionHash,
+      chartCreatedAt: chartJsonRecord.metadata && typeof chartJsonRecord.metadata === 'object'
+        ? (chartJsonRecord.metadata as Record<string, unknown>).computed_at ?? null
+        : null,
+      chartFactsFound,
+      lagnaFromContext: chartContext.ready ? chartContext.publicFacts.lagnaSign ?? null : null,
+      chartJsonAscendantPathsFound,
     })
   }
 
-  const exactFactAnswer = answerExactChartFactQuestion({
+  const result = await answerCanonicalAstroQuestion({
     question,
-    chartContext,
-  })
-
-  if (exactFactAnswer.matched) {
-    return NextResponse.json({ answer: exactFactAnswer.answer })
-  }
-
-  const v2Body = {
-    question,
-    message: question,
-    mode: 'practical_guidance',
     userId: user.id,
     profileId: activeProfile.id,
     chartVersionId: latestChart.id,
-    chartContext: chartContext.compactPromptContext,
-    deterministicChartFacts: chartContext.publicFacts,
-    predictionSummary: latestPredictionSummary?.prediction_context ?? null,
-    metadata: {
-      source: 'astro-canonical-page',
-      oneShot: true,
-      disableFollowUps: true,
-      disableMemory: true,
-      requireChartGrounding: true,
-      requestId,
-    },
-  }
-
-  const v2Request = new Request(req.url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(v2Body),
+    chartJson: latestChart.chart_json,
+    predictionSummary: latestPredictionSummary?.prediction_context,
+    requestId,
   })
 
-  const v2Response = await handleAstroV2ReadingRequest(v2Request)
-
-  let v2Data: Record<string, unknown> = {}
-  try {
-    v2Data = await v2Response.json()
-  } catch {
-    return NextResponse.json(
-      { error: 'Unable to generate a reading right now. Please try again.' },
-      { status: 500 },
-    )
-  }
-
-  if (!v2Response.ok || typeof v2Data.answer !== 'string') {
-    const errMsg = typeof v2Data.error === 'string' ? v2Data.error : 'Unable to generate a reading right now. Please try again.'
-    return NextResponse.json({
-      answer: `aadesh: ${formatChartBasisForAnswer(chartContext)}\n\nI could not complete a deeper reading right now, but based on the saved chart context, avoid taking the result as certainty. Please try again shortly.`,
-      error: errMsg,
-    }, { status: v2Response.ok ? 500 : v2Response.status })
-  }
-
-  // Prefix with spelling correction notice if any
-  let answer = ensureChartGroundedAnswer({
-    answer: typeof v2Data.answer === 'string' ? v2Data.answer : '',
-    chartContext,
-  })
+  let answer = result.answer
   if (quality.warnings.length > 0) {
     answer = answer.startsWith('aadesh:')
       ? `${answer}\n\n${quality.warnings.join(' ')}`

@@ -40,6 +40,45 @@ describe("buildAstroChartContext", () => {
     if (context.ready) expect(context.publicFacts.lagnaSign).toBe("Gemini");
   });
 
+  it("prefers public_facts.lagna_sign over generic ascendant fields", () => {
+    const context = buildAstroChartContext({
+      ...baseInput,
+      chartJson: {
+        public_facts: { lagna_sign: "Leo" },
+        ascendant: { sign: "Virgo" },
+      },
+    });
+    expect(context.ready).toBe(true);
+    if (context.ready) {
+      expect(context.publicFacts.lagnaSign).toBe("Leo");
+      expect(context.basisLine).toContain("Leo Lagna");
+    }
+  });
+
+  it("prefers d1.lagna.sign over generic ascendant fields", () => {
+    const context = buildAstroChartContext({
+      ...baseInput,
+      chartJson: {
+        d1: { lagna: { sign: "Leo" } },
+        ascendant: { sign: "Virgo" },
+      },
+    });
+    expect(context.ready).toBe(true);
+    if (context.ready) expect(context.publicFacts.lagnaSign).toBe("Leo");
+  });
+
+  it("does not read navamsa ascendant as Lagna", () => {
+    const context = buildAstroChartContext({
+      ...baseInput,
+      chartJson: {
+        navamsa: { ascendant: { sign: "Virgo" } },
+        ascendant: { sign: "Leo" },
+      },
+    });
+    expect(context.ready).toBe(true);
+    if (context.ready) expect(context.publicFacts.lagnaSign).toBe("Leo");
+  });
+
   it("extracts Moon sign and house when present", () => {
     const context = buildAstroChartContext({
       ...baseInput,
@@ -106,7 +145,10 @@ describe("buildAstroChartContext", () => {
     expect(context.ready).toBe(true);
     if (context.ready) {
       expect(context.basisLine).toContain("Chart basis:");
-      expect(context.compactPromptContext).toContain("fact: Lagna (Ascendant): Leo");
+      expect(context.compactPromptContext).toContain("chart_fact: Lagna (Ascendant): Leo");
+      expect(context.compactPromptContext).not.toContain("profile_id=");
+      expect(context.compactPromptContext).not.toContain("chart_version_id=");
+      expect(context.compactPromptContext).not.toContain("\nfact:");
       expect(context.compactPromptContext).not.toContain("1999-06-14");
     }
   });

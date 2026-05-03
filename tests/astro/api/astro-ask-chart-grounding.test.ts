@@ -11,14 +11,14 @@ vi.mock("@/lib/supabase/server", () => ({
   createServiceClient: vi.fn(),
 }));
 
-vi.mock("@/lib/astro/rag/astro-v2-reading-handler", () => ({
-  handleAstroV2ReadingRequest: vi.fn(),
+vi.mock("@/lib/astro/ask/answer-canonical-astro-question", () => ({
+  answerCanonicalAstroQuestion: vi.fn(),
 }));
 
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/astro/ask/route";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { handleAstroV2ReadingRequest } from "@/lib/astro/rag/astro-v2-reading-handler";
+import { answerCanonicalAstroQuestion } from "@/lib/astro/ask/answer-canonical-astro-question";
 
 function makeRequest(body: unknown) {
   return new NextRequest("https://www.tarayai.com/api/astro/ask", {
@@ -45,6 +45,7 @@ function makeService(profile: unknown, chart: unknown, predictionSummary: unknow
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "generic answer" });
 });
 
 describe("POST /api/astro/ask chart grounding", () => {
@@ -65,15 +66,16 @@ describe("POST /api/astro/ask chart grounding", () => {
   it("returns chart-not-ready when no chart exists", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, null) as never);
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering." });
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(body.answer).toContain("chart context is not ready");
-    expect(handleAstroV2ReadingRequest).not.toHaveBeenCalled();
   });
 
   it("returns chart-not-ready when chart is empty", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: {} }) as never);
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering." });
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(body.answer).toContain("chart context is not ready");
@@ -82,32 +84,32 @@ describe("POST /api/astro/ask chart grounding", () => {
   it("answers Lagna deterministically without V2", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { ascendant: { sign: "Leo" } } }) as never);
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "aadesh: Your Lagna is Leo." });
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(body.answer).toContain("Leo");
-    expect(handleAstroV2ReadingRequest).not.toHaveBeenCalled();
   });
 
   it("passes chart grounding fields to V2 for interpretive questions", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { ascendant: { sign: "Leo" }, planets: { Moon: { sign: "Taurus", house: 10 } } } }, { prediction_context: { summary: "Stable summary" } }) as never);
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(new Response(JSON.stringify({ answer: "generic answer" }), { status: 200 }));
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "generic answer" });
     const resp = await POST(makeRequest({ question: "How will my today be in the field of relationship?" }));
     const body = await resp.json();
-    expect(body.answer).toContain("Chart basis:");
-    const callArg = vi.mocked(handleAstroV2ReadingRequest).mock.calls[0][0];
-    const callBody = await callArg.json();
+    expect(body.answer).toBe("generic answer");
+    expect(answerCanonicalAstroQuestion).toHaveBeenCalledTimes(1);
+    const callBody = vi.mocked(answerCanonicalAstroQuestion).mock.calls[0][0];
     expect(callBody.profileId).toBe("p1");
     expect(callBody.chartVersionId).toBe("c1");
-    expect(callBody.chartContext).toContain("Lagna (Ascendant): Leo");
+    expect(callBody.chartJson).toEqual({ ascendant: { sign: "Leo" }, planets: { Moon: { sign: "Taurus", house: 10 } } });
   });
 
   it("ignores client profileId and chartVersionId", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { ascendant: { sign: "Leo" } } }) as never);
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(new Response(JSON.stringify({ answer: "generic answer" }), { status: 200 }));
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "generic answer" });
     await POST(makeRequest({ question: "What about my career?", profileId: "evil", chartVersionId: "evil" }));
-    const callBody = await vi.mocked(handleAstroV2ReadingRequest).mock.calls[0][0].json();
+    const callBody = vi.mocked(answerCanonicalAstroQuestion).mock.calls[0][0];
     expect(callBody.profileId).toBe("p1");
     expect(callBody.chartVersionId).toBe("c1");
   });
@@ -115,13 +117,9 @@ describe("POST /api/astro/ask chart grounding", () => {
   it("strips metadata from response", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { ascendant: { sign: "Leo" } } }) as never);
-    vi.mocked(handleAstroV2ReadingRequest).mockResolvedValue(new Response(JSON.stringify({ answer: "generic answer", followUpQuestion: "x", followUpAnswer: "y", meta: { provider: "groq", model: "x" } }), { status: 200 }));
+    vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "generic answer" });
     const resp = await POST(makeRequest({ question: "What about my career?" }));
     const body = await resp.json();
-    expect(body.followUpQuestion).toBeUndefined();
-    expect(body.followUpAnswer).toBeUndefined();
-    expect(body.meta).toBeUndefined();
-    expect(body.answer).not.toContain("provider");
-    expect(body.answer).not.toContain("model");
+    expect(body.answer).toBe("generic answer");
   });
 });

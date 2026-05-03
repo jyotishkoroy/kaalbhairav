@@ -89,14 +89,20 @@ function normalizeSign(value: string | undefined): string | undefined {
 
 function extractLagnaSign(chartJson: unknown): string | undefined {
   const candidates = [
-    ["ascendant", "sign"],
-    ["lagna", "sign"],
-    ["rasi", "ascendant", "sign"],
-    ["d1", "ascendant", "sign"],
-    ["divisionalCharts", "d1", "ascendant", "sign"],
-    ["divisional_charts", "d1", "ascendant", "sign"],
     ["public_facts", "lagna_sign"],
     ["publicFacts", "lagnaSign"],
+    ["d1", "lagna", "sign"],
+    ["d1", "ascendant", "sign"],
+    ["rashi", "lagna", "sign"],
+    ["rashi", "ascendant", "sign"],
+    ["d1_chart", "lagna", "sign"],
+    ["d1_chart", "ascendant", "sign"],
+    ["divisionalCharts", "d1", "lagna", "sign"],
+    ["divisionalCharts", "d1", "ascendant", "sign"],
+    ["divisional_charts", "d1", "lagna", "sign"],
+    ["divisional_charts", "d1", "ascendant", "sign"],
+    ["ascendant", "sign"],
+    ["lagna", "sign"],
     ["masterOutput", "ascendant", "sign"],
     ["master_output", "ascendant", "sign"],
     ["chart", "ascendant", "sign"],
@@ -170,6 +176,7 @@ function extractBirthTimePrecision(chartJson: unknown): string | undefined {
 
 function extractCurrentDasha(chartJson: unknown): string | undefined {
   const summaryPaths = [
+    ["currentDasha"],
     ["prediction_ready_summaries", "current_timing_summary"],
     ["prediction_ready_summaries", "current_timing"],
     ["prediction_ready_summaries", "summary"],
@@ -179,6 +186,16 @@ function extractCurrentDasha(chartJson: unknown): string | undefined {
   ];
   const value = readStringPath(chartJson, summaryPaths);
   return value ? value.replace(/\s+/g, " ") : undefined;
+}
+
+function extractPublicFact(chartJson: unknown, keys: string[]): string | undefined {
+  for (const root of ["public_facts", "publicFacts", "facts"]) {
+    for (const key of keys) {
+      const value = readStringPath(chartJson, [[root, key]]);
+      if (value) return value;
+    }
+  }
+  return undefined;
 }
 
 function extractPredictionSummary(predictionSummary: unknown): string[] {
@@ -193,6 +210,12 @@ function extractPredictionSummary(predictionSummary: unknown): string[] {
     asString(summary.life_areas_summary),
   ]);
   return lines.slice(0, 4);
+}
+
+function formatBasisHeadline(fact: string): string {
+  const lagnaMatch = fact.match(/^Lagna \(Ascendant\):\s*(.+)$/i);
+  if (lagnaMatch) return `${lagnaMatch[1]} Lagna`;
+  return fact;
 }
 
 export function buildAstroChartContext(input: {
@@ -247,6 +270,41 @@ export function buildAstroChartContext(input: {
     publicFacts.currentDasha = currentDasha;
   }
 
+  const lagnaLord = extractPublicFact(chartJson, ["lagna_lord", "lagnaLord"]);
+  if (lagnaLord) {
+    basisFacts.push(`Lagna lord: ${lagnaLord}`);
+    publicFacts.lagnaLord = lagnaLord;
+  }
+
+  const rasiLord = extractPublicFact(chartJson, ["rasi_lord", "rasiLord"]);
+  if (rasiLord) {
+    basisFacts.push(`Rasi lord: ${rasiLord}`);
+    publicFacts.rasiLord = rasiLord;
+  }
+
+  const nakshatraLord = extractPublicFact(chartJson, ["nakshatra_lord", "nakshatraLord"]);
+  if (nakshatraLord) {
+    basisFacts.push(`Nakshatra lord: ${nakshatraLord}`);
+    publicFacts.nakshatraLord = nakshatraLord;
+  }
+
+  const westernSunSign = extractPublicFact(chartJson, ["western_sun_sign", "westernSunSign"]);
+  if (westernSunSign) {
+    basisFacts.push(`Western sun sign: ${westernSunSign}`);
+    publicFacts.westernSunSign = westernSunSign;
+  }
+
+  const nakshatra = readStringPath(chartJson, [
+    ["nakshatra"],
+    ["public_facts", "nakshatra"],
+    ["publicFacts", "nakshatra"],
+    ["moon", "nakshatra"],
+  ]);
+  if (nakshatra) {
+    basisFacts.push(`Nakshatra: ${nakshatra}`);
+    publicFacts.nakshatra = nakshatra;
+  }
+
   const predictionSummaryFacts = extractPredictionSummary(input.predictionSummary);
   for (const fact of predictionSummaryFacts) basisFacts.push(`Prediction summary: ${fact}`);
 
@@ -255,11 +313,9 @@ export function buildAstroChartContext(input: {
     return { ready: false, reason: "no_deterministic_facts" };
   }
 
-  const basisLine = `Chart basis: ${uniqueBasisFacts[0]}. I am using only your saved chart facts and will avoid unsupported timing certainty.`;
+  const basisLine = `Chart basis: ${formatBasisHeadline(uniqueBasisFacts[0])}. I am using only your saved chart facts and will avoid unsupported timing certainty.`;
   const compactPromptContext = [
-    `profile_id=${input.profileId}`,
-    `chart_version_id=${input.chartVersionId}`,
-    ...uniqueBasisFacts.map((fact) => `fact: ${fact}`),
+    ...uniqueBasisFacts.map((fact) => `chart_fact: ${fact}`),
   ].join("\n");
 
   return {
