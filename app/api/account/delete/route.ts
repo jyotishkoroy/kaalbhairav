@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
  * commercially use, train models on, scrape, or create derivative works from this
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
@@ -36,7 +35,11 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('[account_delete_failed]', { userId: user.id, error: error instanceof Error ? error.message : 'unknown_error' })
+    console.error('[account-delete]', {
+      stage: 'route_delete_account',
+      code: error instanceof Error && 'code' in error ? (error as { code?: string }).code : undefined,
+      message: error instanceof Error ? error.message : 'unknown_error',
+    })
     return NextResponse.json({ error: 'account_deletion_failed' }, { status: 500 })
   }
 }

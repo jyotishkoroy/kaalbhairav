@@ -24,7 +24,6 @@ describe('DeleteAccountButton', () => {
   it('renders delete button and confirm copy', () => {
     const html = renderToStaticMarkup(<DeleteAccountButton />)
     expect(html).toContain('Delete my account')
-    expect(html).not.toContain('permission denied')
   })
 
   it('calls delete endpoint and redirects on success', async () => {

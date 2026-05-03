@@ -4,8 +4,8 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
-import { describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
@@ -60,7 +60,7 @@ describe('DELETE /api/account/delete', () => {
     const res = await DELETE(makeReq())
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'account_deletion_failed' })
-    expect(consoleSpy).toHaveBeenCalled()
+    expect(consoleSpy).toHaveBeenCalledWith('[account-delete]', expect.objectContaining({ stage: 'route_delete_account' }))
     consoleSpy.mockRestore()
   })
 
@@ -74,5 +74,17 @@ describe('DELETE /api/account/delete', () => {
     const res = await DELETE(makeReq())
     const body = await res.json()
     expect(JSON.stringify(body)).not.toContain('birth_profiles')
+  })
+
+  it('returns generic error when service role cleanup fails', async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u4', user_metadata: {} } } }) },
+    } as never)
+    vi.mocked(createServiceClient).mockReturnValue({} as never)
+    vi.mocked(deleteAccountAndUserData).mockRejectedValue(new Error('service role key missing'))
+
+    const res = await DELETE(makeReq())
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'account_deletion_failed' })
   })
 })
