@@ -282,7 +282,7 @@ describe('POST /api/astro/v1/calculate', () => {
     const resp = await POST(makeReq(profileId))
     expect(resp.status).toBe(500)
     expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'chart_insert' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
+    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'persist_and_promote_current_chart_version' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
   })
 
   it('returns prediction_summary_save_failed when prediction insert fails', async () => {
@@ -334,8 +334,8 @@ describe('POST /api/astro/v1/calculate', () => {
 
     const resp = await POST(makeReq(profileId))
     expect(resp.status).toBe(500)
-    expect(await resp.json()).toEqual({ error: 'prediction_summary_save_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'prediction_insert' && (payload as Record<string, unknown>).code === 'prediction_summary_save_failed')).toBe(true)
+    expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
+    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'persist_and_promote_current_chart_version' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
   })
 
   it('returns current_chart_promotion_failed when rpc fails', async () => {
@@ -375,8 +375,8 @@ describe('POST /api/astro/v1/calculate', () => {
 
     const resp = await POST(makeReq(profileId))
     expect(resp.status).toBe(500)
-    expect(await resp.json()).toEqual({ error: 'current_chart_promotion_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'promote_current_chart' && (payload as Record<string, unknown>).code === 'current_chart_promotion_failed')).toBe(true)
+    expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
+    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'persist_and_promote_current_chart_version' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
   })
 
   it('returns audit_insert_failed when audit insert fails', async () => {
@@ -415,9 +415,8 @@ describe('POST /api/astro/v1/calculate', () => {
     } as never)
 
     const resp = await POST(makeReq(profileId))
-    expect(resp.status).toBe(500)
-    expect(await resp.json()).toEqual({ error: 'audit_insert_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'audit_insert' && (payload as Record<string, unknown>).code === 'audit_insert_failed')).toBe(true)
+    expect(resp.status).toBe(200)
+    expect(await resp.json()).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', reused_cache: false })
   })
 
   it('returns chart payload on successful persist', async () => {
@@ -501,7 +500,7 @@ describe('POST /api/astro/v1/calculate', () => {
     const body = await resp.json()
     expect(body).toMatchObject({
       error: 'chart_version_save_failed',
-      stage: 'chart_insert',
+      stage: 'persist_and_promote_current_chart_version',
       diagnostic: {
         hasUser: true,
         hasProfile: true,

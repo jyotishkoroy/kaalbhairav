@@ -114,15 +114,11 @@ beforeEach(() => {
   delete process.env.ASTRO_CALCULATE_DEBUG
 })
 
-describe('astro_calculate_promotes_birth_profile_current_chart', () => {
-  it('calls the atomic RPC and does not directly insert chart rows on success', async () => {
-    const chartInsertSpy = vi.fn()
-    const summaryInsertSpy = vi.fn()
-    const rpcSpy = vi.fn(async (_name: string, args: Record<string, unknown>) => ({
-      data: [{ chart_version_id: 'cv-1', chart_version: 12 }],
-      error: null,
-      args,
-    }))
+describe('astro_calculate_persistence_is_atomic', () => {
+  it('fails closed when the atomic RPC returns an error', async () => {
+    let updatePayload: Record<string, unknown> | null = null
+    const updateEqSpy = vi.fn()
+    const rpcSpy = vi.fn(async () => ({ data: null, error: { message: 'rpc boom' } }))
 
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
     vi.mocked(createServiceClient).mockReturnValue({
@@ -130,39 +126,67 @@ describe('astro_calculate_promotes_birth_profile_current_chart', () => {
       from: vi.fn((table: string) => {
         if (table === 'birth_profiles') return makeQuery({ id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' })
         if (table === 'astrology_settings') return makeQuery({ astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' })
-        if (table === 'chart_calculations') return {
-          select: () => makeQuery(null),
-          insert: () => ({
-            select: () => ({
-              single: async () => ({ data: { id: 'calc-1' }, error: null }),
+        if (table === 'chart_calculations') {
+          return {
+            select: () => makeQuery(null),
+            insert: () => ({
+              select: () => ({
+                single: async () => ({ data: { id: 'calc-1' }, error: null }),
+              }),
             }),
-          }),
-          update: () => makeQuery(null),
+            update: (payload: Record<string, unknown>) => {
+              updatePayload = payload
+              return { eq: updateEqSpy }
+            },
+          }
         }
-        if (table === 'chart_json_versions') return { insert: chartInsertSpy, select: () => makeQuery(null) }
-        if (table === 'prediction_ready_summaries') return { insert: summaryInsertSpy }
-        if (table === 'calculation_audit_logs') return { insert: vi.fn() }
         return makeQuery(null)
       }),
     } as never)
 
     const resp = await POST(makeReq())
-    expect(resp.status).toBe(200)
-    const body = await resp.json()
-    expect(body).toMatchObject({ chart_version_id: 'cv-1', chart_version: 12, calculation_id: 'calc-1', reused_cache: false })
-    expect(rpcSpy).toHaveBeenCalledWith(
-      'persist_and_promote_current_chart_version',
-      expect.objectContaining({
-        p_user_id: user.id,
-        p_profile_id: profileId,
-        p_calculation_id: 'calc-1',
-        p_input_hash: expect.any(String),
-        p_settings_hash: expect.any(String),
-        p_chart_json: expect.any(Object),
-        p_prediction_summary: expect.any(Object),
+    expect(resp.status).toBe(500)
+    expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
+    expect(rpcSpy).toHaveBeenCalledWith('persist_and_promote_current_chart_version', expect.objectContaining({
+      p_user_id: user.id,
+      p_profile_id: profileId,
+      p_calculation_id: 'calc-1',
+    }))
+    expect(updatePayload).toMatchObject({ status: 'failed' })
+    expect(String((updatePayload as Record<string, unknown> | null)?.error_message)).toContain('persist_and_promote_current_chart_version_failed')
+    expect(updateEqSpy).toHaveBeenCalledWith('id', 'calc-1')
+  })
+
+  it('fails closed when the atomic RPC omits chart_version_id', async () => {
+    process.env.ASTRO_CALCULATE_DEBUG = 'true'
+    const rpcSpy = vi.fn(async () => ({ data: [{}], error: null }))
+
+    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
+    vi.mocked(createServiceClient).mockReturnValue({
+      rpc: rpcSpy,
+      from: vi.fn((table: string) => {
+        if (table === 'birth_profiles') return makeQuery({ id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' })
+        if (table === 'astrology_settings') return makeQuery({ astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' })
+        if (table === 'chart_calculations') {
+          return {
+            select: () => makeQuery(null),
+            insert: () => ({
+              select: () => ({
+                single: async () => ({ data: { id: 'calc-1' }, error: null }),
+              }),
+            }),
+            update: () => ({ eq: vi.fn() }),
+          }
+        }
+        return makeQuery(null)
       }),
-    )
-    expect(chartInsertSpy).not.toHaveBeenCalled()
-    expect(summaryInsertSpy).not.toHaveBeenCalled()
+    } as never)
+
+    const resp = await POST(makeReq())
+    expect(resp.status).toBe(500)
+    const body = await resp.json()
+    expect(body.error).toBe('chart_version_save_failed')
+    expect(JSON.stringify(body)).toContain('persist_and_promote_current_chart_version_failed')
+    expect(JSON.stringify(body)).not.toContain('chart_json')
   })
 })

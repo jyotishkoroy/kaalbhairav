@@ -55,67 +55,43 @@ async function persistCalculatedOutput(args: {
   calcId: string
   inputHash: string
   settingsHash: string
-  chartVersion: number
   chartJson: ChartJson
-  output: MasterAstroCalculationOutput
+  predictionSummary: Record<string, unknown> | null
   runtimeEngineVersion: string
   runtimeEphemerisVersion: string
   schemaVersion: string
-}) {
-  const chartVersionId = args.chartJson.metadata.chart_version_id
+}): Promise<{ chartVersionId: string; chartVersion: number }> {
+  const auditPayload = {
+    engine_version: args.runtimeEngineVersion,
+    ephemeris_version: args.runtimeEphemerisVersion,
+    schema_version: args.schemaVersion,
+    prediction_summary_present: Boolean(args.predictionSummary),
+  }
 
-  // 1. Insert chart JSON row (immutable — no is_current/status set here).
-  const { error: chartErr } = await args.service
-    .from('chart_json_versions')
-    .insert({
-      id: chartVersionId,
-      user_id: args.userId,
-      profile_id: args.profileId,
-      calculation_id: args.calcId,
-      chart_version: args.chartVersion,
-      input_hash: args.inputHash,
-      settings_hash: args.settingsHash,
-      engine_version: args.runtimeEngineVersion,
-      ephemeris_version: args.runtimeEphemerisVersion,
-      schema_version: args.schemaVersion,
-      chart_json: args.chartJson,
-    })
-  if (chartErr) throw new Error(`chart_insert_failed: ${chartErr.message}`)
-
-  // 2. Insert prediction summary tied to this exact chart version.
-  const { error: predictionErr } = await args.service.from('prediction_ready_summaries').insert({
-    user_id: args.userId,
-    profile_id: args.profileId,
-    chart_version_id: chartVersionId,
-    topic: 'general',
-    prediction_context: args.output.prediction_ready_context,
-  })
-  if (predictionErr) throw new Error(`prediction_insert_failed: ${predictionErr.message}`)
-
-  // 3. Atomically promote this chart version as the current chart via RPC.
-  // This marks older rows non-current, sets is_current=true on the new row,
-  // updates chart_calculations, and points birth_profiles to the new chart.
-  const { error: rpcErr } = await args.service.rpc('promote_current_chart_version', {
+  const { data, error } = await args.service.rpc('persist_and_promote_current_chart_version', {
     p_user_id: args.userId,
     p_profile_id: args.profileId,
-    p_calc_id: args.calcId,
-    p_chart_version_id: chartVersionId,
+    p_calculation_id: args.calcId,
+    p_chart_json: args.chartJson,
+    p_prediction_summary: args.predictionSummary,
     p_input_hash: args.inputHash,
+    p_settings_hash: args.settingsHash,
+    p_engine_version: args.runtimeEngineVersion,
+    p_schema_version: args.schemaVersion,
+    p_audit_payload: auditPayload,
   })
-  if (rpcErr) throw new Error(`promote_current_chart_failed: ${rpcErr.message}`)
 
-  // 4. Audit log.
-  const { error: auditErr } = await args.service.from('calculation_audit_logs').insert({
-    user_id: args.userId,
-    profile_id: args.profileId,
-    calculation_id: args.calcId,
-    chart_version_id: chartVersionId,
-    event: 'calculation_completed',
-    detail: { engine_version: args.runtimeEngineVersion, status: args.output.calculation_status },
-  })
-  if (auditErr) throw new Error(`audit_insert_failed: ${auditErr.message}`)
+  const persisted = Array.isArray(data) ? data[0] : data
+  if (error || !persisted?.chart_version_id || typeof persisted.chart_version !== 'number') {
+    throw new Error(
+      `persist_and_promote_current_chart_version_failed: ${error?.message ?? 'missing chart_version_id'}`,
+    )
+  }
 
-  return chartVersionId
+  return {
+    chartVersionId: persisted.chart_version_id,
+    chartVersion: persisted.chart_version,
+  }
 }
 
 function logCalculationFailure(stage: string, code: string, context: {
@@ -135,19 +111,10 @@ function logCalculationFailure(stage: string, code: string, context: {
 }
 
 function classifyPersistFailure(errorText: string): { stage: string; code: string } {
-  if (errorText.startsWith('chart_insert_failed')) {
-    return { stage: 'chart_insert', code: 'chart_version_save_failed' }
+  if (errorText.startsWith('persist_and_promote_current_chart_version_failed')) {
+    return { stage: 'persist_and_promote_current_chart_version', code: 'chart_version_save_failed' }
   }
-  if (errorText.startsWith('prediction_insert_failed')) {
-    return { stage: 'prediction_insert', code: 'prediction_summary_save_failed' }
-  }
-  if (errorText.startsWith('promote_current_chart_failed')) {
-    return { stage: 'promote_current_chart', code: 'current_chart_promotion_failed' }
-  }
-  if (errorText.startsWith('audit_insert_failed')) {
-    return { stage: 'audit_insert', code: 'audit_insert_failed' }
-  }
-  return { stage: 'persist_chart', code: 'chart_version_save_failed' }
+  return { stage: 'persist_and_promote_current_chart_version', code: 'chart_version_save_failed' }
 }
 
 function buildPersistFailureDiagnostic(args: {
@@ -590,18 +557,17 @@ export async function POST(req: NextRequest) {
       output as unknown as Record<string, unknown>,
     ) as MasterAstroCalculationOutput & Record<string, unknown>
 
-    let persistedChartVersionId: string
+    let persistedChart: { chartVersionId: string; chartVersion: number }
     try {
-      persistedChartVersionId = await persistCalculatedOutput({
+      persistedChart = await persistCalculatedOutput({
         service,
         userId: user.id,
         profileId,
         calcId: calc.id,
         inputHash,
         settingsHash,
-        chartVersion: nextChartVersion,
         chartJson: mergedChartJson,
-        output,
+        predictionSummary: (mergedChartJson.prediction_ready_summaries as Record<string, unknown>) ?? null,
         runtimeEngineVersion: getRuntimeEngineVersion(),
         runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
         schemaVersion: SCHEMA_VERSION,
@@ -709,7 +675,8 @@ export async function POST(req: NextRequest) {
     const responsePayload: Record<string, unknown> = {
       ...mergedApiResponse,
       calculation_id: calc.id,
-      chart_version_id: persistedChartVersionId,
+      chart_version_id: persistedChart.chartVersionId,
+      chart_version: persistedChart.chartVersion,
       reused_cache: false,
     }
 
@@ -726,7 +693,7 @@ export async function POST(req: NextRequest) {
         hasMasterDailyTransits: !!output.daily_transits,
         hasMasterPanchang: !!output.panchang,
         hasMasterVimshottari: !!output.vimshottari_dasha,
-        savedChartVersionId: persistedChartVersionId,
+        savedChartVersionId: persistedChart.chartVersionId,
       }
     }
 

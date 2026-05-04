@@ -227,7 +227,7 @@ vi.mock('../../lib/supabase/server', () => ({
         })),
       }
     }),
-    rpc: vi.fn(async () => ({ data: null, error: null })),
+    rpc: vi.fn(async () => ({ data: [{ chart_version_id: 'remote-cv-1', chart_version: 1 }], error: null })),
   })),
 }))
 
@@ -303,9 +303,7 @@ describe('calculate route remote mode', () => {
 
     const response = await POST(request as never)
     expect(response.status).toBe(200)
-    expect(supabaseState.chartVersionInserts[0]).toMatchObject({
-      chart_version: 1,
-    })
+    expect(supabaseState.chartVersionInserts).toHaveLength(0)
 
     const body = await response.json()
     expect(body.debug_saved_chart_json).toBeDefined()
@@ -321,9 +319,7 @@ describe('calculate route remote mode', () => {
 
     const response = await POST(request as never)
     expect(response.status).toBe(200)
-    expect(supabaseState.chartVersionInserts[0]).toMatchObject({
-      chart_version: 2,
-    })
+    expect(supabaseState.chartVersionInserts).toHaveLength(0)
 
     const body = await response.json()
     expect(body.debug_saved_chart_json).toBeDefined()
@@ -348,14 +344,8 @@ describe('calculate route remote mode', () => {
     expect(body.expanded_sections?.navamsa_d9?.status).toBe('available')
     expect(body.expanded_sections?.current_timing?.current_mahadasha?.lord).toBe('Jupiter')
 
-    const persistedChartJson = supabaseState.chartVersionInserts[0]?.chart_json as Record<string, unknown> | undefined
-    expect(persistedChartJson?.panchang).toBeTruthy()
-    expect((persistedChartJson?.panchang as { status?: string } | undefined)?.status).toBe('available')
-    expect((persistedChartJson?.vimshottari_dasha as { status?: string } | undefined)?.status).toBe('available')
-    expect((persistedChartJson?.navamsa_d9 as { status?: string } | undefined)?.status).toBe('available')
-    expect((persistedChartJson?.ashtakvarga as { status?: string } | undefined)?.status).toBe('available')
-    expect((persistedChartJson?.expanded_sections as { panchang?: { status?: string } } | undefined)?.panchang?.status).toBe('available')
-    expect((persistedChartJson?.expanded_sections as { navamsa_d9?: { status?: string } } | undefined)?.navamsa_d9?.status).toBe('available')
+    expect(supabaseState.chartVersionInserts).toHaveLength(0)
+    expect(body.chart_version_id).toBe('remote-cv-1')
   })
 
   it('returns rejected output when chart version lookup fails', async () => {
