@@ -7,6 +7,7 @@
 import { isCanonicalChartJsonV2 } from '../schemas/canonical-chart-json.ts';
 import { ASTRO_REPORT_FIELD_REGISTRY, type AstroReportFieldRegistryEntry } from './field-registry.ts';
 import { isDeterministicReportFieldSource } from './field-source-types.ts';
+import { validateReportContractProvenance, validateReportFieldProvenance } from './fact-provenance-validator.ts';
 import { unavailableAstroValue } from './unavailable.ts';
 import type { AstroReportContract, ResolvedAstroReportField } from './report-contract.ts';
 
@@ -56,6 +57,57 @@ function normalizeValue(value: unknown): string | number | boolean | Record<stri
   if (Array.isArray(value)) return value;
   if (isRecord(value)) return value;
   return undefined;
+}
+
+function unavailableReasonFromValidation(failureCode?: string, entry?: AstroReportFieldRegistryEntry): 'provenance_invalid' | 'source_not_allowed' | 'missing_chart_path' {
+  switch (failureCode) {
+    case 'missing_source_path':
+    case 'source_path_not_allowed':
+    case 'section_not_computed':
+      return 'missing_chart_path';
+    case 'llm_exact_fact_not_allowed':
+    case 'client_context_not_allowed':
+    case 'source_type_not_allowed':
+    case 'missing_provenance':
+    case 'missing_registry_entry':
+    case 'field_not_registered':
+    case 'missing_source_type':
+    case 'missing_chart_version_id':
+    case 'missing_profile_id':
+    case 'unsupported_exact_field':
+      return 'provenance_invalid';
+    default:
+      return entry?.sourceType === 'llm_grounded_text' ? 'source_not_allowed' : 'provenance_invalid';
+  }
+}
+
+function toUnavailableFromValidation(args: {
+  field: ResolvedAstroReportField;
+  entry: AstroReportFieldRegistryEntry;
+  failureCode?: string;
+  message?: string;
+}): ResolvedAstroReportField {
+  const reason = unavailableReasonFromValidation(args.failureCode, args.entry);
+  return {
+    fieldKey: args.field.fieldKey,
+    groupId: args.field.groupId,
+    displayLabel: args.field.displayLabel,
+    status: 'unavailable',
+    unavailable: unavailableAstroValue({
+      reason,
+      requiredModule: args.entry.calculationModule,
+      requiredChartPath: args.entry.requiredChartPaths[0],
+      message: 'This field is unavailable because its provenance could not be verified.',
+    }),
+    source_type: 'unavailable',
+    provenance: {
+      ...args.field.provenance,
+      sourceType: 'unavailable',
+      registryFieldKey: args.entry.fieldKey,
+    },
+    riskLevel: args.field.riskLevel,
+    warnings: [...args.field.warnings, `fact_provenance_invalid:${args.field.fieldKey}:${args.failureCode ?? 'unknown'}`],
+  };
 }
 
 function resolveField(args: {
@@ -214,7 +266,11 @@ export function buildAstroReportContract(args: {
 
   for (const entry of registry) {
     if (!entry.enabled) continue;
-    const resolved = resolveField({ chartJson: args.chartJson, profileId: args.profileId, chartVersionId: args.chartVersionId, nowIso, entry });
+    const resolvedRaw = resolveField({ chartJson: args.chartJson, profileId: args.profileId, chartVersionId: args.chartVersionId, nowIso, entry });
+    const validation = validateReportFieldProvenance(resolvedRaw, { requireChartVersionId: false, requireProfileId: false });
+    const resolved = validation.ok
+      ? { ...resolvedRaw, provenance_validation: { status: validation.status } }
+      : toUnavailableFromValidation({ field: resolvedRaw, entry, failureCode: validation.failureCode, message: validation.message });
     if (resolved.status === 'resolved') resolvedCount += 1;
     else unavailableCount += 1;
     if (resolved.warnings.length) warnings.push(...resolved.warnings);
@@ -222,7 +278,7 @@ export function buildAstroReportContract(args: {
     grouped.get(entry.groupId)!.fields.push(resolved);
   }
 
-  return {
+  const report: AstroReportContract = {
     schemaVersion: 'astro_report_contract_v1',
     generatedAt: nowIso,
     profileId: args.profileId,
@@ -233,4 +289,12 @@ export function buildAstroReportContract(args: {
     resolvedCount,
     warnings,
   };
+  const provenanceValidation = validateReportContractProvenance(report, { requireChartVersionId: false, requireProfileId: false });
+  if (!provenanceValidation.ok) {
+    for (const failure of provenanceValidation.failures) {
+      warnings.push(`fact_provenance_invalid:${failure.fieldKey}:${failure.failureCode ?? 'unknown'}`);
+    }
+  }
+  report.warnings = warnings;
+  return report;
 }

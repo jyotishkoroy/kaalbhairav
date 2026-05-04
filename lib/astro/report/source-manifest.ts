@@ -13,6 +13,10 @@ export type AstroReportSourceManifestEntry = {
   calculationModule?: string;
   riskLevel: string;
   enabled: boolean;
+  allowedSourceTypes: string[];
+  requiresSourcePath: boolean;
+  requiresChartVersion: boolean;
+  exactFactEligible: boolean;
 };
 
 export function buildAstroReportSourceManifest(): AstroReportSourceManifestEntry[] {
@@ -23,5 +27,9 @@ export function buildAstroReportSourceManifest(): AstroReportSourceManifestEntry
     calculationModule: entry.calculationModule,
     riskLevel: entry.riskLevel,
     enabled: entry.enabled,
+    allowedSourceTypes: [entry.sourceType],
+    requiresSourcePath: entry.sourceType !== 'input_display' && entry.sourceType !== 'static_template',
+    requiresChartVersion: entry.sourceType !== 'input_display' && entry.sourceType !== 'static_template',
+    exactFactEligible: entry.sourceType === 'input_display' || entry.sourceType === 'astronomical_calculation' || entry.sourceType === 'deterministic_derived' || entry.sourceType === 'static_lookup' || entry.sourceType === 'static_template',
   }));
 }

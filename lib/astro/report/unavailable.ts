@@ -8,6 +8,7 @@ export type UnavailableReason =
   | 'module_not_implemented'
   | 'missing_current_chart'
   | 'missing_chart_path'
+  | 'provenance_invalid'
   | 'incompatible_settings'
   | 'missing_golden_fixture'
   | 'unsupported_question'
@@ -33,6 +34,8 @@ function defaultUnavailableMessage(reason: UnavailableReason, requiredModule?: s
       return 'This field is unavailable because the current chart is not ready.';
     case 'missing_chart_path':
       return 'This field is unavailable because the required chart path is missing.';
+    case 'provenance_invalid':
+      return 'This field is unavailable because its deterministic provenance could not be verified.';
     case 'module_not_implemented':
       return 'This field is unavailable because the required calculation module is not implemented.';
     case 'incompatible_settings':

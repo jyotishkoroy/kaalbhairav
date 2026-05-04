@@ -10,3 +10,4 @@ export * from './field-registry.ts';
 export * from './report-contract.ts';
 export * from './report-builder.ts';
 export * from './source-manifest.ts';
+export * from './fact-provenance-validator.ts';

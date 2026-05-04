@@ -17,6 +17,10 @@ export type ResolvedAstroReportField =
       source_type: ReportFieldSourceType;
       source_path?: string;
       source_section_status?: string;
+      provenance_validation?: {
+        status: 'valid' | 'invalid' | 'unavailable';
+        failureCode?: string;
+      };
       provenance: {
         chartVersionId?: string;
         profileId?: string;
@@ -35,6 +39,10 @@ export type ResolvedAstroReportField =
       status: 'unavailable';
       unavailable: UnavailableAstroValue;
       source_type: 'unavailable';
+      provenance_validation?: {
+        status: 'valid' | 'invalid' | 'unavailable';
+        failureCode?: string;
+      };
       provenance: {
         chartVersionId?: string;
         profileId?: string;
