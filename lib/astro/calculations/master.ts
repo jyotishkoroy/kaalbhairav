@@ -31,6 +31,7 @@ import { calculateTransits } from './transits.ts'
 import { calculateConfidence } from './confidence.ts'
 import { collectWarnings } from './warnings.ts'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
+import { normalizeBirthTimeForCalculation } from './time.ts'
 
 const FORBIDDEN_PREDICTION_KEYS = new Set([
   'birth_date',
@@ -71,6 +72,15 @@ export async function calculateMasterAstroOutput(args: {
     return buildRejectedOutput('Swiss Ephemeris unavailable or failed startup validation', normalized, settings, runtime, startupValidation)
   }
 
+  const birthTimeValidation = normalizeBirthTimeForCalculation({
+    dateOfBirth: normalized.birth_date_iso,
+    timeOfBirth: normalized.birth_time_iso,
+    timezone: normalized.timezone,
+    birthTimeKnown: normalized.birth_time_known,
+  })
+  if (birthTimeValidation.status !== 'valid' && birthTimeValidation.status !== 'missing_birth_time') {
+    return buildRejectedOutput(`Invalid birth time state: ${birthTimeValidation.status}`, normalized, settings, runtime, startupValidation, { birth_time_validation: birthTimeValidation })
+  }
   const birthTimeResult = convertBirthTimeToUTC({
     birth_date: normalized.birth_date_iso,
     birth_time: normalized.birth_time_iso ?? undefined,

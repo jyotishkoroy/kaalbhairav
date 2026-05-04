@@ -11,9 +11,44 @@ import { encryptJson } from '@/lib/astro/encryption'
 import { hashSettings, DEFAULT_SETTINGS } from '@/lib/astro/settings'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
 import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
+import { normalizeBirthTimeForCalculation } from '@/lib/astro/calculations/time'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
+
+function readString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function extractBirthTimeValidationInput(input: Record<string, unknown>) {
+  return {
+    dateOfBirth: readString(input.birth_date) ?? readString(input.dateOfBirth) ?? readString(input.birthDate) ?? readString(input.date_of_birth) ?? '',
+    timeOfBirth: readString(input.birth_time) ?? readString(input.timeOfBirth) ?? readString(input.birthTime) ?? readString(input.time_of_birth),
+    timezone: readString(input.timezone),
+    birthTimeKnown: typeof input.birth_time_known === 'boolean'
+      ? input.birth_time_known
+      : typeof input.birthTimeKnown === 'boolean'
+        ? input.birthTimeKnown
+        : true,
+  }
+}
+
+function birthTimeValidationMessage(status: string): string {
+  switch (status) {
+    case 'invalid_timezone':
+      return 'The selected timezone is invalid. Please choose a valid IANA timezone.'
+    case 'nonexistent_local_time':
+      return 'This local birth time did not exist in the selected timezone because of a daylight-saving transition. Please verify the time.'
+    case 'ambiguous_local_time':
+      return 'This local birth time is ambiguous in the selected timezone because of a daylight-saving transition. Please provide a disambiguated time.'
+    case 'missing_timezone':
+      return 'Timezone is required for astrology calculations.'
+    case 'missing_birth_time':
+      return 'Birth time is required for exact Lagna, houses, and dasha calculations.'
+    default:
+      return 'The provided birth time could not be used for calculation.'
+  }
+}
 
 export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
@@ -71,6 +106,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_input' }, { status: 400 })
   }
   const input = parsed.data
+  const birthTimeValidation = normalizeBirthTimeForCalculation(extractBirthTimeValidationInput(input as Record<string, unknown>))
+  if (birthTimeValidation.status === 'invalid_timezone' || birthTimeValidation.status === 'nonexistent_local_time' || birthTimeValidation.status === 'ambiguous_local_time' || birthTimeValidation.status === 'missing_timezone') {
+    return NextResponse.json(
+      {
+        error: birthTimeValidation.status,
+        code: birthTimeValidation.status,
+        message: birthTimeValidationMessage(birthTimeValidation.status),
+        birth_time_validation: {
+          status: birthTimeValidation.status,
+          dstStatus: birthTimeValidation.dstStatus,
+          timezone: birthTimeValidation.timezone,
+          localDate: birthTimeValidation.localDate,
+          localTime: birthTimeValidation.localTime,
+        },
+      },
+      { status: 400 },
+    )
+  }
 
   const googleEmail = user.email ?? null
   const googleName =

@@ -5,6 +5,7 @@
  */
 
 import type { BirthProfileInput, AstroWarning, BirthTimePrecision } from './types.ts'
+import { normalizeBirthTimeForCalculation } from './calculations/time.ts'
 
 export type NormalizedBirthInput = {
   input_hash_material_version: '2.0.0'
@@ -15,6 +16,9 @@ export type NormalizedBirthInput = {
   birth_time_uncertainty_seconds: number
   timezone: string
   timezone_status: 'valid' | 'invalid' | 'ambiguous' | 'unknown'
+  birth_time_validation_status?: 'valid' | 'invalid_timezone' | 'nonexistent_local_time' | 'ambiguous_local_time' | 'missing_timezone' | 'missing_birth_time'
+  birth_time_validation_dst_status?: 'not_applicable' | 'standard' | 'daylight' | 'ambiguous' | 'nonexistent' | 'unknown'
+  birth_utc?: string | null
   // Full precision for astronomical calculation (no rounding)
   latitude_full: number
   longitude_full: number
@@ -43,6 +47,18 @@ export function normalizeBirthInput(input: BirthProfileInput): NormalizedBirthIn
       confidence_impact: -30,
     })
   }
+  const birthTimeValidation = normalizeBirthTimeForCalculation({
+    dateOfBirth: input.birth_date,
+    timeOfBirth: input.birth_time ?? null,
+    timezone: input.timezone,
+    birthTimeKnown: input.birth_time_known,
+  })
+  const birthTimeValidationStatus = birthTimeValidation.status
+  const birthTimeValidationDstStatus = birthTimeValidation.dstStatus
+  const birthUtc = birthTimeValidation.utcDateTime ?? null
+  if (birthTimeValidationStatus === 'invalid_timezone' && timezoneStatus !== 'invalid') {
+    timezoneStatus = 'invalid'
+  }
   if (!input.birth_time_known) {
     warnings.push({
       warning_code: 'BIRTH_TIME_UNKNOWN', severity: 'medium',
@@ -68,6 +84,9 @@ export function normalizeBirthInput(input: BirthProfileInput): NormalizedBirthIn
     birth_time_uncertainty_seconds: PRECISION_TO_UNCERTAINTY[input.birth_time_precision],
     timezone: input.timezone,
     timezone_status: timezoneStatus,
+    birth_time_validation_status: birthTimeValidationStatus,
+    birth_time_validation_dst_status: birthTimeValidationDstStatus,
+    birth_utc: birthUtc,
     latitude_full,
     longitude_full,
     latitude_rounded,

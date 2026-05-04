@@ -11,6 +11,7 @@ import { calculateRequestSchema } from '@/lib/astro/schemas/calculate'
 import { decryptJson } from '@/lib/astro/encryption'
 import { normalizeBirthInput } from '@/lib/astro/normalize'
 import { normalizeStoredBirthData } from '@/lib/astro/profile-birth-data'
+import { normalizeBirthTimeForCalculation } from '@/lib/astro/calculations/time'
 import { sha256Canonical } from '@/lib/astro/hashing'
 import { getRuntimeEngineVersion, getRuntimeEphemerisVersion, SCHEMA_VERSION } from '@/lib/astro/engine/version'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
@@ -229,6 +230,47 @@ function buildInsertFailureDiagnostic(args: {
   }
 }
 
+function birthTimeValidationMessage(status: string): string {
+  switch (status) {
+    case 'invalid_timezone':
+      return 'The selected timezone is invalid. Please choose a valid IANA timezone.'
+    case 'nonexistent_local_time':
+      return 'This local birth time did not exist in the selected timezone because of a daylight-saving transition. Please verify the time.'
+    case 'ambiguous_local_time':
+      return 'This local birth time is ambiguous in the selected timezone because of a daylight-saving transition. Please provide a disambiguated time.'
+    case 'missing_timezone':
+      return 'Timezone is required for astrology calculations.'
+    case 'missing_birth_time':
+      return 'Birth time is required for exact Lagna, houses, and dasha calculations.'
+    default:
+      return 'The provided birth time could not be used for calculation.'
+  }
+}
+
+function buildBirthTimeValidationResponse(validation: {
+  status: string
+  dstStatus?: string
+  timezone: string | null
+  localDate: string
+  localTime: string | null
+}) {
+  return NextResponse.json(
+    {
+      error: validation.status,
+      code: validation.status,
+      message: birthTimeValidationMessage(validation.status),
+      birth_time_validation: {
+        status: validation.status,
+        dstStatus: validation.dstStatus,
+        timezone: validation.timezone,
+        localDate: validation.localDate,
+        localTime: validation.localTime,
+      },
+    },
+    { status: 400 },
+  )
+}
+
 export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
@@ -312,6 +354,31 @@ export async function POST(req: NextRequest) {
   } catch {
     logCalculationFailure('decrypt_birth_data', 'profile_birth_data_invalid', { hasUser: true, hasProfile: true, hasSettings: true, hasEncryptedBirthData: Boolean(profile.encrypted_birth_data) })
     return NextResponse.json({ error: 'profile_birth_data_invalid' }, { status: 400 })
+  }
+
+  const birthTimeValidation = normalizeBirthTimeForCalculation({
+    dateOfBirth: decryptedInput.birth_date,
+    timeOfBirth: decryptedInput.birth_time ?? null,
+    timezone: decryptedInput.timezone,
+    birthTimeKnown: decryptedInput.birth_time_known,
+  })
+  if (birthTimeValidation.status !== 'valid' && birthTimeValidation.status !== 'missing_birth_time') {
+    logCalculationFailure('validate_birth_time', birthTimeValidation.status, {
+      hasUser: true,
+      hasProfile: true,
+      hasSettings: true,
+      hasEncryptedBirthData: Boolean(profile.encrypted_birth_data),
+    })
+    return buildBirthTimeValidationResponse(birthTimeValidation)
+  }
+  if (birthTimeValidation.status === 'missing_birth_time') {
+    logCalculationFailure('validate_birth_time', birthTimeValidation.status, {
+      hasUser: true,
+      hasProfile: true,
+      hasSettings: true,
+      hasEncryptedBirthData: Boolean(profile.encrypted_birth_data),
+    })
+    return buildBirthTimeValidationResponse(birthTimeValidation)
   }
 
   const normalized = normalizeBirthInput(decryptedInput)

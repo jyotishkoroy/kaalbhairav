@@ -62,7 +62,7 @@ export function normalizeStoredBirthData(input: unknown): BirthProfileInput {
     birth_place_name: String(birth_place_name),
     latitude,
     longitude,
-    timezone,
+    timezone: String(timezone),
     gender: typeof raw.gender === 'string' ? raw.gender as BirthProfileInput['gender'] : undefined,
     calendar_system: raw.calendar_system === 'gregorian' || raw.calendarSystem === 'gregorian' ? 'gregorian' : undefined,
     data_consent_version,
