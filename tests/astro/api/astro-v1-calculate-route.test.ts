@@ -32,6 +32,19 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { POST } from '@/app/api/astro/v1/calculate/route'
 
 const user = { id: 'u1' }
+const profileId = '11111111-1111-4111-8111-111111111111'
+
+function chain<T extends Record<string, unknown>>(terminal: T) {
+  const node: Record<string, unknown> = {
+    eq: () => node,
+    order: () => node,
+    limit: () => node,
+    maybeSingle: async () => ({ data: null, error: null }),
+    single: async () => ({ data: null, error: null }),
+    select: () => node,
+  }
+  return Object.assign(node, terminal)
+}
 
 function makeReq(profileId = 'p1') {
   return new NextRequest('http://localhost/api/astro/v1/calculate', {
@@ -42,6 +55,9 @@ function makeReq(profileId = 'p1') {
 }
 
 beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  delete process.env.ASTRO_CALCULATE_DEBUG
+})
 
 describe('POST /api/astro/v1/calculate', () => {
   it('returns profile_not_found when no profile exists', async () => {
@@ -70,5 +86,139 @@ describe('POST /api/astro/v1/calculate', () => {
     const resp = await POST(makeReq('11111111-1111-4111-8111-111111111111'))
     expect(resp.status).toBe(404)
     expect((await resp.json()).error).toBe('profile_access_denied')
+  })
+
+  it('returns generic calc_insert_failed when debug is disabled', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'birth_profiles') {
+          return {
+            select: () => chain({
+              maybeSingle: async () => ({
+                data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' },
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (table === 'astrology_settings') {
+          return {
+            select: () => chain({
+              maybeSingle: async () => ({
+                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' },
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (table === 'chart_calculations') {
+          return {
+            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
+            insert: () => chain({
+              single: async () => ({
+                data: null,
+                error: { code: '23502', message: 'not null violation', details: 'calc row missing' },
+              }),
+            }),
+          }
+        }
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
+      }),
+    } as never)
+
+    const resp = await POST(makeReq(profileId))
+    expect(resp.status).toBe(500)
+    expect(await resp.json()).toEqual({ error: 'calc_insert_failed' })
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[astro_chart_calculation_failed]',
+      expect.objectContaining({
+        stage: 'calc_insert',
+        code: '23502',
+        hasUser: true,
+        hasProfile: true,
+        hasInputHash: true,
+        hasSettingsHash: true,
+        engineVersion: expect.any(String),
+        ephemerisVersion: expect.any(String),
+        schemaVersion: expect.any(String),
+        forceRecalc: false,
+        status: 'running',
+      }),
+    )
+  })
+
+  it('returns safe debug calc_insert diagnostics when debug is enabled', async () => {
+    process.env.ASTRO_CALCULATE_DEBUG = 'true'
+    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'birth_profiles') {
+          return {
+            select: () => chain({
+              maybeSingle: async () => ({
+                data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' },
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (table === 'astrology_settings') {
+          return {
+            select: () => chain({
+              maybeSingle: async () => ({
+                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' },
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (table === 'chart_calculations') {
+          return {
+            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
+            insert: () => chain({
+              single: async () => ({
+                data: null,
+                error: { code: '23502', message: 'not null violation', details: 'calc row missing', hint: 'check payload' },
+              }),
+            }),
+          }
+        }
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
+      }),
+    } as never)
+
+    const resp = await POST(makeReq(profileId))
+    expect(resp.status).toBe(500)
+    expect(await resp.json()).toEqual({
+      error: 'calc_insert_failed',
+      stage: 'calc_insert',
+      code: '23502',
+      message: 'not null violation',
+      details: 'calc row missing',
+      hint: 'check payload',
+      diagnostic: {
+        hasUser: true,
+        hasProfile: true,
+        hasInputHash: true,
+        hasSettingsHash: true,
+        engineVersion: expect.any(String),
+        engineVersionType: 'string',
+        engineVersionIsNull: false,
+        ephemerisVersion: expect.any(String),
+        ephemerisVersionType: 'string',
+        ephemerisVersionIsNull: false,
+        schemaVersion: expect.any(String),
+        schemaVersionType: 'string',
+        schemaVersionIsNull: false,
+        forceRecalc: false,
+        forceRecalcType: 'boolean',
+        forceRecalcIsNull: false,
+        status: 'running',
+        statusType: 'string',
+        statusIsNull: false,
+      },
+    })
   })
 })

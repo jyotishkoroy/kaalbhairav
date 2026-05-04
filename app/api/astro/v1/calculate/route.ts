@@ -134,6 +134,55 @@ function logCalculationFailure(stage: string, code: string, context: {
   })
 }
 
+function buildInsertFailureDiagnostic(args: {
+  calcErr: { code?: unknown; message?: unknown; details?: unknown; hint?: unknown } | null | undefined
+  hasUser: boolean
+  hasProfile: boolean
+  hasInputHash: boolean
+  hasSettingsHash: boolean
+  engineVersion: string
+  ephemerisVersion: string
+  schemaVersion: string
+  forceRecalc: boolean
+  status: string
+}) {
+  const engineVersion = args.engineVersion ?? ''
+  const ephemerisVersion = args.ephemerisVersion ?? ''
+  const schemaVersion = args.schemaVersion ?? ''
+  const forceRecalc = args.forceRecalc
+  const status = args.status ?? ''
+
+  return {
+    error: 'calc_insert_failed',
+    stage: 'calc_insert',
+    code: typeof args.calcErr?.code === 'string' ? args.calcErr.code : null,
+    message: typeof args.calcErr?.message === 'string' ? args.calcErr.message : null,
+    details: typeof args.calcErr?.details === 'string' ? args.calcErr.details : null,
+    hint: typeof args.calcErr?.hint === 'string' ? args.calcErr.hint : null,
+    diagnostic: {
+      hasUser: args.hasUser,
+      hasProfile: args.hasProfile,
+      hasInputHash: args.hasInputHash,
+      hasSettingsHash: args.hasSettingsHash,
+      engineVersion,
+      engineVersionType: typeof engineVersion,
+      engineVersionIsNull: engineVersion === null,
+      ephemerisVersion,
+      ephemerisVersionType: typeof ephemerisVersion,
+      ephemerisVersionIsNull: ephemerisVersion === null,
+      schemaVersion,
+      schemaVersionType: typeof schemaVersion,
+      schemaVersionIsNull: schemaVersion === null,
+      forceRecalc,
+      forceRecalcType: typeof forceRecalc,
+      forceRecalcIsNull: forceRecalc === null,
+      status,
+      statusType: typeof status,
+      statusIsNull: status === null,
+    },
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!astroV1ApiEnabled()) {
     return NextResponse.json({ error: 'astro_v1_disabled' }, { status: 503 })
@@ -357,6 +406,61 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (calcErr || !calc) {
+    const hasUser = Boolean(user?.id)
+    const hasProfile = Boolean(profileId)
+    const hasInputHash = typeof inputHash === 'string' && inputHash.trim().length > 0
+    const hasSettingsHash = typeof settingsHash === 'string' && settingsHash.trim().length > 0
+    const engineVersion = getRuntimeEngineVersion()
+    const ephemerisVersion = getRuntimeEphemerisVersion()
+    const schemaVersion = SCHEMA_VERSION
+    const forceRecalcValue = Boolean(force_recalc)
+    const status = 'running'
+
+    console.warn('[astro_chart_calculation_failed]', {
+      stage: 'calc_insert',
+      code: typeof calcErr?.code === 'string' ? calcErr.code : null,
+      message: typeof calcErr?.message === 'string' ? calcErr.message : null,
+      details: typeof calcErr?.details === 'string' ? calcErr.details : null,
+      hint: typeof calcErr?.hint === 'string' ? calcErr.hint : null,
+      hasUser,
+      hasProfile,
+      hasInputHash,
+      hasSettingsHash,
+      engineVersion,
+      engineVersionType: typeof engineVersion,
+      engineVersionIsNull: engineVersion === null,
+      ephemerisVersion,
+      ephemerisVersionType: typeof ephemerisVersion,
+      ephemerisVersionIsNull: ephemerisVersion === null,
+      schemaVersion,
+      schemaVersionType: typeof schemaVersion,
+      schemaVersionIsNull: schemaVersion === null,
+      forceRecalc: forceRecalcValue,
+      forceRecalcType: typeof forceRecalcValue,
+      forceRecalcIsNull: forceRecalcValue === null,
+      status,
+      statusType: typeof status,
+      statusIsNull: status === null,
+    })
+
+    if (process.env.ASTRO_CALCULATE_DEBUG === 'true') {
+      return NextResponse.json(
+        buildInsertFailureDiagnostic({
+          calcErr,
+          hasUser,
+          hasProfile,
+          hasInputHash,
+          hasSettingsHash,
+          engineVersion,
+          ephemerisVersion,
+          schemaVersion,
+          forceRecalc: forceRecalcValue,
+          status,
+        }),
+        { status: 500 },
+      )
+    }
+
     return NextResponse.json({ error: 'calc_insert_failed' }, { status: 500 })
   }
 

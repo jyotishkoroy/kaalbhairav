@@ -14,14 +14,21 @@ export const SCHEMA_VERSION = '2.0.0'
 export const ENGINE_VERSION = ENGINE_VERSION_STUB
 export const EPHEMERIS_VERSION = EPHEMERIS_VERSION_STUB
 
+function ensureNonEmptyVersion(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim().length > 0 ? value : fallback
+}
+
 export function getRuntimeEngineVersion(): string {
-  return process.env.ASTRO_ENGINE_MODE === 'real' ? ENGINE_VERSION_REAL : ENGINE_VERSION_STUB
+  return ensureNonEmptyVersion(
+    process.env.ASTRO_ENGINE_MODE === 'real' ? ENGINE_VERSION_REAL : ENGINE_VERSION_STUB,
+    ENGINE_VERSION_STUB,
+  )
 }
 
 export function getRuntimeEphemerisVersion(): string {
   if (process.env.ASTRO_ENGINE_MODE !== 'real') return EPHEMERIS_VERSION_STUB
   try {
-    return `sweph@${getSweVersion()}`
+    return ensureNonEmptyVersion(`sweph@${getSweVersion()}`, 'sweph-unavailable')
   } catch {
     return 'sweph-unavailable'
   }
