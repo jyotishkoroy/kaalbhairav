@@ -5,6 +5,7 @@
  */
 
 import type { AstroChartContext } from "./chart-context.ts";
+import type { PublicChartFacts } from "./public-chart-facts.ts";
 
 export type ExactChartFactAnswer = { matched: true; answer: string } | { matched: false };
 
@@ -16,6 +17,13 @@ function unavailable(): ExactChartFactAnswer {
 }
 function answer(text: string): ExactChartFactAnswer {
   return { matched: true, answer: text };
+}
+
+function unavailableExact(reason: string): ExactChartFactAnswer {
+  return {
+    matched: true,
+    answer: `aadesh: That exact chart fact is unavailable because ${reason}. I will not guess it.`,
+  };
 }
 function timelineAnswer(facts: AstroChartContext["normalizedFacts"]): string | undefined {
   const row = facts.antardashaTimeline?.find((item) => item.mahadasha === "Jupiter" && item.antardasha === "Ketu") ?? facts.antardashaTimeline?.[0];
@@ -45,5 +53,21 @@ export function answerExactChartFactQuestion(input: { question: string; chartCon
   if (/\bmoon\b/.test(q) && /\bhouse\b/.test(q)) return facts.moonHouse !== undefined ? answer(`aadesh: Your Moon is in house ${facts.moonHouse}.`) : unavailable();
   if (/\bsun\b/.test(q) && /\bhouse\b/.test(q)) return facts.sunHouse !== undefined ? answer(`aadesh: Your Sun is in house ${facts.sunHouse}.`) : unavailable();
   if (/\bsun sign\b/.test(q)) return facts.sunSign ? answer(`aadesh: Your Sun sign is ${facts.sunSign}${facts.sunHouse ? ` in the ${facts.sunHouse}th house` : ""}.`) : unavailable();
+  return { matched: false };
+}
+
+export function answerExactFactFromPublicFacts(question: string, facts: PublicChartFacts): ExactChartFactAnswer {
+  const q = normalizeQuestion(question);
+  const moonUnavailable = facts.unavailableFacts?.moonHouse;
+  const nakshatraUnavailable = facts.unavailableFacts?.moonNakshatra ?? facts.unavailableFacts?.moonNakshatraPada;
+  if (/\bmoon\b/.test(q) && /\bhouse\b/.test(q)) {
+    if (moonUnavailable) return unavailableExact("the chart settings do not prove a compatible house system");
+    return facts.moonHouse !== undefined ? answer(`aadesh: Your Moon is in house ${facts.moonHouse}.`) : { matched: false };
+  }
+  if ((/\bnakshatra\b/.test(q) && !/\blord\b/.test(q)) || /\bpada\b/.test(q)) {
+    if (nakshatraUnavailable) return unavailableExact("the chart settings do not prove a supported sidereal/Lahiri configuration");
+    if (q.includes("pada")) return facts.nakshatraPada !== undefined ? answer(`aadesh: Your nakshatra pada is ${facts.nakshatraPada}.`) : { matched: false };
+    return facts.nakshatra ? answer(`aadesh: Your Nakshatra is ${facts.nakshatra}${facts.nakshatraPada ? `, Pada ${facts.nakshatraPada}` : ""}.`) : { matched: false };
+  }
   return { matched: false };
 }

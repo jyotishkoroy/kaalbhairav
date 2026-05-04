@@ -4,6 +4,13 @@
  * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
+import {
+  extractCalculationSettingsMetadata,
+  requireWholeSignHouseSystem,
+  requireSiderealLahiriOrSupportedAyanamsa,
+  type CalculationSettingsMetadata,
+} from "./calculation-settings-metadata.ts";
+
 const SIGNS = [
   "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
   "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
@@ -24,6 +31,9 @@ export type PublicChartFacts = {
   source: "chart_json" | "prediction_summary" | "report_derived" | "merged";
   confidence: "complete" | "partial" | "invalid";
   warnings: string[];
+  calculationSettings?: CalculationSettingsMetadata;
+  factWarnings?: string[];
+  unavailableFacts?: Record<string, PublicFactUnavailable>;
 
   lagnaSign?: string;
   lagnaLord?: string;
@@ -54,6 +64,22 @@ export type PublicChartFacts = {
   kalsarpaYoga?: boolean;
 
   placements: Record<string, PublicPlanetPlacement>;
+};
+
+type PublicFactUnavailableReason =
+  | "incompatible_house_system"
+  | "missing_house_system"
+  | "incompatible_ayanamsa"
+  | "missing_ayanamsa"
+  | "missing_zodiac"
+  | "incompatible_zodiac"
+  | "missing_chart_path"
+  | "unsupported_settings";
+
+type PublicFactUnavailable = {
+  status: "unavailable";
+  reason: PublicFactUnavailableReason;
+  message: string;
 };
 
 export function computeWholeSignHouse(lagnaSign: string, planetSign: string): number | undefined {
@@ -91,6 +117,25 @@ function bool(root: unknown, ...paths: string[][]): boolean | undefined {
     if (typeof cur === "string") { if (/^(true|yes|1)$/i.test(cur)) return true; if (/^(false|no|0)$/i.test(cur)) return false; }
   }
   return undefined;
+}
+function atPath(root: unknown, path: string[]): unknown {
+  let current: unknown = root;
+  for (const part of path) {
+    if (!isRecord(current)) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+function normalizeSetting(value?: string): string | undefined {
+  return value?.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function markUnavailable(
+  unavailableFacts: Record<string, PublicFactUnavailable>,
+  key: string,
+  reason: PublicFactUnavailableReason,
+  message: string,
+) {
+  unavailableFacts[key] = { status: "unavailable", reason, message };
 }
 function readTimeline(root: unknown): Array<{ mahadasha: string; antardasha: string; startDate?: string; endDate?: string }> {
   const source = str(root, ["prediction_ready_summaries", "current_timing_summary"]) ? undefined : undefined;
@@ -223,7 +268,29 @@ export function buildPublicChartFacts(input: {
 }): PublicChartFacts {
   const { chartJson, predictionSummary, reportFacts } = input;
   const warnings: string[] = [];
+  const factWarnings: string[] = [];
+  const unavailableFacts: Record<string, PublicFactUnavailable> = {};
   const sources: string[] = [];
+  const calculationSettings = extractCalculationSettingsMetadata(chartJson);
+  const hasSettingsMetadata = Boolean(
+    isRecord(atPath(chartJson, ["metadata", "calculation_settings"])) ||
+      atPath(chartJson, ["metadata", "calculation_settings"]) !== undefined ||
+      atPath(chartJson, ["metadata", "settings"]) !== undefined ||
+      atPath(chartJson, ["metadata", "settings_snapshot"]) !== undefined ||
+      atPath(chartJson, ["settings_snapshot"]) !== undefined ||
+      atPath(chartJson, ["calculation_settings"]) !== undefined ||
+      atPath(chartJson, ["metadata", "house_system"]) !== undefined ||
+      atPath(chartJson, ["metadata", "zodiac_type"]) !== undefined ||
+      atPath(chartJson, ["metadata", "ayanamsa"]) !== undefined ||
+      atPath(chartJson, ["metadata", "node_type"]) !== undefined ||
+      atPath(chartJson, ["metadata", "engine_version"]) !== undefined ||
+      atPath(chartJson, ["metadata", "schema_version"]) !== undefined ||
+      atPath(chartJson, ["panchang", "convention"]) !== undefined ||
+      atPath(chartJson, ["expanded_sections", "panchang", "convention"]) !== undefined ||
+      atPath(chartJson, ["astronomical_data", "panchang", "convention"]) !== undefined,
+  );
+  const wholeSignSupported = requireWholeSignHouseSystem(calculationSettings);
+  const siderealSupported = requireSiderealLahiriOrSupportedAyanamsa(calculationSettings);
   const panchangConvention = str(chartJson, ["panchang", "convention"], ["expanded_sections", "panchang", "convention"], ["astronomical_data", "panchang", "convention"]);
   const panchangSource = str(chartJson, ["panchang", "source"], ["expanded_sections", "panchang", "source"], ["astronomical_data", "panchang", "source"]);
   const panchangLocalDate = str(chartJson, ["panchang", "local_date"], ["panchang", "panchang_local_date"], ["expanded_sections", "panchang", "local_date"], ["astronomical_data", "panchang", "local_date"]);
@@ -258,7 +325,7 @@ export function buildPublicChartFacts(input: {
     str(reportFacts, ["moonSign"], ["moon","sign"])
   );
 
-  let moonHouse = num(chartJson,
+  const moonHouseRaw = num(chartJson,
     ["public_facts","moon_house"], ["publicFacts","moonHouse"],
     ["d1","planets","Moon","house"], ["planets","Moon","house"], ["moon","house"]
   ) ?? num(predictionSummary,
@@ -277,28 +344,39 @@ export function buildPublicChartFacts(input: {
     str(reportFacts, ["sunSign"], ["sun","sign"])
   );
 
-  let sunHouse = num(chartJson,
+  const sunHouseRaw = num(chartJson,
     ["public_facts","sun_house"], ["publicFacts","sunHouse"],
     ["d1","planets","Sun","house"], ["planets","Sun","house"], ["sun","house"]
   ) ?? num(predictionSummary,
     ["public_facts","sun_house"], ["publicFacts","sunHouse"], ["normalizedFacts","sunHouse"], ["sunHouse"]
   ) ?? num(reportFacts, ["sunHouse"]);
 
-  // Derive houses if missing
-  if (lagnaSign && moonSign && moonHouse === undefined) moonHouse = computeWholeSignHouse(lagnaSign, moonSign);
-  if (lagnaSign && sunSign && sunHouse === undefined) sunHouse = computeWholeSignHouse(lagnaSign, sunSign);
+  let moonHouse = moonHouseRaw;
+  let sunHouse = sunHouseRaw;
+  if (hasSettingsMetadata && !wholeSignSupported) {
+    const hasHouseSystem = Boolean(calculationSettings.houseSystem);
+    const reason: PublicFactUnavailableReason = hasHouseSystem ? "incompatible_house_system" : "missing_house_system";
+    markUnavailable(unavailableFacts, "moonHouse", reason, "Moon house is unavailable because the chart settings do not prove a compatible whole-sign house system.");
+    markUnavailable(unavailableFacts, "sunHouse", reason, "Sun house is unavailable because the chart settings do not prove a compatible whole-sign house system.");
+    factWarnings.push(hasHouseSystem ? "house_unavailable_incompatible_house_system" : "house_unavailable_missing_house_system");
+    moonHouse = undefined;
+    sunHouse = undefined;
+  } else {
+    if (lagnaSign && moonSign && moonHouse === undefined) moonHouse = computeWholeSignHouse(lagnaSign, moonSign);
+    if (lagnaSign && sunSign && sunHouse === undefined) sunHouse = computeWholeSignHouse(lagnaSign, sunSign);
+  }
 
-  const nakshatra = str(chartJson,
+  const nakshatraRaw = str(chartJson,
     ["public_facts","moon_nakshatra"], ["publicFacts","moonNakshatra"],
     ["nakshatra"], ["moonNakshatra"], ["moon_nakshatra"],
     ["d1","planets","Moon","nakshatra"], ["planets","Moon","nakshatra"]
   ) ?? str(predictionSummary, ["nakshatra"], ["moonNakshatra"], ["public_facts","moon_nakshatra"], ["publicFacts","moonNakshatra"]);
 
-  const nakshatraPada = num(chartJson,
-    ["public_facts","moon_pada"], ["publicFacts","moonPada"],
+  const nakshatraPadaRaw = num(chartJson,
+    ["public_facts","moon_pada"], ["publicFacts","moonPada"], ["public_facts","moon_nakshatra_pada"], ["publicFacts","moonNakshatraPada"],
     ["nakshatraPada"], ["nakshatra_pada"],
-    ["d1","planets","Moon","pada"], ["planets","Moon","pada"]
-  ) ?? num(predictionSummary, ["nakshatraPada"], ["nakshatra_pada"], ["public_facts","moon_pada"], ["publicFacts","moonPada"]);
+    ["d1","planets","Moon","pada"], ["planets","Moon","pada"], ["planets","Moon","nakshatra_pada"], ["moon","nakshatra_pada"]
+  ) ?? num(predictionSummary, ["nakshatraPada"], ["nakshatra_pada"], ["public_facts","moon_pada"], ["publicFacts","moonPada"], ["public_facts","moon_nakshatra_pada"], ["publicFacts","moonNakshatraPada"]);
 
   const nakshatraLord = str(chartJson, ["nakshatraLord"], ["nakshatra_lord"], ["publicFacts","nakshatraLord"], ["public_facts","nakshatra_lord"])
     ?? str(predictionSummary, ["nakshatraLord"], ["nakshatra_lord"]);
@@ -308,6 +386,28 @@ export function buildPublicChartFacts(input: {
     ?? str(predictionSummary, ["rasiLord"], ["rasi_lord"]);
   const westernSunSign = str(chartJson, ["westernSunSign"], ["tropicalSunSign"], ["western_sun_sign"])
     ?? str(predictionSummary, ["westernSunSign"], ["western_sun_sign"]);
+
+  const zodiac = normalizeSetting(calculationSettings.zodiac);
+  const ayanamsa = normalizeSetting(calculationSettings.ayanamsa);
+  if (hasSettingsMetadata && !siderealSupported) {
+    if (!zodiac) {
+      markUnavailable(unavailableFacts, "moonNakshatra", "missing_zodiac", "Moon nakshatra is unavailable because zodiac metadata is missing.");
+      factWarnings.push("sidereal_fact_unavailable_missing_zodiac");
+    } else if (zodiac !== "sidereal") {
+      markUnavailable(unavailableFacts, "moonNakshatra", "incompatible_zodiac", "Moon nakshatra is unavailable because the chart is not proven sidereal.");
+      factWarnings.push("sidereal_fact_unavailable_incompatible_zodiac");
+    }
+    if (!ayanamsa) {
+      markUnavailable(unavailableFacts, "moonNakshatra", "missing_ayanamsa", "Moon nakshatra is unavailable because ayanamsa metadata is missing.");
+      factWarnings.push("nakshatra_unavailable_missing_ayanamsa");
+    } else if (ayanamsa !== "lahiri") {
+      markUnavailable(unavailableFacts, "moonNakshatra", "incompatible_ayanamsa", "Moon nakshatra is unavailable because the ayanamsa is not supported.");
+      factWarnings.push("sidereal_fact_unavailable_incompatible_ayanamsa");
+    }
+    markUnavailable(unavailableFacts, "moonNakshatraPada", !zodiac ? "missing_zodiac" : zodiac !== "sidereal" ? "incompatible_zodiac" : !ayanamsa ? "missing_ayanamsa" : "incompatible_ayanamsa", "Moon nakshatra pada is unavailable because the chart settings do not prove a supported sidereal/Lahiri configuration.");
+  }
+  const nakshatra = hasSettingsMetadata && !siderealSupported ? undefined : nakshatraRaw;
+  const nakshatraPada = hasSettingsMetadata && !siderealSupported ? undefined : nakshatraPadaRaw;
 
   const dashaFacts = extractDeterministicDashaFacts({ chartJson, predictionSummary, reportFacts });
   const mahadasha = dashaFacts.mahadasha;
@@ -338,6 +438,7 @@ export function buildPublicChartFacts(input: {
   if (!sunSign) warnings.push("sun_sign_missing");
   if (!nakshatra) warnings.push("nakshatra_missing");
   if (!mahadasha) warnings.push("mahadasha_missing");
+  if (factWarnings.length) warnings.push(...factWarnings);
 
   const complete = Boolean(lagnaSign && moonSign && sunSign && nakshatra && mahadasha && (moonHouse !== undefined) && (sunHouse !== undefined));
   const confidence: "complete" | "partial" | "invalid" = !lagnaSign ? "invalid" : complete ? "complete" : "partial";
@@ -353,6 +454,9 @@ export function buildPublicChartFacts(input: {
     source,
     confidence,
     warnings,
+    calculationSettings: Object.keys(calculationSettings).length ? calculationSettings : undefined,
+    factWarnings: factWarnings.length ? factWarnings : undefined,
+    unavailableFacts: Object.keys(unavailableFacts).length ? unavailableFacts : undefined,
     lagnaSign,
     lagnaLord,
     moonSign,
@@ -395,14 +499,14 @@ export function validatePublicChartFacts(facts: PublicChartFacts): {
   if (!facts.lagnaSign) missing.push("lagnaSign");
   if (!facts.moonSign) missing.push("moonSign");
   if (!facts.sunSign) missing.push("sunSign");
-  if (!facts.nakshatra) missing.push("nakshatra");
+  if (!facts.nakshatra && !facts.unavailableFacts?.moonNakshatra) missing.push("nakshatra");
   if (!facts.mahadasha) missing.push("mahadasha");
 
-  if (facts.lagnaSign && facts.moonSign && facts.moonHouse === undefined) {
+  if (facts.lagnaSign && facts.moonSign && facts.moonHouse === undefined && !facts.unavailableFacts?.moonHouse) {
     const derived = computeWholeSignHouse(facts.lagnaSign, facts.moonSign);
     if (derived === undefined) missing.push("moonHouse");
   }
-  if (facts.lagnaSign && facts.sunSign && facts.sunHouse === undefined) {
+  if (facts.lagnaSign && facts.sunSign && facts.sunHouse === undefined && !facts.unavailableFacts?.sunHouse) {
     const derived = computeWholeSignHouse(facts.lagnaSign, facts.sunSign);
     if (derived === undefined) missing.push("sunHouse");
   }

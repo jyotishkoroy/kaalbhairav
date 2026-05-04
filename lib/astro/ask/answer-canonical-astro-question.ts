@@ -5,7 +5,7 @@
  */
 
 import { buildPublicChartFacts, validatePublicChartFacts, type PublicChartFacts } from "../public-chart-facts.ts";
-import { answerExactChartFactQuestion } from "../exact-chart-facts.ts";
+import { answerExactChartFactQuestion, answerExactFactFromPublicFacts } from "../exact-chart-facts.ts";
 import { classifyVedicTopic } from "../rag/vedic-topic-classifier.ts";
 import { buildAstroAnswerPlan } from "../answer-plan/astro-answer-plan.ts";
 import { renderAstroAnswerPlan } from "../answer-plan/astro-answer-renderer.ts";
@@ -40,6 +40,11 @@ export async function answerCanonicalAstroQuestion(input: {
   const valid = validatePublicChartFacts(facts);
   if (!valid.ok) {
     return { answer: "aadesh: Your birth chart context needs recalculation before I can answer this reliably. Please update your birth details once and try again." };
+  }
+
+  const exactPublic = answerExactFactFromPublicFacts(input.question, facts);
+  if (exactPublic.matched) {
+    return { answer: exactPublic.answer };
   }
 
   // Exact fact detection via legacy chart context path

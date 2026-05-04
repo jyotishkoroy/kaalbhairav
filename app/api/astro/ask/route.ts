@@ -15,9 +15,14 @@ import { extractChartFactsFromVersion } from "@/lib/astro/rag/chart-fact-extract
 import { answerExactFactIfPossible } from "@/lib/astro/rag/exact-fact-router";
 import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from "@/lib/security/e2e-rate-limit";
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from "@/lib/security/request-guards";
+import { answerExactFactFromPublicFacts } from "@/lib/astro/exact-chart-facts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function looksLikeExactAstroQuestion(question: string): boolean {
+  return /\b(lagna|ascendant|moon sign|sun sign|nakshatra|pada|mahadasha|antardasha|which house|what house|house is my|what is my moon|what is my sun|what is my nakshatra|what is my current dasha)\b/i.test(question);
+}
 
 function getChartJsonFromCurrentChartResult(result: unknown): Record<string, unknown> | null {
   if (!result || typeof result !== "object") return null;
@@ -77,18 +82,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const chartFacts = extractChartFactsFromVersion(chartJson, {
-    userId: user.id,
-    profileId: String(loaded.profile.id),
-    chartVersionId: String(loaded.chartVersion.id),
-  });
-  const exactFactAnswer = answerExactFactIfPossible(question, chartFacts);
-  if (exactFactAnswer?.answer) {
-    return NextResponse.json({
-      answer: exactFactAnswer.answer,
-    });
-  }
-
   const predictionContext = loaded.predictionSummary && typeof loaded.predictionSummary === "object"
     ? ((loaded.predictionSummary as Record<string, unknown>).prediction_context ?? loaded.predictionSummary)
     : undefined;
@@ -100,6 +93,25 @@ export async function POST(req: NextRequest) {
     predictionSummary: predictionContext,
     now: new Date(),
   });
+
+  const exactFactPublic = answerExactFactFromPublicFacts(question, publicFacts);
+  if (exactFactPublic.matched) {
+    return NextResponse.json({ answer: exactFactPublic.answer });
+  }
+
+  const chartFacts = extractChartFactsFromVersion(chartJson, {
+    userId: user.id,
+    profileId: String(loaded.profile.id),
+    chartVersionId: String(loaded.chartVersion.id),
+  });
+  if (looksLikeExactAstroQuestion(question)) {
+    const exactFactAnswer = answerExactFactIfPossible(question, chartFacts);
+    if (exactFactAnswer?.answer) {
+      return NextResponse.json({
+        answer: exactFactAnswer.answer,
+      });
+    }
+  }
 
   if (process.env.ASTRO_DEBUG_CHART_CONTEXT === "true") {
     console.log("[astro_chart_context_debug]", { route: "/api/astro/ask", lagnaSign: publicFacts.lagnaSign, moonSign: publicFacts.moonSign, moonHouse: publicFacts.moonHouse, sunSign: publicFacts.sunSign, sunHouse: publicFacts.sunHouse, nakshatra: publicFacts.nakshatra, mahadasha: publicFacts.mahadasha, confidence: publicFacts.confidence, warnings: publicFacts.warnings });
