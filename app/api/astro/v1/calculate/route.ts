@@ -134,6 +134,57 @@ function logCalculationFailure(stage: string, code: string, context: {
   })
 }
 
+function classifyPersistFailure(errorText: string): { stage: string; code: string } {
+  if (errorText.startsWith('chart_insert_failed')) {
+    return { stage: 'chart_insert', code: 'chart_version_save_failed' }
+  }
+  if (errorText.startsWith('prediction_insert_failed')) {
+    return { stage: 'prediction_insert', code: 'prediction_summary_save_failed' }
+  }
+  if (errorText.startsWith('promote_current_chart_failed')) {
+    return { stage: 'promote_current_chart', code: 'current_chart_promotion_failed' }
+  }
+  if (errorText.startsWith('audit_insert_failed')) {
+    return { stage: 'audit_insert', code: 'audit_insert_failed' }
+  }
+  return { stage: 'persist_chart', code: 'chart_version_save_failed' }
+}
+
+function buildPersistFailureDiagnostic(args: {
+  errorText: string
+  stage: string
+  code: string
+  hasUser: boolean
+  hasProfile: boolean
+  hasInputHash: boolean
+  hasSettingsHash: boolean
+  calcIdPresent: boolean
+  profileIdPresent: boolean
+  userIdPresent: boolean
+  chartVersion: number
+  chartJsonHasMetadata: boolean
+  outputStatus: unknown
+}) {
+  return {
+    error: args.code,
+    stage: args.stage,
+    message: args.errorText,
+    diagnostic: {
+      hasUser: args.hasUser,
+      hasProfile: args.hasProfile,
+      hasInputHash: args.hasInputHash,
+      hasSettingsHash: args.hasSettingsHash,
+      calcIdPresent: args.calcIdPresent,
+      profileIdPresent: args.profileIdPresent,
+      userIdPresent: args.userIdPresent,
+      chartVersion: args.chartVersion,
+      chartVersionType: typeof args.chartVersion,
+      chartJsonHasMetadata: args.chartJsonHasMetadata,
+      outputStatus: typeof args.outputStatus === 'string' ? args.outputStatus : null,
+    },
+  }
+}
+
 function buildInsertFailureDiagnostic(args: {
   calcErr: { code?: unknown; message?: unknown; details?: unknown; hint?: unknown } | null | undefined
   hasUser: boolean
@@ -557,11 +608,38 @@ export async function POST(req: NextRequest) {
       })
     } catch (persistError) {
       const errorText = persistError instanceof Error ? persistError.message : 'unknown'
-      const code = errorText.startsWith('prediction_insert_failed') ? 'prediction_summary_save_failed' : 'chart_version_save_failed'
-      logCalculationFailure('persist_chart', code, {
-        hasUser: true,
-        hasProfile: true,
-        hasSettings: true,
+      const { stage, code } = classifyPersistFailure(errorText)
+      const hasUser = Boolean(user?.id)
+      const hasProfile = Boolean(profileId)
+      const hasInputHash = typeof inputHash === 'string' && inputHash.trim().length > 0
+      const hasSettingsHash = typeof settingsHash === 'string' && settingsHash.trim().length > 0
+      const calcIdPresent = Boolean(calc?.id)
+      const profileIdPresent = Boolean(profileId)
+      const userIdPresent = Boolean(user?.id)
+      const chartVersionValue = nextChartVersion
+      const chartJsonHasMetadata = Boolean(mergedChartJson?.metadata)
+      const outputStatus = output?.calculation_status
+
+      console.warn('[astro_chart_calculation_failed]', {
+        stage,
+        code,
+        message: errorText,
+        hasUser,
+        hasProfile,
+        hasInputHash,
+        hasSettingsHash,
+        chartVersion: chartVersionValue,
+        chartVersionType: typeof chartVersionValue,
+        chartJsonHasMetadata,
+        outputStatus,
+        calcIdPresent,
+        profileIdPresent,
+        userIdPresent,
+      })
+      logCalculationFailure(stage, code, {
+        hasUser,
+        hasProfile,
+        hasSettings: hasSettingsHash,
         hasEncryptedBirthData: true,
       })
       await service
@@ -572,6 +650,26 @@ export async function POST(req: NextRequest) {
           completed_at: new Date().toISOString(),
         })
         .eq('id', calc.id)
+      if (process.env.ASTRO_CALCULATE_DEBUG === 'true') {
+        return NextResponse.json(
+          buildPersistFailureDiagnostic({
+            errorText,
+            stage,
+            code,
+            hasUser,
+            hasProfile,
+            hasInputHash,
+            hasSettingsHash,
+            calcIdPresent,
+            profileIdPresent,
+            userIdPresent,
+            chartVersion: chartVersionValue,
+            chartJsonHasMetadata,
+            outputStatus,
+          }),
+          { status: 500 },
+        )
+      }
       return NextResponse.json({ error: code }, { status: 500 })
     }
 
