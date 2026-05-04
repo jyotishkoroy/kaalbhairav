@@ -153,3 +153,36 @@ export type PredictionContext = {
     refuse_deterministic_medical_legal_financial_death_or_guaranteed_event_predictions: true
   }
 }
+
+// Field provenance tracking — used to enforce fail-closed on unsupported/unimplemented sections.
+export type AstroSourceType =
+  | 'input'
+  | 'deterministic_calculation'
+  | 'deterministic_lookup'
+  | 'stored_current_chart_json'
+  | 'versioned_template'
+  | 'rag_rule'
+  | 'llm_wording_only'
+  | 'none';
+
+export type AstroFieldStatus =
+  | 'computed'
+  | 'unavailable'
+  | 'partial'
+  | 'unsupported'
+  | 'invalid';
+
+export interface AstroFieldProvenance {
+  status: AstroFieldStatus;
+  source: AstroSourceType;
+  sourcePath?: string;
+  module?: string;
+  ruleId?: string;
+  chartVersionId?: string;
+  calculationSettingsHash?: string;
+  reason?: string;
+}
+
+export function unavailableAstroField(field: string, reason = 'not_implemented'): { field: string; status: 'unavailable'; reason: string; source: 'none' } {
+  return { field, status: 'unavailable', reason, source: 'none' } as const;
+}

@@ -53,28 +53,43 @@ const summaryRecord = {
   },
 }
 
+// Profile record with current_chart_version_id matching the summaryRecord
+const profileRecord = {
+  id: 'profile-1',
+  user_id: 'user-test',
+  status: 'active',
+  current_chart_version_id: 'chart-version-1',
+}
+
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser },
   })),
   createServiceClient: vi.fn(() => ({
     from: vi.fn((table: string) => {
+      if (table === 'birth_profiles') {
+        // Chainable mock for any depth of .eq() calls
+        const makeEqChain = (data: unknown): Record<string, unknown> => ({
+          select: () => makeEqChain(data),
+          eq: () => makeEqChain(data),
+          order: () => makeEqChain(data),
+          limit: () => makeEqChain(data),
+          maybeSingle: async () => ({ data, error: null }),
+          single: async () => ({ data, error: null }),
+        })
+        return makeEqChain(profileRecord)
+      }
+
       if (table === 'prediction_ready_summaries') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  order: vi.fn(() => ({
-                    limit: vi.fn(() => ({
-                      maybeSingle: vi.fn(async () => ({ data: summaryRecord, error: null })),
-                    })),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        }
+        // Chainable mock that returns summaryRecord for any eq/order/limit chain
+        const makeChain = (data: unknown): Record<string, unknown> => ({
+          select: () => makeChain(data),
+          eq: () => makeChain(data),
+          order: () => makeChain(data),
+          limit: () => makeChain(data),
+          maybeSingle: async () => ({ data, error: null }),
+        })
+        return makeChain(summaryRecord)
       }
 
       if (table === 'astro_chat_messages') {

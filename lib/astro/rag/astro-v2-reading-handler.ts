@@ -140,6 +140,12 @@ function inferQuestionMode(question: string): "companion" | "exact_fact" {
   return "companion";
 }
 
+// Client-supplied chart context is only allowed in explicit dev/test mode.
+// Default is false — in production, exact facts always come from the server.
+const allowClientChartContext =
+  process.env.ASTRO_ALLOW_CLIENT_CHART_CONTEXT === "true" &&
+  process.env.NODE_ENV !== "production";
+
 export async function handleAstroV2ReadingRequest(request: Request, deps: Partial<AstroV2ReadingDependencies> = {}): Promise<Response> {
   let body: AstroV2ReadingRequestBody;
   try { body = (await request.json()) as AstroV2ReadingRequestBody; } catch { return NextResponse.json({ error: "Invalid JSON request body." }, { status: 400 }); }
@@ -150,8 +156,11 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
   const birthDetails = parseBirthDetails(body.birthDetails);
   const metadata = context.metadata;
   const consultationFlags = resolveConsultationFeatureFlags(process.env as never);
-  const consultationChartEvidence = parseConsultationChartEvidence(body.chart);
-  const groundedChartContext = parseChartContext(body.chartContext);
+
+  // In production, ignore client-supplied chart evidence and context —
+  // exact facts must only come from the server-loaded current chart.
+  const consultationChartEvidence = allowClientChartContext ? parseConsultationChartEvidence(body.chart) : undefined;
+  const groundedChartContext = allowClientChartContext ? parseChartContext(body.chartContext) : undefined;
   const consultationResult = runConsultationProductionWrapper({
     userQuestion: question,
     message: readString(body.message),
@@ -206,8 +215,11 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
     routingEnabled: Boolean(flags.routingEnabled),
   });
   const ragBranchEnabled = routeDecision.kind === "rag" && shouldUseRagReadingRoute(flags, question);
-  const deterministicChartFacts = isRecord(body.deterministicChartFacts) ? body.deterministicChartFacts as Record<string, unknown> : undefined;
-  const chartContextText = groundedChartContext ?? (typeof body.chartContext === "string" ? body.chartContext : undefined);
+  // In production, deterministicChartFacts from client are ignored — server chart is authoritative.
+  const deterministicChartFacts = allowClientChartContext && isRecord(body.deterministicChartFacts)
+    ? body.deterministicChartFacts as Record<string, unknown>
+    : undefined;
+  const chartContextText = groundedChartContext ?? (allowClientChartContext && typeof body.chartContext === "string" ? body.chartContext : undefined);
   const groundedInstruction = (oneShotFlags.oneShot || chartContextText)
     ? "Use the supplied deterministic chart facts as the only source for exact natal facts. Do not invent chart facts. If a requested chart fact is missing, say it is unavailable. Give interpretation using chart basis, and avoid unsupported timing certainty."
     : undefined;

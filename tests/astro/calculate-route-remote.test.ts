@@ -227,6 +227,7 @@ vi.mock('../../lib/supabase/server', () => ({
         })),
       }
     }),
+    rpc: vi.fn(async () => ({ data: null, error: null })),
   })),
 }))
 

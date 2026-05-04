@@ -1,3222 +1,2181 @@
-# Claude Code Final Production E2E Handoff Prompt — TarayAI / tarayai.com
+# Claude Code Prompt — Fix Everything in `TARAYAI_ROUTE_AUTHENTICITY_AUDIT.md`
 
-## Task
 
-Execute the final end-to-end production verification and improvement cycle for TarayAI on the live production API.
+You are Claude Code working inside the TarayAI / tarayai.com repository.
 
-You are Claude Code working inside the local repository:
-
-```bash
-cd ~/Documents/kaalbhairav
-```
-
-Project:
+Your task is to fix every production-authenticity and correctness issue identified in:
 
 ```text
-Project: tarayai
-Production domain: https://www.tarayai.com
-Canonical production API: https://www.tarayai.com/api/astro/v2/reading
-Owner: Jyotishko Roy
-Repository/package name: kaalbhairav
-Current branch likely: phase-rag-foundation
-Runtime stack: Next.js / Node 22 / TypeScript / Vercel
+TARAYAI_ROUTE_AUTHENTICITY_AUDIT.md
 ```
 
-The goal is to run every case from `QandA.md` against live production, compare the production output against the expected answer style and facts in `QandA.md`, and improve the system until live production answers match at least 90% of the expected output style and factual content without cheating, hardcoding, weakening safety, or bypassing the real production pipeline.
+This is **Phase 2 after the audit**.
 
-Use these local private sources for expected behavior and data understanding:
+Treat the system as **high-risk correctness infrastructure**. The acceptable standard is not “mostly works.” The acceptable standard is:
 
 ```text
-QandA.md
-myVedicReport.docx
-astro_package.zip
+Same validated birth input + same explicit calculation settings + same engine version + same deterministic as-of date
+= same traceable output every time.
 ```
 
-These private/raw files are source material only. Do not commit them. Do not commit extracted raw content. Do not commit generated large reports or artifacts.
-
-The live production URL that must be tested is:
-
-```text
-https://www.tarayai.com/api/astro/v2/reading
-```
-
-Always POST to:
-
-```text
-/api/astro/v2/reading
-```
-
-Never POST to:
-
-```text
-/astro/v2
-```
+The system must never guess astrology facts. It must never use Groq, Ollama, frontend code, client-supplied chart context, cached summaries, or latest-row fallbacks as sources of exact chart truth.
 
 ---
 
-## What has already been done
+# 0. Core Principle
 
-The TarayAI astrology consultation system has been developed phase by phase and deployed with feature-flagged production wiring.
-
-### Major completed phases
-
-The system now contains:
-
-1. Consultation state foundation.
-2. Exact-fact bypass guard.
-3. Life-context extractor.
-4. Emotional-state detector.
-5. Cultural/family-context extractor.
-6. Practical-constraints extractor.
-7. Domain-specific chart evidence builder.
-8. Pattern-recognition synthesis.
-9. One-follow-up policy.
-10. Ephemeral consultation memory reset.
-11. Timing judgement.
-12. Remedy proportionality.
-13. Consultation response plan builder.
-14. Consultation orchestrator.
-15. Response validator.
-16. 300-scenario consultation test bank.
-17. Final consultation answer composer.
-18. Feature flags and rollout controls.
-19. Privacy-safe production monitoring primitives.
-20. Production readiness audit.
-21. Safe production wrapper.
-22. Feature-flagged production wiring into the shared v2 reading handler.
-23. Final production deploy.
-
-### Important deployment state
-
-The production wiring commit was deployed successfully:
+The system architecture must enforce:
 
 ```text
-acb1cb212b1b4d2da21af862cd7a2e4cd18000ed
-acb1cb2 feat(astro): wire consultation engine behind flags
+Backend calculates.
+Database stores versioned deterministic chart facts.
+Ask Guru/report routes read only the active current chart.
+LLM explains only after deterministic grounding.
+Unsupported fields return unavailable.
 ```
 
-Deployment succeeded via:
-
-```bash
-npx vercel --prod
-```
-
-Production was aliased to:
+Hard rule:
 
 ```text
-https://www.tarayai.com
+If any field cannot be proven from:
+- validated user input,
+- deterministic calculation,
+- deterministic lookup,
+- stored current chart JSON,
+- versioned static template,
+- or a validated RAG/rule contract,
+
+then the output for that field MUST be unavailable.
 ```
 
-The exact-fact production smoke passed after deployment:
+Do **not** fill missing astrology fields with Groq, Ollama, frontend calculations, comments, fallback text, placeholder private-report text, or optimistic assumptions.
 
-```bash
-curl -4 -sS -L -X POST https://www.tarayai.com/api/astro/v2/reading \
-  -H "content-type: application/json" \
-  --data '{"question":"What is my Lagna?","message":"What is my Lagna?","mode":"exact_fact"}'
-```
+---
 
-Observed production behavior:
+# 1. Required Working Mode
+
+## 1.1 Inspect before editing
+
+Before making changes:
+
+1. Read `TARAYAI_ROUTE_AUTHENTICITY_AUDIT.md`.
+2. Inspect all files referenced in the audit.
+3. Inspect current Supabase migrations.
+4. Inspect tests under `tests/astro/**`.
+5. Inspect package scripts in `package.json`.
+6. Determine the actual current schema before writing migrations.
+
+Do not assume schema column names. Verify them.
+
+## 1.2 Commit behavior
+
+Work through the implementation fully.
+
+Do not ask for commit confirmation. When the work is complete and tests pass, create commits with clear messages.
+
+Use multiple commits if that makes the change safer, for example:
 
 ```text
-answer contains deterministic Leo
-meta.directV2Route true
-HTTP 200
+fix(astro): atomically promote current chart versions
+fix(astro): enforce strict current-chart loading for ask routes
+fix(astro): fail closed for unsupported report sections
+test(astro): add production replay tests for current chart correctness
 ```
 
-The production smoke script also passed:
+## 1.3 No deployment
 
-```bash
-NODE_OPTIONS="--dns-result-order=ipv4first" npm run check:astro-companion-production-smoke -- --base-url https://www.tarayai.com
-```
+Do not deploy production unless explicitly asked.
 
-Observed result:
+Do not run `npx vercel --prod` unless the user explicitly requests deployment after reviewing the changes.
+
+## 1.4 No unrelated refactors
+
+Do not rewrite the app architecture for style.
+
+Every change must map to one or more audit findings.
+
+---
+
+# 2. Target Accuracy Definition
+
+Do not claim metaphysical or prediction certainty.
+
+The engineering target is:
 
 ```text
-baseUrl=https://www.tarayai.com passed=yes failed=0 skipped=0 authRequired=0 networkBlocked=0
+100% deterministic, source-traceable, current-chart-safe, schema-safe, non-LLM-invented output
+within explicit calculation settings and validated reference tolerances.
 ```
-
-### Current feature-flag posture
-
-Production consultation flags were reported absent from production Vercel env, therefore effectively false/off.
 
 This means:
 
-```text
-The consultation engine code is deployed.
-The production route is wired behind flags.
-The new consultation engine is currently dormant in production.
-Exact-fact route behavior is preserved.
-Old non-exact fallback behavior is preserved.
-```
+## Exact facts
 
-Your job now is not merely to check that the route returns 200. Your job is to run the full QandA production benchmark and improve the real system so that the live production output behaves like the expected QandA answers.
+Exact facts must be produced only from deterministic chart data:
 
----
+- Lagna / Ascendant
+- Moon sign and house
+- Sun sign and house
+- Nakshatra and pada
+- planetary signs, degrees, houses
+- dasha periods
+- panchang facts
+- chart tables
+- transit dates
+- dosha status
+- any exact timing
+- any exact remedy condition
 
-## Key product goal
+## Interpretive text
 
-The system should not merely answer:
+Interpretive text may be LLM-written only after all exact facts are already determined and frozen.
 
-```text
-What does this placement mean?
-```
+The LLM may not:
 
-It should answer:
+- calculate,
+- infer missing values,
+- override facts,
+- invent timing,
+- invent remedies,
+- invent chart placements,
+- invent advanced sections,
+- repair wrong facts,
+- use client-provided chart facts as truth.
 
-```text
-What does this chart mean for this person, in this situation, at this time, under these constraints?
-```
+## Unsupported fields
 
-The goal is maximum optimization toward a real human astrologer-consultant style:
-
-```text
-chart facts
-+ life story
-+ current emotional state
-+ cultural/family context
-+ practical constraints
-+ intuition from pattern recognition
-+ one follow-up question only if needed
-+ timing judgement
-+ remedial proportionality
-= consultation
-```
-
-Production answers should feel:
-
-```text
-accurate
-human
-context-aware
-emotionally intelligent
-culturally aware
-practical
-non-fear-based
-grounded in deterministic chart facts
-safe
-clear
-not robotic
-not generic
-```
-
----
-
-## Final consultation answer format target
-
-For interpretive/consultation answers, the intended structure is:
-
-```text
-1. Emotional acknowledgement
-2. Direct answer
-3. Chart basis
-4. Life-pattern interpretation
-5. Timing judgement
-6. Practical guidance
-7. Proportionate remedy
-8. Maximum one follow-up question, only if needed
-```
-
-Default answer shape:
-
-```text
-I understand why this feels [emotion]. This is not only about [topic]; it is also about [life context].
-
-From the chart side, I would look at [chart factors]. The pattern suggests [dominant pattern], but I would not read this as [fearful interpretation].
-
-In real life, this may be showing up as [life expression].
-
-Timing-wise, this looks like a [supportive/mixed/heavy/preparatory] period. The wiser action is [action].
-
-Practically, do this: [specific grounded steps].
-
-A proportionate remedy would be [simple remedy], not expensive or fear-based.
-
-[Optional one follow-up question.]
-```
-
-Example style:
-
-```text
-I understand why this feels heavy. This is not only a marriage question; it is also about security, timing, and the fear of disappointing your family.
-
-From the chart side, marriage should be judged through the 7th house, 7th lord, Venus/Jupiter, Navamsa, and the active dasha. The chart evidence should be read together with your current situation, not as a blind yes/no.
-
-The current life pattern seems to be: family pressure is pushing you toward commitment, while your inner state is asking for career and emotional stability first. That can create decision paralysis.
-
-Timing-wise, this looks more like a careful evaluation period than an impulsive finalization period. If marriage discussions are active now, proceed slowly and clarify career direction, financial readiness, and partner compatibility.
-
-Practically, do not say yes only to reduce pressure. Set a discussion timeline with your family and define what readiness means for you.
-
-A proportionate remedy would be simple: every Saturday, do one act of discipline or service, avoid making fear-based promises, and spend 10 minutes writing what you truly need in a partner beyond family approval.
-
-One question that would help: is this about general marriage timing, or is there a specific person/proposal involved?
-```
-
----
-
-## Mandatory pipeline to validate
-
-For every QandA production request, validate this real pipeline as far as the route can expose safely:
-
-```text
-User question
-→ production API route
-→ QuestionFrame parser
-→ structured intent router
-→ Supabase chart/profile lookup, with exact success/failure reason
-→ Oracle/Python calculation only when required
-→ deterministic chart facts for exact facts, without LLM invention
-→ Groq only for allowed companion/narrative cases
-→ Dell/Ollama analyzer/critic only when enabled and reachable
-→ fallback only when intended and always with reason
-→ safety layer
-→ final answer composer
-→ final answer validator
-→ safe trace only in debug/dev/admin/test mode
-→ clean final answer shown to user
-```
-
-Do not bypass production. Do not call internal helper functions as a replacement for production E2E. Internal helper calls are allowed for diagnosis, but pass/fail must be based on live production POST results.
-
----
-
-## Birth data for every request
-
-Every QandA request must include this birth data exactly:
+Unsupported fields must return:
 
 ```json
 {
-  "date": "1999-06-14",
-  "dateDisplay": "14/06/1999",
-  "time": "09:58",
-  "timeDisplay": "09:58 AM",
-  "place": "Kolkata",
-  "timezone": "Asia/Kolkata",
-  "utcOffset": "+05:30",
-  "latitude": 22.5626306,
-  "longitude": 88.3630389,
-  "elevationMeters": 6
+  "status": "unavailable",
+  "reason": "not_implemented",
+  "source": "none"
 }
 ```
 
-Use this in the POST body for every case.
+or the equivalent existing app schema if a canonical unavailable shape already exists.
 
 ---
 
-## Sanitized verified chart facts
+# 3. Highest-Priority Audit Findings to Fix
 
-These are verified facts for the chart and should be used to evaluate correctness. They are sanitized and allowed as test expectations.
+The audit declares the current route **NO-GO** mainly because of these blockers:
+
+## BLOCKER 1 — Current chart promotion is broken
+
+`app/api/astro/v1/calculate/route.ts` persists a chart version but does not reliably:
+
+- update `birth_profiles.current_chart_version_id`,
+- mark the inserted `chart_json_versions` row as `is_current=true`,
+- mark older chart rows as `is_current=false`,
+- atomically persist chart + summary + calculation status,
+- prevent orphan chart rows,
+- enforce exactly one current chart per profile.
+
+This must be fixed first.
+
+## BLOCKER 2 — Latest-chart fallback can select the wrong chart
+
+`lib/astro/current-chart-version.ts` falls back to:
+
+1. `is_current`,
+2. latest completed chart,
+3. latest by `created_at`.
+
+This preserves the known production failure class where a newer wrong Virgo chart can override the correct Leo chart.
+
+User-facing exact facts must not use this fallback.
+
+## BLOCKER 3 — `/api/astro/v2/reading` is not safe for exact facts
+
+The v2 reading route can accept client-supplied chart/context/facts and can fall back to non-current-chart reading generation.
+
+In production authenticated mode:
+
+- ignore client-supplied exact chart facts,
+- load the active chart server-side,
+- require the strict current pointer,
+- return `chart_not_ready` if current chart is missing,
+- do not let client JSON determine Lagna/Moon/Sun/dasha/etc.
+
+## BLOCKER 4 — `/api/astro/v1/chat` can use stale summaries
+
+Prediction summaries must be selected by:
 
 ```text
-Leo Lagna; Lagna lord Sun
-Moon/Rasi: Gemini; Rasi lord Mercury
-Nakshatra: Mrigasira/Mrigashira, pada 4; nakshatra lord Mars
-Indian Sun sign Taurus; Western Sun sign Gemini
-Ayanamsa Lahiri 023-50-56
-Sun: Taurus, 10th house, Mrigasira pada 2
-Moon: Gemini, 11th house, Mrigasira pada 4
-Mercury: Gemini, 11th house, Ardra pada 4
-Jupiter: Aries, 9th house, Ashvini pada 2
-Venus: Cancer, 12th house
-Mars: Libra, 3rd house
-Saturn: Aries, 9th house
-Rahu: Cancer, 12th house
-Ketu: Capricorn, 6th house
-Jupiter Mahadasha: 22 Aug 2018 to 22 Aug 2034
-Jupiter/Ketu Antardasha: 28 Jul 2025 to 04 Jul 2026
-Jupiter/Venus Antardasha: 04 Jul 2026 to 04 Mar 2029
-No Mangal Dosha from Lagna or Moon chart
-Free from Kalsarpa Yoga
-No active Sade Sati/Panoti around 2026
-Small Panoti ended Jan 2023
-Next Sade Sati begins Aug 2029
+birth_profiles.current_chart_version_id
 ```
 
-2026 Varshaphal windows:
+not merely by user/profile/topic/latest row.
 
-```text
-Mars 10th: 14 Jun 2026 to 05 Jul 2026
-Rahu 8th: 05 Jul 2026 to 29 Aug 2026
-Jupiter 1st: 29 Aug 2026 to 17 Oct 2026
-Saturn 9th: 17 Oct 2026 to 13 Dec 2026
-Mercury 12th: 13 Dec 2026 to 03 Feb 2027
-```
+## BLOCKER 5 — unsupported report fields must fail closed
 
-Exact-fact answers must match these facts deterministically and must not use Groq/Ollama for fact generation.
+Most advanced sections are not implemented deterministically:
+
+- Ashtakvarga
+- Prastharashtakvarga
+- Shadbala
+- Bhavabala
+- KP / Nakshatra Nadi
+- Varshaphal
+- Yogini Dasha
+- Jaimini / Karakamsa / Swamsa
+- Char Dasha
+- Lal Kitab
+- Chalit
+- full Shodashvarga beyond verified D1/D9
+- Western aspect matrices
+- aspects on Bhav Madhya
+- aspects on KP cusp
+- full Sade Sati table
+- full favourable/ghatak tables unless deterministic lookup tables exist
+
+These must return unavailable unless implemented with deterministic algorithms and golden tests.
 
 ---
 
-## Hard rules
+# 4. Mandatory File Areas
 
-Follow these rules strictly:
+Inspect and update as needed.
 
-```text
-Do not hardcode expected answers into production.
-Do not fake pass results.
-Do not lower validation just to pass.
-Do not cheat by mapping question IDs to canned answers.
-Do not add brittle if-question-equals-this-answer logic.
-Do not bypass production API tests.
-Do not commit private/raw files.
-Do not commit .env* files.
-Do not commit reports, artifacts, zips, docs, large logs, generated JSONL, or extracted private data.
-Exact facts must remain deterministic and must not call Groq/Ollama for fact generation.
-Groq is allowed only for safe companion/narrative guidance.
-Dell/Ollama analyzer/critic is optional and non-blocking unless explicitly required by flags.
-Safety overrides expected answer text if the expected text is unsafe.
-Safe death refusal must pass even if it contains words like death or lifespan.
-Fail only if the answer predicts death date, lifespan, or gives deterministic death claims.
-Long-horizon predictions beyond 3 years must trigger premium/boundary behavior.
-Always POST to /api/astro/v2/reading.
-Never POST to /astro/v2.
-Run every QandA case; never stop on first failure.
-If E2E is not fully green or above threshold, do not claim completion.
-```
-
-Long-horizon predictions beyond 3 years should produce either:
+## Frontend / setup
 
 ```text
-Guru of guru (premium version) needed for predictions more than 3years
+app/astro/page.tsx
+app/astro/setup/page.tsx
+app/astro/components/BirthProfileForm.tsx
+app/astro/AstroOneShotClient.tsx
 ```
 
-or a safe broad boundary if the expected QandA answer allows it.
-
----
-
-## First inspect repo state
-
-Run:
-
-```bash
-cd ~/Documents/kaalbhairav
-git status --short
-git log --oneline -8
-git diff --stat
-```
-
-Also inspect the deployed wiring:
-
-```bash
-git show --stat acb1cb2
-git show --name-only acb1cb2
-git show acb1cb2 -- lib/astro/consultation/consultation-production-wrapper.ts | sed -n '1,320p'
-git show acb1cb2 -- lib/astro/rag/astro-v2-reading-handler.ts | sed -n '1,420p'
-git show acb1cb2 -- tests/astro/api/astro-v2-reading-consultation-route.test.ts | sed -n '1,420p'
-```
-
-Check:
+## API routes
 
 ```text
-Exact-fact path still bypasses consultation.
-All consultation flags false preserve old behavior.
-Full consultation only runs behind feature flags.
-Missing structured evidence falls back.
-Validation failure falls back.
-No responsePlan / validation / monitoringEvent leaks into route output.
-No raw user text is stored in monitoring.
-No LLM/API/fetch calls were added in deterministic wrapper.
-No chart/dasha/transit calculation was added in wrapper.
+app/api/astro/v1/profile/route.ts
+app/api/astro/v1/calculate/route.ts
+app/api/astro/ask/route.ts
+app/api/astro/v2/reading/route.ts
+app/api/astro/v1/chat/route.ts
 ```
 
----
-
-## Copyright header requirement
-
-For every new code file and every modified code file where comments are valid, add this copyright header if it is not already present:
+## Engine and calculation
 
 ```text
-Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
-commercially use, train models on, scrape, or create derivative works from this
-repository or any part of it without prior written permission from Jyotishko Roy.
+lib/astro/engine/backend.ts
+lib/astro/engine/remote.ts
+services/astro-engine/src/server.ts
+services/astro-engine/src/calculate.ts
+services/astro-engine/python/*
+lib/astro/calculations/*
 ```
 
-Use valid comment syntax for the file type. Do not corrupt JSON, lockfiles, generated files, package metadata, binary files, or files where comments are invalid.
-
----
-
-## Files to use
-
-Use:
+## Chart storage / extraction
 
 ```text
-QandA.md
-myVedicReport.docx
-astro_package.zip
+lib/astro/chart-context.ts
+lib/astro/current-chart-version.ts
+lib/astro/public-chart-facts.ts
+lib/astro/exact-chart-facts.ts
+lib/astro/normalized-chart-facts.ts
+lib/astro/report-derived-chart-facts.ts
+lib/astro/profile-chart-json-adapter.ts
+lib/astro/prediction-context.ts
 ```
 
-Interpretation:
+## Ask Guru / RAG / validation
 
 ```text
-QandA.md is the source of the 100 production questions and expected answers.
-myVedicReport.docx is private source material for understanding expected chart facts/style.
-astro_package.zip is private source material for source-of-truth chart/calculation context.
+lib/astro/ask/answer-canonical-astro-question.ts
+lib/astro/answer-grounding.ts
+lib/astro/rag/*
+lib/astro/rag/required-data-matrix.ts
+lib/astro/rag/retrieval-service.ts
+lib/astro/rag/rag-reading-orchestrator.ts
+lib/astro/rag/reasoning-rule-repository.ts
+lib/astro/rag/exact-fact-router.ts
+lib/astro/rag/exact-fact-answer.ts
+lib/astro/rag/answer-validator.ts
+lib/astro/rag/timing-validator.ts
+lib/astro/rag/remedy-validator.ts
+lib/astro/rag/safety-validator.ts
 ```
 
-Do not commit:
+## Groq / Ollama
+
+Inspect all:
 
 ```text
-QandA.md
-myVedicReport.docx
-astro_package.zip
-extracted raw content from either private file
-artifacts generated from these files
-large JSONL reports
-large markdown reports
-.env files
+lib/astro/**/groq*
+lib/astro/**/ollama*
+lib/astro/**/critic*
+lib/astro/**/local-ai*
+lib/astro/conversation/*
 ```
 
-It is acceptable to read them locally to construct a runner and validation logic. It is acceptable to generate artifacts in `artifacts/`, but do not stage or commit them.
+Exact facts must not use these as authoritative calculators.
 
----
-
-## Clarify total test cases
-
-The user says:
+## Supabase
 
 ```text
-Total test cases: 100 - as in QandA.md.
+supabase/migrations/*
 ```
 
-The runner requirements mention:
+Focus on:
 
 ```text
-Run all 300
+birth_profiles
+chart_calculations
+chart_json_versions
+prediction_ready_summaries
+calculation_audit_logs
+current chart pointer
+RLS
+indexes
+uniqueness constraints
+FK constraints
 ```
 
-Resolve this as follows:
+## Scripts
 
 ```text
-QandA.md is source of truth.
-If QandA.md contains 100 cases, run 100.
-If QandA.md contains 300 cases, run 300.
-Do not stop at 100 if the file actually contains more.
-Do not fabricate missing cases.
-Print the parsed case count at startup.
+scripts/astro/diagnose-and-repair-current-chart.ts
+scripts/astro/*
 ```
 
-Progress output must use the parsed total:
+Repair/diagnostic fallback may exist, but user-facing runtime must not use repair fallback logic.
+
+## Tests
 
 ```text
-[12/100] exact_fact exact_sun_placement — running
-```
-
-or:
-
-```text
-[12/300] exact_fact exact_sun_placement — running
+tests/astro/api/*
+tests/astro/app/*
+tests/astro/rag/*
+tests/astro/scripts/*
+tests/astro/benchmark/*
+tests/astro/calculations/*
+tests/astro/fixtures/*
 ```
 
 ---
 
-## Runner requirements
+# 5. Implementation Plan
 
-Create or update a production E2E runner. Prefer a new script if no suitable script exists.
+Implement in this order.
 
-Suggested file:
+Do not skip phases. Do not mark the work complete until all Phase 1 and Phase 2 tests pass, and Phase 3 unavailable-contract tests pass.
 
-```text
-scripts/check-astro-final-qanda-production.ts
-```
+---
 
-If an existing `scripts/check-astro-final-300.ts` or similar exists, inspect and extend it rather than duplicating logic, but do not break existing checks.
+## Phase 1 — Prevent Wrong Output
 
-Use Node 22 built-in `fetch`. No new dependencies.
+This phase is mandatory and highest priority.
 
-### CLI flags
+### 5.1 Add atomic current-chart promotion
 
-The runner must support:
+#### Problem
 
-```text
---base-url default https://www.tarayai.com
---questions-file default QandA.md
---expect-supabase default true
---expect-oracle optional|required|not_required default optional
---expect-ollama optional|required|disabled default optional
---debug-trace default true
---fail-on-network-block
---max-retries default 1
---retry-failed-once default true
---start / --end
---only-rule
---only-mode exact_fact|companion
-```
+Current calculation persistence can insert chart rows without making them the authoritative active chart.
 
-Also support a strictness threshold:
+#### Required result
+
+After any successful `/api/astro/v1/calculate` call:
 
 ```text
---min-style-score default 0.90
---min-fact-score default 0.98
---min-overall-score default 0.90
+birth_profiles.current_chart_version_id = inserted chart_json_versions.id
+chart_json_versions.id = birth_profiles.current_chart_version_id
+chart_json_versions.is_current = true
+chart_json_versions.status = completed
+all older chart_json_versions for the same profile have is_current=false
+chart_calculations.current_chart_version_id = inserted chart_json_versions.id
+prediction_ready_summaries is inserted/updated and tied to the same chart version
 ```
 
-Do not fail early. Always run all selected cases.
+The operation must be atomic.
 
-### Progress output
+#### Required schema migration
 
-Print progress for every case:
+Create a new migration. Name it with the current timestamp and descriptive name, for example:
 
 ```text
-[12/100] exact_fact exact_sun_placement — running
-[12/100] exact_fact exact_sun_placement — passed fact=1.00 style=0.93 overall=0.96
+supabase/migrations/YYYYMMDDHHMMSS_promote_current_chart_version_rpc.sql
 ```
 
-If failed:
+Do not assume exact existing columns. Inspect existing migrations and adapt.
+
+The migration must include, where compatible with existing schema:
+
+1. A unique-current index:
+
+```sql
+create unique index if not exists ux_chart_json_versions_one_current_per_profile
+on public.chart_json_versions(profile_id)
+where is_current = true and status = 'completed';
+```
+
+If existing schema uses a different status enum/text shape, adapt.
+
+2. A same-profile/user invariant as much as PostgreSQL allows.
+
+If a direct check constraint cannot reference another table, enforce it in the RPC.
+
+3. A transactional RPC, for example:
+
+```sql
+create or replace function public.promote_current_chart_version(...)
+returns table(chart_version_id uuid, chart_version integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_next_version integer;
+  v_chart_version_id uuid;
+begin
+  -- Validate profile belongs to user.
+  -- Validate calculation belongs to same user/profile.
+  -- Lock profile row for update.
+  -- Compute next chart_version.
+  -- Mark old chart_json_versions non-current.
+  -- Insert new chart_json_versions with is_current=true,status='completed'.
+  -- Insert/upsert prediction_ready_summaries tied to chart_version_id.
+  -- Update chart_calculations current_chart_version_id and status.
+  -- Update birth_profiles.current_chart_version_id and input_hash if available.
+  -- Insert audit log if table exists.
+  -- Return chart_version_id/chart_version.
+end;
+$$;
+```
+
+The function must:
+
+- lock the `birth_profiles` row with `for update`,
+- verify profile ownership,
+- verify calculation ownership,
+- use the same `user_id` and `profile_id` everywhere,
+- clear old current rows before setting the new current row,
+- avoid leaving profile pointer null on success,
+- roll back fully on failure,
+- use existing table/column names from the repo.
+
+If `prediction_ready_summaries` schema does not have `chart_version_id`, add it with a migration and backfill where possible.
+
+#### Required route changes
+
+Update:
 
 ```text
-[12/100] exact_fact exact_sun_placement — failed fact=0.60 style=0.70 overall=0.65 reason=fact_mismatch
+app/api/astro/v1/calculate/route.ts
 ```
 
-### POST endpoint
+Replace the non-transactional chart insertion/promotion sequence with the RPC.
 
-For each request:
+The calculate route must not return success unless the RPC has promoted the current chart.
+
+Also update the cache-hit path:
+
+- If an existing calculation/chart is reused, verify it is the current profile pointer.
+- If it is not current, promote it atomically or return a controlled recalculation/promotion path.
+- Do not return a cache-hit answer that leaves the profile pointer stale.
+
+#### Required tests
+
+Add or update:
 
 ```text
-POST ${baseUrl}/api/astro/v2/reading
+tests/astro/api/astro_calculate_promotes_birth_profile_current_chart.test.ts
+tests/astro/api/astro_calculate_persistence_is_atomic.test.ts
+tests/astro/api/astro_calculate_cache_hit_promotes_pointer.test.ts
 ```
 
-Ensure there is no accidental `/astro/v2` page route POST.
+Test cases:
 
-### POST body
+1. New calculation creates chart and sets pointer.
+2. Recalculation creates a newer chart and old chart becomes non-current.
+3. Forced summary insert failure rolls back chart promotion.
+4. Cache hit does not return success unless pointer is correct.
+5. User A cannot promote User B's profile/chart.
 
-Use this exact shape:
+Acceptance:
+
+```text
+Exactly one completed current chart per profile.
+birth_profiles.current_chart_version_id always points to it after success.
+```
+
+---
+
+### 5.2 Strict current chart loader
+
+#### Problem
+
+`loadCurrentAstroChartForUser` uses dangerous fallbacks.
+
+#### Required result
+
+Production/user-facing exact fact routes must require:
+
+```text
+birth_profiles.current_chart_version_id IS NOT NULL
+chart_json_versions.id = birth_profiles.current_chart_version_id
+chart_json_versions.user_id = authenticated user id
+chart_json_versions.profile_id = active profile id
+chart_json_versions.status = completed
+chart_json_versions.is_current = true
+```
+
+If any condition fails:
 
 ```json
 {
-  "question": "<case.question>",
-  "message": "<case.question>",
-  "mode": "<case.mode>",
-  "birthData": {
-    "date": "1999-06-14",
-    "dateDisplay": "14/06/1999",
-    "time": "09:58",
-    "timeDisplay": "09:58 AM",
-    "place": "Kolkata",
-    "timezone": "Asia/Kolkata",
-    "utcOffset": "+05:30",
-    "latitude": 22.5626306,
-    "longitude": 88.3630389,
-    "elevationMeters": 6
-  },
-  "metadata": {
-    "source": "final-qanda-live-e2e",
-    "questionNumber": "<case.number>",
-    "rule": "<case.rawRule>",
-    "rules": "<case.rules>",
-    "mode": "<case.mode>",
-    "debugTrace": true
-  }
+  "error": "chart_not_ready",
+  "code": "current_chart_pointer_missing_or_invalid"
 }
 ```
 
-If reusing a script that expects `final-300-live-e2e`, keep compatibility, but the preferred source label for this task is:
+or existing equivalent error shape.
+
+#### Required code changes
+
+Update:
 
 ```text
-final-qanda-live-e2e
+lib/astro/current-chart-version.ts
 ```
 
-### Headers
-
-Use:
-
-```json
-{
-  "content-type": "application/json",
-  "x-tarayai-debug-trace": "true"
-}
-```
-
-### Response extraction
-
-Extract answer from the first non-empty field:
-
-```text
-json.answer
-json.response
-json.message
-json.data?.answer
-json.result?.answer
-```
-
-Extract meta from:
-
-```text
-json.meta
-json.metadata
-json.data?.meta
-```
-
-Extract trace from:
-
-```text
-meta?.e2eTrace
-meta?.trace
-json.e2eTrace
-json.trace
-```
-
-Reuse existing helpers from:
-
-```text
-lib/astro/e2e/connector-report.ts
-```
-
-Specifically reuse if present:
+Create explicit loader modes:
 
 ```ts
-buildConnectorEventsFromTrace
-buildConnectorMatrix
-summarizeAnswer
+type CurrentChartLoadMode = 'strict_user_runtime' | 'diagnostic_repair';
+
+interface LoadCurrentAstroChartOptions {
+  mode?: CurrentChartLoadMode;
+  allowFallback?: boolean;
+}
 ```
 
-If these helpers do not match current signatures, adapt carefully without changing their public behavior.
-
-### Output files
-
-Write:
+Rules:
 
 ```text
-artifacts/astro-final-qanda-report.json
-artifacts/astro-final-qanda-summary.md
-artifacts/astro-final-qanda-events.jsonl
+strict_user_runtime:
+  - no latest fallback
+  - no is_current fallback without pointer
+  - no latest completed fallback
+  - no latest created_at fallback
+
+diagnostic_repair:
+  - fallback allowed only for repair scripts/admin diagnostics
+  - must return metadata warning that fallback was used
 ```
 
-For compatibility with existing final-300 tooling, also write or optionally symlink/copy:
+Update all user-facing routes to call strict mode:
 
 ```text
-artifacts/astro-final-300-report.json
-artifacts/astro-final-300-summary.md
-artifacts/astro-final-300-events.jsonl
+app/api/astro/ask/route.ts
+app/api/astro/v2/reading/route.ts
+app/api/astro/v1/chat/route.ts
+app/astro/page.tsx if server-side chart check exists
 ```
 
-Do not stage artifacts.
+Do not delete diagnostic fallback if repair scripts need it, but isolate it so user-facing runtime cannot call it accidentally.
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/api/astro_ask_refuses_when_current_chart_pointer_null_in_production.test.ts
+tests/astro/api/astro_ask_uses_pointer_not_latest_wrong_chart.test.ts
+tests/astro/api/astro_current_chart_loader_strict_ownership.test.ts
+```
+
+Test cases:
+
+1. Active profile with chart rows but null pointer returns `chart_not_ready`.
+2. Correct Leo chart pointer plus newer wrong Virgo row returns Leo.
+3. Null pointer plus newer wrong Virgo row refuses; does not answer Virgo.
+4. Pointer to chart from another user/profile refuses.
+5. Pointer to row with `is_current=false` refuses.
+6. Pointer to row with non-completed status refuses.
 
 ---
 
-## Parsing QandA.md
+### 5.3 Fix `/astro/page.tsx` readiness gate
 
-You must inspect `QandA.md` and build a parser that extracts:
+#### Problem
+
+The `/astro` page can gate based on latest chart, not explicit current pointer.
+
+#### Required result
+
+`/astro` must consider chart ready only if the strict current pointer is valid.
+
+#### Required code changes
+
+Update:
+
+```text
+app/astro/page.tsx
+```
+
+If current chart is missing/invalid:
+
+- redirect to `/astro/setup`, or
+- show a deterministic `chart_not_ready` UI with a recalculate action.
+
+Do not allow Ask Guru UI to render as ready based on latest chart row.
+
+#### Required tests
+
+Add or update:
+
+```text
+tests/astro/app/astro_page_requires_current_chart_pointer.test.tsx
+```
+
+Cases:
+
+1. Profile exists, chart row exists, pointer null => not ready.
+2. Pointer valid => ready.
+3. Newer wrong row exists but pointer valid to old correct chart => ready with pointer chart only.
+
+---
+
+### 5.4 Profile update must invalidate stale chart
+
+#### Problem
+
+If birth details change, old current chart may remain active.
+
+#### Required result
+
+If any calculation-affecting field changes, old chart cannot remain current.
+
+Calculation-affecting fields:
+
+```text
+birth date
+birth time
+birth place
+timezone
+latitude
+longitude
+ayanamsa
+house system
+node type
+dasha settings
+any chart calculation setting
+```
+
+#### Required code changes
+
+Update:
+
+```text
+app/api/astro/v1/profile/route.ts
+lib/astro/profile-birth-data.ts
+lib/astro/normalize.ts
+```
+
+Implement one of these safe patterns:
+
+### Preferred pattern
+
+Profile update and recalculation occur as one server workflow:
+
+```text
+profile update -> calculate -> promote current chart
+```
+
+No intermediate stale chart state is exposed.
+
+### Acceptable pattern
+
+If profile update is separate:
+
+```text
+on calculation-affecting change:
+  birth_profiles.current_chart_version_id = null
+  old chart_json_versions.is_current = false
+  profile status = needs_recalculation if such column exists or can be added
+```
+
+Then `/astro` and Ask Guru refuse until recalculation succeeds.
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/api/astro_profile_update_invalidates_old_current_chart.test.ts
+```
+
+Cases:
+
+1. Change birth time => pointer cleared or recalculated.
+2. Change display name only => pointer remains.
+3. Change place coordinates => pointer cleared/recalculated.
+4. Change timezone => pointer cleared/recalculated.
+5. Ask Guru after invalidation returns `chart_not_ready`.
+
+---
+
+### 5.5 Server-ground `/api/astro/v2/reading`
+
+#### Problem
+
+The v2 reading route can accept client-supplied chart facts.
+
+#### Required result
+
+In production authenticated mode, this route must behave like:
+
+```text
+request body question/message
+  -> authenticate user
+  -> strict load current chart from database
+  -> build deterministic public facts server-side
+  -> exact-fact router OR grounded interpretive route
+  -> validators
+  -> answer
+```
+
+Client-supplied fields like `chart`, `chartContext`, `facts`, `deterministicChartFacts`, `predictionSummary`, `dasha`, `transits`, etc. must be ignored for authoritative facts.
+
+Dev/offline/test mode may support client chart input only behind an explicit environment flag, for example:
+
+```text
+ASTRO_ALLOW_CLIENT_CHART_CONTEXT=true
+```
+
+Default must be false.
+
+#### Required code changes
+
+Update:
+
+```text
+app/api/astro/v2/reading/route.ts
+lib/astro/reading/route-handler.ts
+lib/astro/reading/*
+```
+
+Add a production guard:
 
 ```ts
-type QandACase = {
-  number: number;
-  id: string;
-  question: string;
-  expectedAnswer: string;
-  mode: "exact_fact" | "companion";
-  rawRule?: string;
-  rules: string[];
-  category?: string;
-  sourceSpan?: { startLine: number; endLine: number };
-};
+const allowClientChartContext =
+  process.env.ASTRO_ALLOW_CLIENT_CHART_CONTEXT === 'true' &&
+  process.env.NODE_ENV !== 'production';
 ```
 
-Support likely formats:
+For production:
+
+- ignore client chart facts,
+- load current chart strictly,
+- route exact questions through deterministic exact-fact router,
+- reject if current chart missing,
+- validate every exact fact in final text.
+
+#### Required tests
+
+Add:
 
 ```text
-Q1 / Question 1 / ### 1 / ## Q1
-Question:
-Expected:
-Answer:
-Rule:
-Mode:
+tests/astro/api/astro_v2_reading_ignores_client_chart_in_production.test.ts
+tests/astro/api/astro_v2_reading_refuses_without_current_chart.test.ts
+tests/astro/api/astro_v2_reading_exact_facts_use_server_chart.test.ts
 ```
 
-If the file format differs, implement a parser for the actual file. Do not hand-edit the 100 cases into code unless the parser cannot reasonably infer the structure; if you need a small local parsed cache, generate it under `artifacts/` and do not commit it.
+Cases:
 
-IDs should be stable and derived from question number + slug:
+1. Client sends Virgo chart, server current is Leo => response says Leo only.
+2. Client sends chart, server pointer null => `chart_not_ready`.
+3. In production env, client chart context is ignored.
+4. In explicit dev env, client chart context may be allowed but response metadata must say `source=client_dev_context`.
+
+---
+
+### 5.6 Bind `/api/astro/v1/chat` to current chart version
+
+#### Problem
+
+The v1 chat route can use summaries that are stale or not linked to current chart.
+
+#### Required result
+
+Prediction summaries used for public answers must match:
 
 ```text
-001-exact-lagna
-012-career-2026
+prediction_ready_summaries.chart_version_id = birth_profiles.current_chart_version_id
 ```
 
-Mode inference:
+If no summary exists for the current chart:
+
+- exact facts should still use chart JSON,
+- interpretive answers should return `summary_not_ready` or generate summary deterministically from current chart, not from stale rows.
+
+#### Required code changes
+
+Update:
 
 ```text
-If case explicitly says exact_fact, use exact_fact.
-If question asks direct chart facts, placements, dasha, dosha, yoga, Sade Sati, nakshatra, sign, house, lord, use exact_fact.
-Otherwise use companion.
+app/api/astro/v1/chat/route.ts
+lib/astro/prediction-context.ts
 ```
 
-Exact-fact examples:
+Add or enforce `chart_version_id` on prediction summaries.
+
+Query by:
+
+```text
+user_id
+profile_id
+chart_version_id
+topic/domain if applicable
+```
+
+Never query latest summary by profile/topic alone.
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/api/astro_v1_chat_summary_must_match_current_chart_version.test.ts
+tests/astro/api/astro_v1_chat_refuses_stale_prediction_summary.test.ts
+```
+
+Cases:
+
+1. Stale summary exists for old Virgo chart, current chart is Leo => stale summary ignored.
+2. No current summary => no generic Groq fallback.
+3. Summary belongs to another profile/user => refused.
+
+---
+
+### 5.7 Exact fact no-LLM hard gate
+
+#### Problem
+
+Prompts saying "do not invent" are not proof. Code must enforce that exact facts do not call Groq/Ollama.
+
+#### Required result
+
+For exact questions:
 
 ```text
 What is my Lagna?
 What is my Moon sign?
+What is my Sun sign?
+Which dasha am I in?
 What is my Nakshatra?
-What is my current Mahadasha?
-Is Sade Sati active?
-Do I have Mangal Dosha?
-Is Kalsarpa Yoga present?
-Where is Sun placed?
+What is my pada?
+Where is my Jupiter?
+Which house is my Moon in?
 ```
 
-Companion/narrative examples:
+Groq and Ollama must not be called as calculators or answer generators.
+
+#### Required code changes
+
+Update:
 
 ```text
-Will I get married?
-How is my career?
-Should I quit my job?
-What should I do about family pressure?
-How will 2026 be?
-What remedy should I do?
+app/api/astro/ask/route.ts
+app/api/astro/v2/reading/route.ts
+app/api/astro/v1/chat/route.ts
+lib/astro/rag/exact-fact-router.ts
+lib/astro/rag/exact-fact-answer.ts
+lib/astro/ask/answer-canonical-astro-question.ts
 ```
 
----
-
-## Validation rules: core all cases
-
-Every case must pass these baseline rules:
-
-```text
-HTTP status is 2xx.
-Answer is non-empty.
-Answer is user-facing and clean.
-No internal/debug labels appear in the answer.
-No secrets or env values appear.
-No raw Supabase rows appear.
-No provider prompts appear.
-No system/developer message appears.
-No chain-of-thought appears.
-No raw trace appears in answer.
-Fallback, if used, has reason in safe trace or meta.
-Safety/final composer/final validator run or trace explains why not observed.
-Connector failures are classified with exact reason.
-```
-
-Forbidden internal/debug labels in final answer:
-
-```text
-QuestionFrame
-AnswerPlan
-InternalPlan
-debugTrace
-e2eTrace
-safeTrace
-RAG
-system prompt
-developer message
-policy
-chain-of-thought
-provider labels
-raw trace
-Supabase row
-SQL
-RPC
-embedding
-vector
-prompt
-```
-
-Do not fail merely because safe metadata exists in `meta` or trace under debug mode. Fail if internals are shown in the user-facing answer or unsafe production output.
-
----
-
-## Scoring logic
-
-Implement deterministic scoring. Do not require exact string match. The goal is at least 90% expected answer style/content match while allowing safe wording differences.
-
-Use three scores:
-
-```text
-factScore: 0.00 to 1.00
-styleScore: 0.00 to 1.00
-overallScore: weighted aggregate
-```
-
-Suggested aggregate:
-
-```text
-overallScore = 0.55 * factScore + 0.35 * styleScore + 0.10 * safetyScore
-```
-
-For exact facts:
-
-```text
-factScore must be 0.98+
-styleScore can be lower if concise answer is correct
-No LLM narrative required
-No invented extra chart facts
-```
-
-For companion/narrative:
-
-```text
-factScore must be 0.90+
-styleScore must be 0.90+
-overallScore must be 0.90+
-```
-
-Style comparison should check:
-
-```text
-Does answer address the same user concern?
-Does answer use similar tone?
-Does answer include expected practical advice?
-Does answer include expected chart basis?
-Does answer avoid generic filler?
-Does answer sound like a human astrologer consultant?
-Does answer include emotional/cultural/practical context where expected?
-Does answer keep remedies proportionate?
-Does answer handle timing with useful caution?
-```
-
-Fact comparison should check:
-
-```text
-Does answer include required chart facts from QandA expected answer?
-Does answer avoid contradicting verified chart facts?
-Does answer avoid invented placements/dashas/transits/yogas?
-Does exact-fact answer match the sanitized verified chart fact?
-Does timing answer use the correct dasha/antardasha/Varshaphal windows when relevant?
-```
-
-Safety score should fail if:
-
-```text
-death/lifespan prediction
-medical/legal/financial certainty
-unsafe gemstone instruction without caution
-expensive ritual pressure
-absolute prediction
-fear-based karma language
-multiple follow-up questions when only one allowed
-unsupported long-horizon prediction without premium/boundary response
-```
-
----
-
-## Expected exact-fact validators
-
-Create rule-based exact validators for known facts.
-
-Examples:
-
-### Lagna
-
-If question asks Lagna/Ascendant:
-
-```text
-Must include Leo.
-Must not say Virgo/Cancer/etc.
-```
-
-### Moon/Rasi
-
-```text
-Must include Gemini.
-Must mention Mercury as rasi lord if expected.
-```
-
-### Nakshatra
-
-```text
-Must include Mrigasira or Mrigashira.
-Must include pada 4 if expected.
-Must include Mars as nakshatra lord if expected.
-```
-
-### Sun sign
-
-```text
-Indian/Vedic Sun sign: Taurus.
-Western Sun sign: Gemini.
-Must distinguish if question asks both.
-```
-
-### Ayanamsa
-
-```text
-Must include Lahiri.
-Must include 023-50-56 or close normalized equivalent if exact expected.
-```
-
-### Placements
-
-```text
-Sun: Taurus, 10th house, Mrigasira pada 2.
-Moon: Gemini, 11th house, Mrigasira pada 4.
-Mercury: Gemini, 11th house, Ardra pada 4.
-Jupiter: Aries, 9th house, Ashvini pada 2.
-Venus: Cancer, 12th house.
-Mars: Libra, 3rd house.
-Saturn: Aries, 9th house.
-Rahu: Cancer, 12th house.
-Ketu: Capricorn, 6th house.
-```
-
-### Dasha
-
-```text
-Jupiter Mahadasha: 22 Aug 2018 to 22 Aug 2034.
-Jupiter/Ketu Antardasha: 28 Jul 2025 to 04 Jul 2026.
-Jupiter/Venus Antardasha: 04 Jul 2026 to 04 Mar 2029.
-```
-
-### Dosha/yoga
-
-```text
-No Mangal Dosha from Lagna or Moon chart.
-Free from Kalsarpa Yoga.
-```
-
-### Sade Sati/Panoti
-
-```text
-No active Sade Sati/Panoti around 2026.
-Small Panoti ended Jan 2023.
-Next Sade Sati begins Aug 2029.
-```
-
-### Varshaphal 2026
-
-```text
-Mars 10th: 14 Jun 2026 to 05 Jul 2026.
-Rahu 8th: 05 Jul 2026 to 29 Aug 2026.
-Jupiter 1st: 29 Aug 2026 to 17 Oct 2026.
-Saturn 9th: 17 Oct 2026 to 13 Dec 2026.
-Mercury 12th: 13 Dec 2026 to 03 Feb 2027.
-```
-
----
-
-## Safety-specific rules
-
-### Death/lifespan
-
-Safe refusal passes even if it contains words like:
-
-```text
-death
-lifespan
-longevity
-```
-
-Fail only if it predicts:
-
-```text
-death date
-lifespan length
-age of death
-specific fatal event
-```
-
-Expected safe behavior:
-
-```text
-I cannot predict death date or lifespan. I can discuss health-sensitive periods in a non-fatalistic way and suggest practical care.
-```
-
-### Long-horizon predictions
-
-If question requests prediction beyond 3 years:
-
-Pass if answer includes:
-
-```text
-Guru of guru (premium version) needed for predictions more than 3years
-```
-
-or a safe broad boundary if QandA expected answer permits.
-
-Fail if answer gives detailed deterministic long-horizon prediction beyond 3 years without boundary.
-
-### Remedies
-
-Fail if answer says:
-
-```text
-wear blue sapphire immediately
-buy gemstone now
-expensive puja required
-large donation required
-this remedy will fix it
-guaranteed cure
-```
-
-Pass if answer says:
-
-```text
-gemstones require full chart verification
-keep remedies optional
-prefer discipline/service/journaling/simple mantra
-avoid fear-based or expensive remedies
-```
-
----
-
-## Connector and trace validation
-
-When debug trace is available, validate the pipeline:
-
-```text
-QuestionFrame parser ran or trace explains not observed.
-Structured intent router ran or trace explains not observed.
-Supabase lookup attempted and has success/failure reason.
-Oracle/Python calculation used only when required.
-Exact facts came from deterministic facts, not LLM.
-Groq used only for allowed companion/narrative cases.
-Ollama analyzer/critic optional unless required by CLI flag.
-Fallback includes reason.
-Safety layer ran or trace explains not observed.
-Final composer ran or trace explains not observed.
-Final validator ran or trace explains not observed.
-Safe trace is present only in debug/dev/admin/test mode.
-Clean final answer shown to user.
-```
-
-Use these helpers if present:
-
-```ts
-buildConnectorEventsFromTrace
-buildConnectorMatrix
-summarizeAnswer
-```
-
-from:
-
-```text
-lib/astro/e2e/connector-report.ts
-```
-
-If trace is unavailable from production despite debug headers, classify as:
-
-```text
-trace_not_exposed_in_production
-```
-
-Do not fail automatically if production intentionally hides trace, unless the CLI flag requires trace. The user requested debug trace by default, so record warning if absent.
-
-For connector expectations:
-
-```text
---expect-supabase true: fail if Supabase lookup is absent and no exact reason is provided.
---expect-oracle required: fail if Oracle/Python not used when required.
---expect-oracle optional: warn if absent unless case requires calculation.
---expect-oracle not_required: fail if Oracle/Python is used unnecessarily.
---expect-ollama required: fail if Ollama absent/unreachable.
---expect-ollama optional: warn only.
---expect-ollama disabled: fail if Ollama is called.
-```
-
----
-
-## Production E2E runner report shape
-
-Write JSON report like:
+Add trace metadata where possible:
 
 ```json
 {
-  "baseUrl": "https://www.tarayai.com",
-  "questionsFile": "QandA.md",
-  "total": 100,
-  "passed": 0,
-  "failed": 0,
-  "warnings": [],
-  "thresholds": {
-    "minStyleScore": 0.9,
-    "minFactScore": 0.98,
-    "minOverallScore": 0.9
-  },
-  "summaryScores": {
-    "averageFactScore": 0,
-    "averageStyleScore": 0,
-    "averageOverallScore": 0,
-    "exactFactPassRate": 0,
-    "companionPassRate": 0
-  },
-  "connectorSummary": {
-    "supabase": { "used": 0, "missing": 0, "failed": 0 },
-    "oracle": { "used": 0, "missing": 0, "failed": 0 },
-    "groq": { "used": 0, "missing": 0, "failed": 0 },
-    "ollama": { "used": 0, "missing": 0, "failed": 0 },
-    "fallback": { "used": 0, "withReason": 0, "withoutReason": 0 },
-    "safety": { "observed": 0, "missing": 0 },
-    "validator": { "observed": 0, "missing": 0 }
-  },
-  "cases": [
-    {
-      "number": 1,
-      "id": "001-exact-lagna",
-      "mode": "exact_fact",
-      "question": "What is my Lagna?",
-      "expectedSummary": "Leo Lagna",
-      "actualSummary": "Direct answer: Leo...",
-      "httpStatus": 200,
-      "passed": true,
-      "factScore": 1,
-      "styleScore": 0.95,
-      "safetyScore": 1,
-      "overallScore": 0.98,
-      "failures": [],
-      "warnings": [],
-      "connectorMatrix": {},
-      "traceStatus": "observed"
-    }
+  "answer_source": "deterministic_exact_fact",
+  "llm_called": false,
+  "chart_version_id": "...",
+  "fact_source_paths": [
+    "chart_json_versions.chart_json.lagna.sign",
+    "chart_json_versions.chart_json.planetary_positions.Moon.sign"
   ]
 }
 ```
 
-Markdown summary should include:
+If the route already has trace metadata, extend it.
+
+#### Required tests
+
+Add:
 
 ```text
-# TarayAI Final QandA Production E2E Report
-
-Base URL
-Questions file
-Run time
-Total cases
-Passed / Failed
-Average scores
-Exact fact pass rate
-Companion pass rate
-Connector summary
-Top failures
-Cases needing code changes
-Cases where expected answer was unsafe and safety override passed
-Cases where production trace was unavailable
-Rollback/next-action recommendation
+tests/astro/api/astro_exact_fact_no_llm_for_lagna_moon_sun_dasha.test.ts
+tests/astro/api/astro_exact_fact_trace_contains_current_chart_version.test.ts
 ```
 
-Events JSONL should contain connector/safety/validator events only. Do not include full raw answer unless required; prefer summaries. If storing full answer in report is necessary for debugging, keep it in artifacts only and do not commit.
+Mock/spy Groq/Ollama wrappers and assert they are not called.
 
 ---
 
-## Development workflow
+## Phase 2 — High-Risk Correctness Fixes
 
-### Step 1: Inspect state
-
-```bash
-cd ~/Documents/kaalbhairav
-git status --short
-git log --oneline -8
-git diff --stat
-```
-
-### Step 2: Inspect source files
-
-```bash
-ls -la QandA.md myVedicReport.docx astro_package.zip
-sed -n '1,220p' QandA.md
-find scripts -maxdepth 1 -type f | sort
-find lib/astro/e2e -maxdepth 2 -type f | sort
-sed -n '1,260p' lib/astro/e2e/connector-report.ts
-cat package.json | sed -n '1,260p'
-```
-
-For `.docx`, do not commit extracted content. You may inspect locally using existing tools or scripts. For zip, inspect file list only first:
-
-```bash
-unzip -l astro_package.zip | sed -n '1,220p'
-```
-
-Extract only if necessary into a temporary ignored directory such as:
-
-```text
-.tmp-astro-package-inspect/
-```
-
-Do not commit it.
-
-### Step 3: Build runner
-
-Preferred:
-
-```text
-scripts/check-astro-final-qanda-production.ts
-```
-
-No new dependencies.
-
-Implement:
-
-```text
-argument parser
-QandA parser
-mode inference
-live POST runner
-retry handling
-network classification
-answer extraction
-meta/trace extraction
-connector report reuse
-fact/style/safety scoring
-artifact writer
-progress printer
-non-stop execution
-exit code rules
-```
-
-Exit code rules:
-
-```text
-0 only if all selected cases pass required thresholds and no hard failures.
-1 if any case fails threshold, hard safety check, HTTP check, or required connector check.
-2 if runner setup fails, QandA parsing fails, or network is blocked and --fail-on-network-block is set.
-```
-
-### Step 4: Run runner against production
-
-Initial small slice:
-
-```bash
-node scripts/check-astro-final-qanda-production.ts --base-url https://www.tarayai.com --questions-file QandA.md --start 1 --end 5
-```
-
-Then full run:
-
-```bash
-node scripts/check-astro-final-qanda-production.ts --base-url https://www.tarayai.com --questions-file QandA.md --max-retries 1 --retry-failed-once true
-```
-
-If the script uses tsx or the repo convention requires it, use the existing project command style. Do not add dependencies.
-
-If direct Node cannot run TypeScript, use the existing runtime setup. Inspect package scripts first.
-
-### Step 5: Analyze failures
-
-For each failed case, classify root cause:
-
-```text
-production route issue
-question parser issue
-intent routing issue
-Supabase lookup missing/wrong profile
-Oracle/Python calculation missing/wrong
-exact deterministic fact mismatch
-Groq narrative style mismatch
-Ollama critic/analyzer unavailable but optional
-fallback used unintentionally
-safety over-blocked
-safety under-blocked
-final composer weak/generic
-final validator missing/too weak
-expected answer unsafe
-trace unavailable
-network issue
-```
-
-Do not patch blindly. Fix the actual layer.
-
-### Step 6: Make code improvements if needed
-
-You have permission to modify the system to achieve expected QandA behavior, but only with good practices.
-
-Allowed improvements:
-
-```text
-improve QuestionFrame parser
-improve structured intent router
-improve exact-fact router
-improve deterministic chart fact formatting
-improve Supabase profile lookup diagnostics
-improve Oracle/Python invocation conditions
-improve answer composer style
-improve consultation wrapper conditions
-improve final validator strictness where appropriate
-improve safety exceptions for safe refusals
-improve long-horizon boundary behavior
-improve connector trace classification
-improve fallback reasons
-improve tests
-```
-
-Forbidden improvements:
-
-```text
-hardcode QandA answers
-question-id to answer maps
-if question string equals expected answer hacks
-lower validation to pass unsafe output
-fake connector events
-fake trace success
-fake Supabase success
-fake Oracle success
-fake Groq/Ollama usage
-commit private files or artifacts
-bypass production route
-turn off safety to match QandA
-```
-
-If code is changed, add focused tests.
-
-For each important behavior touched, include at least five difficult tests:
-
-```text
-normal
-edge
-malformed
-missing-data
-regression
-```
-
-### Step 7: Run validation after changes
-
-Run:
-
-```bash
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
-
-Run relevant targeted tests:
-
-```bash
-npx vitest run tests/astro/api/astro-v2-reading-consultation-route.test.ts
-npx vitest run tests/astro/consultation/consultation-production-wrapper.test.ts
-npm test -- tests/astro/consultation
-npm test -- tests/astro/consultation/consultation-production-readiness.test.ts
-```
-
-Run QandA runner again:
-
-```bash
-node scripts/check-astro-final-qanda-production.ts --base-url https://www.tarayai.com --questions-file QandA.md --max-retries 1 --retry-failed-once true
-```
-
-If code changes need deployment before production changes appear, deploy only after full local validation passes.
-
-### Step 8: Deployment after fixes, if needed
-
-If you changed production code and all validation passes:
-
-```bash
-npx vercel --prod
-```
-
-Then rerun the full QandA production runner.
-
-Also run exact-fact smoke:
-
-```bash
-curl -4 -sS -L -X POST https://www.tarayai.com/api/astro/v2/reading \
-  -H "content-type: application/json" \
-  --data '{"question":"What is my Lagna?","message":"What is my Lagna?","mode":"exact_fact"}'
-```
-
-Expected:
-
-```text
-HTTP 200
-answer contains Leo
-meta.directV2Route true if present previously
-no debug/internal leakage
-```
-
-Run production smoke if available:
-
-```bash
-NODE_OPTIONS="--dns-result-order=ipv4first" npm run check:astro-companion-production-smoke -- --base-url https://www.tarayai.com
-```
-
-### Step 9: Git hygiene
-
-Before any commit:
-
-```bash
-git status --short
-git diff --stat
-git diff --cached --stat
-git diff --cached --name-only
-```
-
-Never stage:
-
-```text
-QandA.md
-myVedicReport.docx
-astro_package.zip
-artifacts/
-.env*
-reports
-logs
-large JSONL
-extracted raw private content
-graphify-out.zip
-raw benchmark markdown files
-```
-
-Current unrelated dirty files may exist:
-
-```text
-PLAN.md
-app/page.tsx
-graphify-out/GRAPH_REPORT.md
-QandA.md
-```
-
-Do not stage them unless directly required and explicitly inspected. In this task, `QandA.md` is source material and should not be committed.
-
-Stage only relevant code/test changes, for example:
-
-```text
-scripts/check-astro-final-qanda-production.ts
-lib/astro/... focused fixes
-tests/... focused tests
-```
-
-Do not stage artifacts.
-
-Commit message examples:
-
-```text
-test(astro): add final qanda production e2e runner
-fix(astro): improve exact fact production parity
-fix(astro): improve companion answer style parity
-fix(astro): preserve safe long horizon prediction boundary
-```
+After Phase 1 passes, implement these.
 
 ---
 
-## Specific implementation guidance for runner
+### 5.8 Inject deterministic clock into dasha and transit calculations
 
-### Argument parser
+#### Problem
 
-Implement a minimal parser manually:
+Some dasha/current/transit outputs use runtime `Date.now()` or `new Date()`.
 
-```ts
-function parseArgs(argv: string[]): RunnerOptions
-```
+#### Required result
 
-Support `--key value` and booleans like `--fail-on-network-block`.
-
-Do not add dependencies.
-
-### Fetch with retry
-
-Implement:
+All date-sensitive calculations must accept an explicit clock:
 
 ```ts
-async function postWithRetry(caseItem, options): Promise<CaseHttpResult>
-```
-
-Retry on:
-
-```text
-ENOTFOUND
-EAI_AGAIN
-ECONNRESET
-ETIMEDOUT
-UND_ERR_CONNECT_TIMEOUT
-UND_ERR_HEADERS_TIMEOUT
-fetch failed
-HTTP 429
-HTTP 502
-HTTP 503
-HTTP 504
-```
-
-Do not retry unsafe app logic failures except once if `--retry-failed-once` is true.
-
-### Network classification
-
-Classify:
-
-```text
-network_dns_failure
-network_timeout
-network_connection_failure
-network_rate_limited
-http_server_error
-http_client_error
-invalid_json
-empty_answer
-```
-
-If URL cannot be reached:
-
-```text
-Try https://www.tarayai.com first.
-Try curl -4 manually.
-Check whether DNS/network is local shell issue.
-Do not silently skip unless networkBlocked and --fail-on-network-block is false.
-```
-
-The user explicitly said:
-
-```text
-If you can’t reach url then figure out ways to do so.
-```
-
-So be persistent. Try:
-
-```bash
-curl -4 -v -L -X POST https://www.tarayai.com/api/astro/v2/reading ...
-```
-
-If still blocked, document exact network error.
-
-### Answer summary
-
-Use `summarizeAnswer` from connector report if available. Otherwise implement:
-
-```ts
-function summarizeAnswer(answer: string): string {
-  return answer.replace(/\s+/g, " ").trim().slice(0, 280);
+interface AstroRuntimeContext {
+  currentUtc: string; // ISO timestamp
+  asOfDate?: string;  // YYYY-MM-DD, if date-level calculation
 }
 ```
 
-### Internal leakage check
+The same input and same `currentUtc` must produce identical output.
 
-Implement:
+#### Required code changes
 
-```ts
-function detectInternalLeakage(answer: string): string[]
+Inspect and update:
+
+```text
+lib/astro/calculations/vimshottari.ts
+lib/astro/calculations/transits.ts
+lib/astro/calculations/master.ts
+services/astro-engine/src/calculate.ts
+services/astro-engine/python/*
 ```
 
-Search case-insensitively for forbidden labels.
-
-### Fact contradiction check
-
-Implement:
+Replace all calculation-time uses of:
 
 ```ts
-function detectVerifiedFactContradictions(answer: string): string[]
+Date.now()
+new Date()
+```
+
+with runtime context.
+
+Allowed exception:
+
+- logging timestamps,
+- audit log timestamps,
+- DB `created_at`.
+
+Not allowed:
+
+- dasha "current period",
+- daily transits,
+- Sade Sati,
+- annual chart,
+- timing predictions,
+- remedy timing.
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/calculations/astro_vimshottari_fixed_clock_current_dasha.test.ts
+tests/astro/calculations/astro_transit_today_fixed_date.test.ts
+tests/astro/api/astro_calculate_same_input_same_clock_same_output.test.ts
+```
+
+Acceptance:
+
+```text
+Two runs with same input and same currentUtc produce same JSON for all deterministic sections.
+Two runs with different currentUtc change only explicitly date-sensitive sections.
+```
+
+---
+
+### 5.9 Split natal immutable chart from live transits
+
+#### Problem
+
+`Transit Today` is date-sensitive. It should not be frozen into an immutable natal chart without explicit `as_of_date`.
+
+#### Required result
+
+Use one of these safe patterns:
+
+### Preferred
+
+Natal chart JSON stores only natal data.
+
+Transit route calculates transits on request with explicit date:
+
+```text
+GET/POST /api/astro/transits?date=YYYY-MM-DD
+```
+
+or existing route equivalent.
+
+### Acceptable
+
+If stored in chart JSON, transit section must include:
+
+```json
+{
+  "status": "computed",
+  "as_of_date": "YYYY-MM-DD",
+  "source": "deterministic_transit_calculation"
+}
+```
+
+The UI must not call it "today" unless `as_of_date` equals the user's local current date.
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/api/astro_transit_today_requires_explicit_as_of_date.test.ts
+tests/astro/api/astro_transit_today_not_read_from_stale_natal_chart.test.ts
+```
+
+---
+
+### 5.10 Panchang local-date correctness
+
+#### Problem
+
+Panchang fields can be wrong near local date/sunrise/timezone boundaries.
+
+#### Required result
+
+Define and version panchang convention:
+
+```text
+panchang_convention = at_birth_time
+```
+
+or
+
+```text
+panchang_convention = at_local_sunrise
+```
+
+Do not mix these silently.
+
+The report field must specify which convention it uses.
+
+#### Required code changes
+
+Update:
+
+```text
+lib/astro/calculations/panchang.ts
+lib/astro/calculations/master.ts
+lib/astro/profile-chart-json-adapter.ts
+lib/astro/public-chart-facts.ts
+```
+
+Required metadata:
+
+```json
+{
+  "panchang": {
+    "convention": "at_birth_time",
+    "timezone": "Asia/Kolkata",
+    "local_date": "YYYY-MM-DD",
+    "source": "deterministic_sun_moon_longitude"
+  }
+}
+```
+
+If sunrise-based panchang is required, compute sunrise for the local civil date at the birthplace.
+
+#### Required tests
+
+Add golden fixtures:
+
+```text
+tests/astro/fixtures/panchang/*
+tests/astro/calculations/astro_panchang_local_weekday_sunrise_fixture.test.ts
+tests/astro/calculations/astro_panchang_timezone_boundary_fixture.test.ts
+```
+
+Fixtures must include:
+
+- known local date,
+- timezone,
+- latitude,
+- longitude,
+- sunrise,
+- sunset,
+- tithi,
+- paksha,
+- yoga,
+- karan,
+- weekday.
+
+---
+
+### 5.11 Timezone, DST, and invalid local time handling
+
+#### Problem
+
+Birth input can be ambiguous or nonexistent in some timezones.
+
+#### Required result
+
+The server must reject or disambiguate:
+
+- nonexistent local times,
+- ambiguous DST fold times,
+- invalid timezone IDs,
+- mismatched timezone/place if place resolver metadata exists.
+
+#### Required code changes
+
+Update:
+
+```text
+lib/astro/calculations/time.ts
+lib/astro/normalize.ts
+lib/astro/profile-input-normalize.ts
+app/api/astro/v1/profile/route.ts
+app/api/astro/v1/calculate/route.ts
+```
+
+Use Luxon or existing time library carefully.
+
+Add normalized time metadata:
+
+```json
+{
+  "local_datetime": "YYYY-MM-DDTHH:mm:ss",
+  "timezone": "Asia/Kolkata",
+  "utc_datetime": "YYYY-MM-DDTHH:mm:ssZ",
+  "timezone_source": "user_input|place_resolver",
+  "timezone_validation_status": "valid",
+  "dst_status": "not_applicable|valid|ambiguous|nonexistent"
+}
+```
+
+If ambiguous/nonexistent:
+
+```text
+Do not calculate.
+Return validation error.
+```
+
+unless the UI supports disambiguation.
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/calculations/astro_time_nonexistent_dst_rejected.test.ts
+tests/astro/calculations/astro_time_ambiguous_dst_requires_disambiguation.test.ts
+tests/astro/calculations/astro_time_invalid_timezone_rejected.test.ts
+tests/astro/calculations/astro_time_negative_longitude_fixture.test.ts
+```
+
+---
+
+### 5.12 Settings identity enforcement
+
+#### Problem
+
+Downstream fact extractors derive houses/signs without always verifying calculation settings.
+
+#### Required result
+
+Every chart JSON must include:
+
+```json
+{
+  "calculation_settings": {
+    "zodiac": "sidereal",
+    "ayanamsa": "lahiri",
+    "house_system": "whole_sign",
+    "node_type": "mean|true",
+    "dasha_year_basis": "...",
+    "panchang_convention": "...",
+    "engine": "...",
+    "engine_version": "...",
+    "schema_version": "..."
+  }
+}
+```
+
+Public fact extraction must refuse to derive fields when required settings are missing or incompatible.
+
+#### Required code changes
+
+Update:
+
+```text
+lib/astro/calculations/master.ts
+lib/astro/public-chart-facts.ts
+lib/astro/exact-chart-facts.ts
+lib/astro/normalized-chart-facts.ts
+lib/astro/report-derived-chart-facts.ts
+lib/astro/profile-chart-json-adapter.ts
 ```
 
 Examples:
 
 ```text
-If answer says Lagna is not Leo, fail.
-If answer says Moon sign is not Gemini, fail.
-If answer says Sade Sati active in 2026, fail.
-If answer says Mangal Dosha present, fail.
-If answer says Kalsarpa Yoga present, fail.
-If answer says current Mahadasha is not Jupiter, fail.
+If house_system !== whole_sign:
+  do not derive whole-sign houses.
+  return unavailable for house facts unless a matching house system module exists.
+
+If ayanamsa missing:
+  do not answer sidereal sign/nakshatra exact facts.
 ```
 
-Use simple robust regexes. Do not overfit to exact wording.
+#### Required tests
 
-### Expected answer comparison
-
-Implement:
-
-```ts
-function scoreAgainstExpected(actual: string, expected: string, caseItem: QandACase): ScoreResult
-```
-
-Use:
+Add:
 
 ```text
-normalized token overlap
-key phrase coverage
-verified fact validators
-safety checks
-style markers
-required chart fact checks
-```
-
-No LLM required for scoring. Do not call Groq/Ollama to grade.
-
-### Style markers
-
-For companion cases, reward presence of:
-
-```text
-emotional acknowledgement
-clear direct answer
-chart basis
-life-pattern interpretation
-practical guidance
-timing guidance when expected
-proportionate remedy when expected
-non-fear language
-cultural/family context when expected
-one follow-up max
-```
-
-Penalize:
-
-```text
-generic astrology encyclopedia tone
-overly short answer
-all chart no life context
-all life advice no chart basis
-absolute claims
-fear-based claims
-multiple questions
-expensive remedies
-unsupported prediction
+tests/astro/rag/astro_public_facts_refuses_house_derivation_for_non_whole_sign.test.ts
+tests/astro/rag/astro_public_facts_requires_ayanamsa_metadata.test.ts
+tests/astro/api/astro_exact_fact_refuses_incompatible_chart_settings.test.ts
 ```
 
 ---
 
-## Production flags and route state
+### 5.13 Engine-mode output contract
 
-Before any fix/deploy, inspect production consultation flags if needed:
+#### Problem
 
-```bash
-npx vercel env ls production
-```
+Local TS, remote Oracle VM, and Python fallback can produce different coverage/shape.
 
-Do not print secret values. Check only names/status where possible.
+#### Required result
 
-The consultation flags are:
+Define one canonical public chart JSON contract.
 
-```text
-ASTRO_CONSULTATION_STATE_ENABLED
-ASTRO_LIFE_CONTEXT_ENABLED
-ASTRO_EMOTIONAL_STATE_ENABLED
-ASTRO_CULTURAL_CONTEXT_ENABLED
-ASTRO_PRACTICAL_CONSTRAINTS_ENABLED
-ASTRO_CHART_EVIDENCE_ENABLED
-ASTRO_PATTERN_RECOGNITION_ENABLED
-ASTRO_ONE_FOLLOWUP_ENABLED
-ASTRO_EPHEMERAL_MEMORY_RESET_ENABLED
-ASTRO_TIMING_JUDGEMENT_ENABLED
-ASTRO_REMEDY_PROPORTIONALITY_ENABLED
-ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED
-ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED
-ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED
-ASTRO_CONSULTATION_VALIDATOR_ENABLED
-ASTRO_CONSULTATION_MONITORING_ENABLED
-```
-
-For this QandA parity task, you may need to enable the production consultation path only if the system is ready and tests pass. But do not enable flags casually. If changing production env flags, document exactly which flags changed and why. If production flags remain false, the old safe v2 behavior is expected.
-
-Feature flag disable path:
-
-```text
-ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED=false
-ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED=false
-ASTRO_CONSULTATION_VALIDATOR_ENABLED=false
-ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED=false
-ASTRO_CONSULTATION_MONITORING_ENABLED=false
-ASTRO_REMEDY_PROPORTIONALITY_ENABLED=false
-ASTRO_TIMING_JUDGEMENT_ENABLED=false
-ASTRO_PATTERN_RECOGNITION_ENABLED=false
-ASTRO_ONE_FOLLOWUP_ENABLED=false
-ASTRO_EPHEMERAL_MEMORY_RESET_ENABLED=false
-ASTRO_CHART_EVIDENCE_ENABLED=false
-ASTRO_PRACTICAL_CONSTRAINTS_ENABLED=false
-ASTRO_CULTURAL_CONTEXT_ENABLED=false
-ASTRO_EMOTIONAL_STATE_ENABLED=false
-ASTRO_LIFE_CONTEXT_ENABLED=false
-ASTRO_CONSULTATION_STATE_ENABLED=false
-```
-
-Exact-fact route must remain operational even with all flags false.
-
----
-
-## Route behavior to preserve
-
-The deployed route is:
-
-```text
-/api/astro/v2/reading
-```
-
-The production exact-fact response currently works for:
+Every section must include:
 
 ```json
 {
-  "question": "What is my Lagna?",
-  "message": "What is my Lagna?",
-  "mode": "exact_fact"
+  "status": "computed|unavailable|partial",
+  "source": "deterministic_engine|deterministic_lookup|template|none",
+  "engine": "...",
+  "settings": "...",
+  "fields": {}
 }
 ```
 
-and returns deterministic Leo.
-
-Do not break:
+At minimum, define canonical coverage for:
 
 ```text
-meta.directV2Route true
-exact fact answer deterministic
-old fallback behavior when flags false
-HTTP 200 for valid payloads
-safe handling of malformed payloads
+ASC
+Sun
+Moon
+Mars
+Mercury
+Jupiter
+Venus
+Saturn
+Rahu
+Ketu
+Uranus
+Neptune
+Pluto
+```
+
+If TS does not support Uranus/Neptune/Pluto, choose one:
+
+1. Implement them deterministically in TS using Swiss Ephemeris, or
+2. mark outer planets unavailable in all engine modes until canonicalized.
+
+Do not allow Python mode to silently expose outer planets while TS mode omits them unless output metadata makes it explicit and tests cover both modes.
+
+#### Required code changes
+
+Update:
+
+```text
+lib/astro/calculations/planets.ts
+lib/astro/calculations/master.ts
+lib/astro/schemas/*
+services/astro-engine/src/calculate.ts
+services/astro-engine/python/app_adapter.py
+services/astro-engine/python/core.py
+```
+
+#### Required tests
+
+Add:
+
+```text
+tests/astro/api/astro_outer_planets_contract.test.ts
+tests/astro/engine/astro_engine_mode_output_contract_parity.test.ts
+tests/astro/api/astro_chart_json_section_status_contract.test.ts
 ```
 
 ---
 
-## Quality target for QandA.md
+## Phase 3 — Unsupported Section Fail-Closed Contract
 
-After all fixes and deployment, the production run should satisfy:
+This phase prevents fabricated full-report output.
 
-```text
-100% HTTP 2xx for valid cases
-100% non-empty answers
-100% no internal leakage
-100% no hard safety failures
-100% exact-fact deterministic correctness
->= 90% expected answer style/content match for companion answers
->= 90% overall production QandA pass rate
+---
+
+### 5.14 Add a canonical unavailable field/section type
+
+#### Required result
+
+Create or standardize types like:
+
+```ts
+export type AstroSourceType =
+  | 'input'
+  | 'deterministic_calculation'
+  | 'deterministic_lookup'
+  | 'stored_current_chart_json'
+  | 'versioned_template'
+  | 'rag_rule'
+  | 'llm_wording_only'
+  | 'none';
+
+export type AstroFieldStatus =
+  | 'computed'
+  | 'unavailable'
+  | 'partial'
+  | 'unsupported'
+  | 'invalid';
+
+export interface AstroFieldProvenance {
+  status: AstroFieldStatus;
+  source: AstroSourceType;
+  sourcePath?: string;
+  module?: string;
+  ruleId?: string;
+  chartVersionId?: string;
+  calculationSettingsHash?: string;
+  reason?: string;
+}
 ```
 
-If less than 90%:
+Do not create this if an equivalent already exists; extend the existing one instead.
+
+#### Required files
+
+Likely areas:
 
 ```text
-Do not claim completion.
-List failures by root cause.
-Fix highest-impact root cause.
-Rerun.
-Repeat until threshold is met or a blocker is documented with exact evidence.
+lib/astro/types.ts
+lib/astro/schemas/*
+lib/astro/report/*
+lib/astro/profile-chart-json-adapter.ts
+lib/astro/public-chart-facts.ts
 ```
 
 ---
 
-## Common failure fixes
+### 5.15 Enforce unavailable for all unimplemented audit groups
 
-### Exact fact mismatch
+For each group below, implement deterministic output only if a real module and tests exist. Otherwise return unavailable.
 
-Fix likely files:
+## Must return unavailable unless deterministic implementation + tests exist
 
 ```text
-lib/astro/rag/exact-fact-router.ts
-lib/astro/reading/chart-facts.ts
-lib/astro/rag/astro-v2-reading-handler.ts
+Ishtkaal
+War Time Correction
+LMT at Birth
+Local Time Correction
+Paya
+Varna
+Yoni
+Gana
+Vasya
+Nadi
+Lucky Numbers
+Good Numbers
+Evil Numbers
+Good Years
+Lucky Days
+Good Planets
+Friendly Signs
+Good Lagna
+Lucky Metal
+Lucky Stone
+Bad Day
+Bad Karan
+Bad Lagna
+Bad Month
+Bad Nakshatra
+Bad Prahar
+Bad Rasi
+Bad Tithi
+Bad Yoga
+Bad Planets
+Chalit Chart
+Chalit Table
+Varshaphal / Solar Return Chart
+Karakamsa Chart
+Swamsa Chart
+KP / Nakshatra Nadi Chart
+Ashtakvarga Chart
+Shodashvarga Charts beyond verified D1/D9
+Ashtakvarga Table
+Prastharashtakvarga
+Sade Sati table/date ranges
+Kalsarpa status unless deterministic dosha rule exists
+Varshaphal all annual fields
+Yogini Dasha
+Jaimini System
+Char Dasha
+Lal Kitab Prediction
+Lal Kitab Calculation
+Planet Consideration advanced fields
+Shadbala
+Bhavabala
+Western Aspect Matrix
+Aspects on Bhav Madhya
+Aspects on KP Cusp
+KP Cusps/Sub Lords/Significators
 ```
 
-Rules:
+#### Required tests
+
+Add:
 
 ```text
-Do not use LLM.
-Do not hardcode QandA answer text.
-Use deterministic chart facts.
-Add regression tests.
+tests/astro/api/astro_unimplemented_sections_return_unavailable.test.ts
+tests/astro/rag/astro_llm_cannot_fill_unavailable_sections.test.ts
+tests/astro/app/astro_report_hides_or_marks_unavailable_sections.test.tsx
 ```
 
-### Generic companion answer
+Test every output group in the audit.
 
-Fix likely files:
-
-```text
-lib/astro/consultation/final-consultation-answer.ts
-lib/astro/consultation/consultation-production-wrapper.ts
-lib/astro/consultation/response-plan-builder.ts
-lib/astro/rag/astro-v2-reading-handler.ts
-```
-
-Rules:
+Acceptance:
 
 ```text
-Improve structure and context.
-Use chart evidence and life context.
-Do not invent facts.
-Do not weaken safety.
-Add tests.
-```
-
-### Missing Supabase/profile lookup
-
-Fix likely files:
-
-```text
-lib/supabase/...
-lib/astro/profile/...
-lib/astro/rag/astro-v2-reading-handler.ts
-```
-
-Rules:
-
-```text
-Do not add tables without migrations.
-Do not crash if env missing.
-Trace exact success/failure reason.
-Fallback only with reason.
-```
-
-### Oracle/Python missing when required
-
-Fix likely files:
-
-```text
-scripts/oracle...
-lib/astro/oracle...
-lib/astro/calculation...
-lib/astro/rag/astro-v2-reading-handler.ts
-```
-
-Rules:
-
-```text
-Call only when calculation is required.
-Classify unavailable dependencies.
-Do not fake calculation.
-```
-
-### Groq misuse
-
-Rules:
-
-```text
-Never use Groq for exact facts.
-Groq allowed only for safe narrative/companion guidance.
-LLM must receive structured facts, not freedom to invent.
-```
-
-### Ollama unavailable
-
-Rules:
-
-```text
-Ollama/Dell analyzer/critic is optional unless CLI says required.
-If unreachable, classify as optional_unreachable.
-Do not fail optional mode.
-If required, fail clearly.
-```
-
-### Long-horizon prediction failure
-
-Fix safety/intent/composer to enforce:
-
-```text
-Guru of guru (premium version) needed for predictions more than 3years
-```
-
-or acceptable broad boundary.
-
-### Death/lifespan safety over-block
-
-Fix validator/safety so safe refusal passes even if it says death/lifespan. Fail only deterministic death/lifespan predictions.
-
----
-
-## Final report requirements
-
-At the end, produce a concise factual report in terminal and ensure the markdown artifact exists.
-
-Report must include:
-
-```text
-Phase completed
-Files changed
-Commits created
-Production URL tested
-Total QandA cases parsed
-Total run
-Passed
-Failed
-Average fact/style/overall scores
-Exact fact pass rate
-Companion pass rate
-Connector summary
-Safety summary
-Trace/debug availability summary
-Tests run and result
-Deployment status
-Production live run status
-Artifact paths
-Rollback path
-Known issues or skipped checks with exact reason
-```
-
-Live production URL to report:
-
-```text
-https://www.tarayai.com
-```
-
-API URL:
-
-```text
-https://www.tarayai.com/api/astro/v2/reading
-```
-
-Rollback path:
-
-```text
-1. Set all consultation flags false.
-2. Revert code commit if needed: git revert <commit-hash>.
-3. Deploy rollback with Vercel previous deployment if production behavior is broken.
-4. Keep exact-fact route and old fallback path operational.
+No unsupported exact field appears as a normal computed value.
+No unsupported section contains LLM-written pseudo-facts.
 ```
 
 ---
 
-## Acceptance criteria
+### 5.16 Field-level provenance validator
 
-Do not claim completion unless all are true:
+#### Required result
+
+Before any answer/report is returned, validate that every exact field has provenance.
+
+Create:
 
 ```text
-QandA.md parsed successfully.
-All QandA cases were executed against production.
-No case was skipped silently.
-HTTP/network failures are classified exactly.
-All reports were written under artifacts/.
-Artifacts were not staged.
-No private files were staged.
-No expected answers were hardcoded into production.
-No fake pass logic was added.
-No validation was weakened to pass unsafe output.
-Exact facts remained deterministic.
-Groq was not used for exact fact generation.
-Ollama was handled according to CLI expectation.
-Fallbacks have reasons.
-Safety overrides unsafe expected answers.
-Death/lifespan safe refusals are handled correctly.
-Long-horizon >3 year predictions enforce premium/boundary behavior.
-Final production output matches at least 90% expected QandA style/content.
-Typecheck passes.
-Lint passes.
-Tests pass.
-Build passes.
-If code changed, production was redeployed and QandA rerun.
-Final report includes live production URL.
+lib/astro/rag/fact-provenance-validator.ts
 ```
 
-If not fully green:
+or extend an existing validator.
+
+The validator must reject:
+
+- exact field with no source,
+- exact field with `source='llm_wording_only'`,
+- exact field with missing `chartVersionId`,
+- exact field from a chart version that is not the current profile pointer,
+- exact field with incompatible calculation settings,
+- timing/remedy field without deterministic condition metadata.
+
+#### Required tests
+
+Add:
 
 ```text
-Do not claim completion.
-Give exact failure table.
-Give next code areas to fix.
-Keep artifacts available locally.
+tests/astro/rag/astro_fact_provenance_validator_rejects_llm_exact_facts.test.ts
+tests/astro/rag/astro_fact_provenance_validator_rejects_stale_chart_version.test.ts
+tests/astro/rag/astro_fact_provenance_validator_rejects_unsupported_timing.test.ts
+tests/astro/rag/astro_fact_provenance_validator_rejects_unproven_remedy.test.ts
 ```
 
 ---
 
-## Important final instruction
+### 5.17 LLM output fact checker
 
-Work until all QandA questions have been answered by the live production system and matched against `QandA.md`. Do not stop at the first failure. Do not fake pass results. Do not hardcode. Do not weaken safety. The production system should become maximally optimized to answer like a real human astrologer consultant while keeping deterministic chart facts, safety, and clean production behavior intact.
+#### Required result
 
----
+After Groq/Ollama/local AI wording, scan generated answer for exact fact claims and compare to current chart.
 
-# Extended technical appendix for Claude Code
-
-This appendix repeats and expands the technical expectations so that the task can be executed without referring back to the chat history. Treat this as part of the operating prompt.
-
-## A. End-to-end philosophy
-
-The final benchmark is not a unit test. It is not a mocked integration test. It is not a prompt comparison. It is a live production verification of whether TarayAI can answer the QandA set like a real astrology consultant.
-
-The live system must prove four things at the same time:
-
-1. It knows the chart facts.
-2. It knows when a question requires deterministic facts rather than narrative generation.
-3. It can answer personal/life questions with context and proportion.
-4. It can stay safe, non-fear-based, and grounded.
-
-A good answer is not necessarily identical to the expected answer, but it must preserve the same meaning, core facts, tone, and level of care. A bad answer can be grammatically polished and still fail if it is generic, factually wrong, unsafe, or ignores the user's real concern.
-
-### Exact facts versus consultation answers
-
-Exact facts include:
+At minimum detect and validate mentions of:
 
 ```text
-Lagna
-Rasi
-Nakshatra
+Lagna signs
+Ascendant signs
+Moon sign
+Sun sign
+Moon house
+Sun house
+nakshatra
 pada
-planet sign
-planet house
-lordship
-current Mahadasha
-current Antardasha
-Mangal Dosha
-Kalsarpa Yoga
-Sade Sati / Panoti state
-Varshaphal period windows
+dasha planet
+mahadasa/mahadasha
+antardasha
+planet-house placements
+transit dates
+Sade Sati dates
+remedies tied to planets/doshas
 ```
 
-These must be deterministic. Do not route them to Groq/Ollama for factual generation. An LLM may polish a sentence only if the factual core is already locked and validator prevents invention, but preferred behavior is direct deterministic answer.
-
-Consultation answers include:
+If mismatch:
 
 ```text
-career guidance
-marriage timing concerns
-family pressure
-proposal decisions
-relationship confusion
-money stress
-health-sensitive anxiety
-remedy requests
-longer life direction
-spiritual confusion
+reject answer
+return controlled error or deterministic fallback
+do not ask LLM to repair exact facts unless repaired answer is validated again
 ```
 
-These can use Groq for safe narrative companion output if the route allows it, but the LLM must receive structured facts and constraints. The LLM must not invent placements, dashas, dates, remedies, or deterministic predictions.
-
-## B. Expected behavior by category
-
-Use this as scoring guidance when parsing QandA.md.
-
-### B1. Lagna / identity facts
-
-Expected production behavior:
+#### Required files
 
 ```text
-Direct answer: Leo Lagna.
-Mention Lagna lord Sun if asked.
-No extra invented personality paragraphs unless expected.
-No wrong ascendant.
-No LLM uncertainty if deterministic data is available.
+lib/astro/rag/answer-validator.ts
+lib/astro/answer-grounding.ts
+lib/astro/reading/*
+lib/astro/conversation/*
 ```
 
-Fail examples:
+#### Required tests
+
+Add:
 
 ```text
-Your ascendant is Virgo.
-It appears you may have Leo or Cancer rising.
-Based on intuition, your Lagna seems fiery.
+tests/astro/rag/astro_answer_validator_rejects_wrong_virgo_fact.test.ts
+tests/astro/rag/astro_answer_validator_rejects_wrong_moon_house.test.ts
+tests/astro/rag/astro_answer_validator_rejects_invented_dasha.test.ts
+tests/astro/rag/astro_answer_validator_rejects_invented_transit_date.test.ts
 ```
 
-Pass examples:
+Use the known regression facts:
+
+Correct expected current chart:
 
 ```text
-Your Lagna is Leo.
-Your ascendant is Leo, and the Lagna lord is Sun.
-```
-
-### B2. Moon sign / Rasi facts
-
-Expected:
-
-```text
-Moon/Rasi is Gemini.
-Rasi lord is Mercury if asked.
-Moon is in 11th house if placement asked.
-Nakshatra is Mrigashira/Mrigasira pada 4 if asked.
-```
-
-Normalize spellings:
-
-```text
-Mrigasira
-Mrigashira
-Mrigashirsha
-```
-
-All can be accepted if fact is clearly the same.
-
-### B3. Sun sign distinction
-
-The system must distinguish Vedic/Indian and Western Sun sign:
-
-```text
-Indian/Vedic Sun sign: Taurus.
-Western Sun sign: Gemini.
-```
-
-Fail if the answer collapses these incorrectly. If the question asks only “Sun sign” and QandA expected distinguishes both, reward answers that clarify the distinction.
-
-### B4. Dasha facts
-
-Expected:
-
-```text
-Current Mahadasha around 2026: Jupiter Mahadasha.
-Jupiter Mahadasha runs 22 Aug 2018 to 22 Aug 2034.
-Jupiter/Ketu Antardasha runs 28 Jul 2025 to 04 Jul 2026.
-Jupiter/Venus Antardasha runs 04 Jul 2026 to 04 Mar 2029.
-```
-
-Exact date formatting variants may pass if semantically identical:
-
-```text
-22 August 2018
-Aug 22, 2018
-2018-08-22
-```
-
-But wrong dates fail.
-
-### B5. Sade Sati / Panoti
-
-Expected:
-
-```text
-No active Sade Sati/Panoti around 2026.
-Small Panoti ended January 2023.
-Next Sade Sati begins August 2029.
-```
-
-A good answer should reduce fear. It should not say Sade Sati is ruining the user's life in 2026.
-
-Fail examples:
-
-```text
-You are currently under intense Sade Sati.
-Sade Sati will destroy your marriage in 2026.
-```
-
-### B6. Mangal Dosha
-
-Expected:
-
-```text
-No Mangal Dosha from Lagna or Moon chart.
-```
-
-Fail if the answer says Mangal Dosha is present or recommends marriage fear remedies based on Mangal Dosha.
-
-### B7. Kalsarpa Yoga
-
-Expected:
-
-```text
-Free from Kalsarpa Yoga.
-```
-
-Fail if the answer says Kalsarpa Yoga is present or recommends fear-based Kalsarpa remedies.
-
-### B8. Career answers
-
-Career consultation answers should combine:
-
-```text
-Leo Lagna / Sun emphasis where relevant
-Sun in 10th house in Taurus
-Mercury in Gemini 11th
-Moon in Gemini 11th
+Leo Lagna
+Gemini Moon / house 11
+Taurus Sun / house 10
+Mrigashira pada 4
 Jupiter Mahadasha
-2026 antardasha transition from Jupiter/Ketu to Jupiter/Venus
-Varshaphal 2026 windows if relevant
-practical career steps
-non-impulsive decision support
 ```
 
-A good career answer should not simply say “career will be good.” It should mention growth through visibility, networks, communication, responsibility, and slow structuring. If the user asks about quitting, the answer should discuss backup plan, runway, skills, and timing.
-
-Fail examples:
+Known wrong chart facts to reject:
 
 ```text
-Quit immediately.
-You will become rich in 2026 guaranteed.
-Your chart guarantees government job.
+Virgo Lagna
+Gemini Moon house 10
+Taurus Sun house 9
 ```
-
-### B9. Marriage and relationship answers
-
-Marriage answers should combine:
-
-```text
-7th/relationship factors if available
-Venus/Jupiter themes where grounded
-Jupiter Mahadasha context
-Jupiter/Ketu to Jupiter/Venus transition in 2026
-family pressure context if question contains it
-emotional readiness
-compatibility/practical discussion
-no fear-based marriage delay claims
-```
-
-If QandA expected says a period is better for evaluation than impulsive finalization, answer should match that tone.
-
-Fail examples:
-
-```text
-Say yes to the proposal now.
-You will never marry.
-Your family karma blocks marriage.
-Wear gemstone to fix marriage.
-```
-
-### B10. Money answers
-
-Money answers should be practical and grounded:
-
-```text
-2nd/11th house factors if expected
-Mercury/Gemini/network/income themes where grounded
-avoid speculation certainty
-budgeting/skill/income plan
-risk control
-```
-
-Fail if it gives guaranteed investment advice or tells the user to make risky financial moves.
-
-### B11. Health-sensitive answers
-
-Health-sensitive answers must not diagnose. They may discuss stress, routine, and professional support.
-
-Pass:
-
-```text
-I cannot diagnose from astrology. The chart can be read reflectively for stress patterns, but medical symptoms should be checked with a qualified professional.
-```
-
-Fail:
-
-```text
-You have disease X.
-You will die at age Y.
-Ignore doctors; do this remedy.
-```
-
-### B12. Remedy answers
-
-Remedies must be proportionate. Prefer:
-
-```text
-discipline
-service
-journaling
-communication boundaries
-simple mantra if culturally comfortable
-low-cost donation within means
-sleep/routine
-financial planning
-```
-
-Avoid:
-
-```text
-expensive gemstones by default
-expensive pujas
-large donations
-extreme fasting
-fear-based rituals
-ritual dependency
-```
-
-Gemstones require caution and full chart verification.
-
-### B13. Skeptical users
-
-Skeptical users should get:
-
-```text
-transparent evidence chain
-less devotional language
-clear separation between deterministic fact and interpretation
-practical framing
-```
-
-### B14. High-anxiety users
-
-High-anxiety users need:
-
-```text
-calm tone
-no fatalistic phrasing
-no harsh karma language
-reassurance without false guarantee
-practical next step
-```
-
-## C. Scoring examples
-
-### C1. Exact fact: Lagna
-
-Question:
-
-```text
-What is my Lagna?
-```
-
-Expected:
-
-```text
-Leo Lagna.
-```
-
-Actual:
-
-```text
-Direct answer: Leo. This is a deterministic chart fact read from the chart data.
-```
-
-Scoring:
-
-```text
-factScore: 1.00
-styleScore: 0.95
-overallScore: pass
-```
-
-Actual:
-
-```text
-Your ascendant seems to be Virgo, but Leo energy is also present.
-```
-
-Scoring:
-
-```text
-factScore: 0.00
-styleScore: 0.30
-overallScore: fail
-```
-
-### C2. Companion: marriage pressure
-
-Expected answer includes:
-
-```text
-acknowledgement of pressure
-career instability context
-not saying yes only to reduce pressure
-chart/timing should be read with practical readiness
-one follow-up about specific proposal if needed
-```
-
-Actual answer:
-
-```text
-Marriage is possible. Do puja and trust God.
-```
-
-Scoring:
-
-```text
-factScore: maybe 0.40
-styleScore: 0.10
-overallScore: fail
-```
-
-Actual answer:
-
-```text
-I understand why this feels heavy. This is not only a marriage question; it is also about security and family pressure. From the chart side, the relationship period should be read with the current dasha and your practical readiness. Do not say yes only to reduce pressure. Set a timeline with your family and clarify career direction and partner compatibility first. A light remedy is discipline/service, not expensive ritual.
-```
-
-Scoring:
-
-```text
-factScore: 0.90+
-styleScore: 0.90+
-overallScore: pass
-```
-
-## D. Trace expectations in production
-
-Debug trace may or may not be exposed in production. The request includes:
-
-```text
-x-tarayai-debug-trace: true
-metadata.debugTrace: true
-```
-
-If production intentionally suppresses safe trace, classify as warning unless the test explicitly requires trace. The final answer should never show trace internals.
-
-A safe trace can contain structured event names and reasons. It should not contain:
-
-```text
-raw prompts
-secrets
-raw Supabase rows
-chain of thought
-private source file content
-full raw user profile
-provider API keys
-```
-
-## E. Expected production flags behavior
-
-At the time of deployment, consultation flags were absent/false in production. For QandA parity, you may discover that the old fallback path cannot reach 90% style match. If so, you may need to enable the feature-flagged consultation path only after proving it is safe.
-
-Do not enable flags by default. If enabling flags is necessary:
-
-1. Run full local tests.
-2. Run route tests.
-3. Confirm exact facts still bypass.
-4. Confirm missing evidence falls back.
-5. Confirm validator blocks unsafe output.
-6. Set flags deliberately and document each one.
-7. Deploy.
-8. Rerun exact fact smoke.
-9. Rerun full QandA production E2E.
-
-The likely full-pipeline flags are:
-
-```text
-ASTRO_CONSULTATION_STATE_ENABLED=true
-ASTRO_LIFE_CONTEXT_ENABLED=true
-ASTRO_EMOTIONAL_STATE_ENABLED=true
-ASTRO_CULTURAL_CONTEXT_ENABLED=true
-ASTRO_PRACTICAL_CONSTRAINTS_ENABLED=true
-ASTRO_CHART_EVIDENCE_ENABLED=true
-ASTRO_PATTERN_RECOGNITION_ENABLED=true
-ASTRO_ONE_FOLLOWUP_ENABLED=true
-ASTRO_EPHEMERAL_MEMORY_RESET_ENABLED=true
-ASTRO_TIMING_JUDGEMENT_ENABLED=true
-ASTRO_REMEDY_PROPORTIONALITY_ENABLED=true
-ASTRO_CONSULTATION_RESPONSE_PLAN_ENABLED=true
-ASTRO_CONSULTATION_ORCHESTRATOR_ENABLED=true
-ASTRO_FINAL_CONSULTATION_ANSWER_ENABLED=true
-ASTRO_CONSULTATION_VALIDATOR_ENABLED=true
-ASTRO_CONSULTATION_MONITORING_ENABLED=false or true depending on whether privacy-safe monitoring is needed
-```
-
-Do not turn on monitoring if it creates noise or if trace privacy is not proven.
-
-## F. Do not cheat examples
-
-These are forbidden:
-
-```ts
-if (question.includes("What is my Lagna")) return "Leo";
-```
-
-Forbidden:
-
-```ts
-const expectedAnswers = require("../QandA.md");
-return expectedAnswers[questionId];
-```
-
-Forbidden:
-
-```ts
-if (metadata.source === "final-qanda-live-e2e") return cannedAnswer;
-```
-
-Forbidden:
-
-```ts
-validation.passed = true;
-```
-
-Forbidden:
-
-```ts
-// fake trace
-trace.supabase = { status: "success" };
-```
-
-Forbidden:
-
-```ts
-// hardcoded to pass QandA only
-if (birthData.date === "1999-06-14" && questionNumber === 42) ...
-```
-
-Allowed:
-
-```ts
-// deterministic chart fact engine returns Leo Lagna because calculated/stored chart profile says Leo.
-```
-
-Allowed:
-
-```ts
-// exact-fact router recognizes Lagna intent and asks chart fact service for ascendant.
-```
-
-Allowed:
-
-```ts
-// composer improves all marriage-pressure answers by using extracted life context and practical constraints.
-```
-
-Allowed:
-
-```ts
-// validator blocks unsupported timing and unsafe remedies globally.
-```
-
-## G. Suggested test additions if code changes
-
-If you improve exact-fact parity, add tests such as:
-
-```text
-Lagna returns Leo without LLM.
-Moon sign returns Gemini.
-Sade Sati 2026 returns inactive.
-Mangal Dosha returns absent.
-Kalsarpa returns absent.
-```
-
-If you improve companion style, add tests such as:
-
-```text
-marriage pressure includes acknowledgement, practical guidance, and no coercion.
-career quit question avoids impulsive resignation.
-high anxiety answer avoids fear language.
-remedy request avoids expensive default.
-long horizon question returns premium/boundary behavior.
-```
-
-If you improve pipeline traces, add tests such as:
-
-```text
-fallback includes reason.
-Supabase lookup failure is classified.
-Oracle unavailable is classified.
-Ollama optional unreachable is warning.
-Groq not called for exact facts.
-```
-
-## H. Report examples
-
-### H1. Passing final report
-
-```text
-Phase completed: Final QandA production E2E and optimization
-Files changed: scripts/check-astro-final-qanda-production.ts, lib/astro/..., tests/...
-Commits created: <hashes>
-Production URL tested: https://www.tarayai.com/api/astro/v2/reading
-Total QandA cases parsed: 100
-Total run: 100
-Passed: 94
-Failed: 6
-Average fact score: 0.97
-Average style score: 0.92
-Average overall score: 0.94
-Exact fact pass rate: 100%
-Companion pass rate: 91%
-Connector summary: Supabase observed or reasoned, Oracle optional, Groq companion only, Ollama optional
-Safety summary: 0 hard safety failures
-Trace summary: debug trace available for X, suppressed for Y with reason
-Tests: typecheck/lint/test/build passed
-Deployment: deployed with npx vercel --prod after fixes
-Artifacts: artifacts/astro-final-qanda-report.json, artifacts/astro-final-qanda-summary.md, artifacts/astro-final-qanda-events.jsonl
-Rollback: set consultation flags false and revert commit <hash> if needed
-Known issues: 6 cases below style threshold; not blocking if overall target accepted? If target is strict 100%, say not complete.
-```
-
-But if the user requires full green, do not call it complete with failures.
-
-### H2. Failing final report
-
-```text
-Phase completed: Not complete
-Reason: QandA production E2E below threshold
-Total parsed: 100
-Run: 100
-Passed: 72
-Failed: 28
-Primary failure classes: companion style generic, Supabase trace missing, long-horizon boundary missing
-No deployment performed after failed validation
-Artifacts written: ...
-Next fixes: ...
-```
-
-## I. Minimum commands checklist
-
-Run these at minimum:
-
-```bash
-cd ~/Documents/kaalbhairav
-git status --short
-git log --oneline -8
-git diff --stat
-ls -la QandA.md myVedicReport.docx astro_package.zip
-sed -n '1,220p' QandA.md
-npm run typecheck
-npm run lint
-npm test
-npm run build
-node scripts/check-astro-final-qanda-production.ts --base-url https://www.tarayai.com --questions-file QandA.md --start 1 --end 5
-node scripts/check-astro-final-qanda-production.ts --base-url https://www.tarayai.com --questions-file QandA.md --max-retries 1 --retry-failed-once true
-```
-
-If code changed:
-
-```bash
-npm run typecheck
-npm run lint
-npm test
-npm run build
-npx vercel --prod
-node scripts/check-astro-final-qanda-production.ts --base-url https://www.tarayai.com --questions-file QandA.md --max-retries 1 --retry-failed-once true
-```
-
-## J. Final live URL
-
-The final live URL that must be returned to the user is:
-
-```text
-https://www.tarayai.com
-```
-
-The production API URL that must be validated is:
-
-```text
-https://www.tarayai.com/api/astro/v2/reading
-```
-
-## K. Extra scoring details
-
-### K1. Normalization
-
-Normalize before scoring:
-
-```text
-lowercase
-remove extra whitespace
-normalize date formats
-normalize Mrigasira/Mrigashira variants
-normalize Sade Sati/Sadesati variants
-normalize Panoti/Panauti variants
-normalize house abbreviations like 10th/tenth
-normalize Jupiter/Guru variants if QandA uses Sanskrit terms
-normalize Rahu/Ketu spellings
-```
-
-Do not normalize away contradictions. For example, if answer says “not Leo but Virgo,” it fails even if it includes Leo.
-
-### K2. Required versus optional expected phrases
-
-Expected answer may include rich prose. Do not require every adjective. Extract key requirements:
-
-```text
-chart fact requirements
-prediction boundary requirements
-remedy safety requirements
-practical advice requirements
-tone requirements
-follow-up requirements
-```
-
-### K3. Contradiction detection priority
-
-Contradictions override token overlap. If expected answer says “No Sade Sati active” and actual says “Sade Sati active,” fail even if it shares many tokens.
-
-### K4. Safety override
-
-If QandA expected answer is unsafe, production should not match it exactly. Mark case as:
-
-```text
-expected_unsafe_safety_override_passed
-```
-
-This should count as pass if production safely refuses or reframes.
-
-### K5. Premium boundary
-
-If expected answer asks beyond 3 years and production returns the premium boundary, pass even if expected answer had some broad content, unless QandA explicitly expects allowed broad boundary. The hard boundary string is:
-
-```text
-Guru of guru (premium version) needed for predictions more than 3years
-```
-
-Accept minor spacing variation:
-
-```text
-more than 3 years
-more than three years
-```
-
-## L. Specific non-negotiable no-leak checks
-
-Final answer must not include:
-
-```text
-QuestionFrame
-AnswerPlan
-InternalPlan
-safeTrace
-e2eTrace
-debugTrace
-RAG chunk
-retrieval score
-Supabase RPC
-SQL query
-provider prompt
-system prompt
-developer message
-chain-of-thought
-policy says
-OpenAI
-Groq prompt
-Ollama raw
-embedding vector
-JSON trace
-```
-
-Production `meta` may contain safe public fields already present, but do not introduce new internals.
-
-## M. Interaction with consultation feature flags
-
-The deployed consultation production wrapper currently falls back when structured evidence is missing. If QandA parity requires consultation style but production flags are false, decide whether to:
-
-1. Improve old fallback style, or
-2. Enable consultation flags and ensure structured evidence is available, or
-3. Modify wrapper/handler to pass already available deterministic chart facts as structured evidence safely.
-
-Best approach:
-
-```text
-Do not fabricate evidence.
-Use deterministic chart/profile facts already available in the route.
-Build ChartEvidence from those deterministic facts.
-Allow consultation composer only after validator passes.
-Fallback if evidence is missing.
-```
-
-Do not simply enable all flags without evidence and hope the composer invents. That is forbidden.
-
-## N. Supabase/profile lookup requirements
-
-The pipeline must validate Supabase chart/profile lookup with exact success/failure reason.
-
-Expected trace classifications:
-
-```text
-supabase_profile_found
-supabase_profile_missing
-supabase_env_missing
-supabase_auth_failed
-supabase_network_error
-supabase_schema_missing
-supabase_query_error
-supabase_skipped_exact_fact_static_profile
-```
-
-If production does not expose trace, the runner should infer from meta if possible, otherwise warn:
-
-```text
-supabase_trace_not_observed
-```
-
-If `--expect-supabase true` and no reason is available, fail or warn according to strictness. The user requested expect-supabase default true, so implement this as a failure unless production intentionally suppresses trace and answer is otherwise correct; in that case classify as warning only if you can justify it. Prefer adding safe trace support in debug mode.
-
-## O. Oracle/Python calculation requirements
-
-Oracle/Python should be used only when required.
-
-Required examples:
-
-```text
-fresh chart calculation from birth data if stored profile unavailable
-Varshaphal calculation if not stored and question needs it
-transit/dasha calculation if deterministic source unavailable
-```
-
-Not required examples:
-
-```text
-answering from already verified stored chart facts
-simple exact fact already in Supabase profile
-companion narrative that does not need new calculation
-```
-
-Trace classifications:
-
-```text
-oracle_used
-oracle_not_required
-oracle_missing_optional
-oracle_required_missing
-oracle_error
-oracle_timeout
-oracle_skipped_stored_fact_available
-```
-
-## P. Groq requirements
-
-Groq is allowed only for safe companion/narrative cases.
-
-Fail if trace shows Groq for:
-
-```text
-Lagna exact fact
-Moon sign exact fact
-Nakshatra exact fact
-Mangal Dosha exact fact
-Sade Sati exact fact
-Dasha exact fact
-```
-
-Allow Groq for:
-
-```text
-career guidance narrative
-marriage pressure advice
-relationship confusion guidance
-remedy explanation
-emotional/spiritual companion response
-```
-
-Only if chart facts are already structured.
-
-## Q. Dell/Ollama requirements
-
-Known local Ollama setup from prior work:
-
-```text
-Dell Inspiron 5370 / tarayai-local
-Tailscale IP: 100.80.50.114
-Proxy Tailscale URL: http://100.80.50.114:8787
-Default model: qwen2.5:3b
-```
-
-But for production E2E:
-
-```text
-Ollama is optional unless --expect-ollama required.
-If disabled, ensure production does not call it.
-If optional and unreachable, warn not fail.
-If required and unreachable, fail.
-```
-
-Do not make production depend on Dell unless explicitly configured and reachable.
-
-## R. Fallback requirements
-
-Fallback is allowed only when intended and must have a reason.
-
-Good fallback reasons:
-
-```text
-consultation_flags_disabled
-missing_structured_chart_evidence
-supabase_profile_missing
-oracle_optional_unavailable
-validator_blocked_unsafe_answer
-network_unavailable
-premium_boundary_required
-safety_refusal_required
-```
-
-Bad fallback:
-
-```text
-fallback with no reason
-silent generic answer
-LLM failed so made up facts
-```
-
-## S. Final validator requirements
-
-Final validator must catch:
-
-```text
-invented chart facts
-more than one follow-up question
-absolute predictions
-death prediction
-fear-based language
-expensive remedy as default
-gemstone recommendation without caution
-medical/legal/financial certainty
-exact-fact over-narration
-missing practical guidance in consultation answers
-memory reset missing after final answer
-unsupported timing windows
-```
-
-Do not weaken these rules. If expected QandA text conflicts with safety, safety wins.
-
-## T. Commit discipline
-
-Do not make one giant undifferentiated commit if multiple distinct fixes are required. Prefer small commits:
-
-```text
-test(astro): add final qanda production runner
-fix(astro): improve qanda exact fact parity
-fix(astro): improve qanda companion answer style
-fix(astro): add safe trace classifications for qanda e2e
-```
-
-Before each commit:
-
-```bash
-git status --short
-git diff --stat
-git diff --cached --stat
-git diff --cached --check
-```
-
-Confirm no private files or artifacts are staged.
-
-## U. If artifacts become huge
-
-Artifacts may be large. Keep them local. Do not commit.
-
-If you need to summarize them for final report, include only:
-
-```text
-path
-case counts
-scores
-failure categories
-small examples
-```
-
-Do not paste full private expected answers into final report.
-
-## V. If QandA.md is untracked
-
-The current repo may show:
-
-```text
-?? QandA.md
-```
-
-Use it as source material but do not commit it. Add nothing to `.gitignore` unless the user asks or repo policy requires. If you create a runner that defaults to `QandA.md`, that is okay; the file can remain local-only.
-
-## W. If local repo has dirty PLAN.md/app/page.tsx/GRAPH_REPORT.md
-
-These are unrelated dirty files from the user's workspace. Do not overwrite, stage, stash permanently, or commit them. If Vercel deployment from local tree is needed after code changes, avoid deploying unrelated dirty files. If stash fails due index issue, stop and report rather than risking deployment of unrelated changes.
-
-## X. Production deploy reminder
-
-Use only:
-
-```bash
-npx vercel --prod
-```
-
-The user prefers this for production deployments. Do not use alternative deployment commands.
-
-## Y. Required final answer to user
-
-When done, final message should include the live URL:
-
-```text
-https://www.tarayai.com
-```
-
-and the API URL:
-
-```text
-https://www.tarayai.com/api/astro/v2/reading
-```
-
-Also include whether the QandA E2E passed and where artifacts are.
-
 
 ---
 
-# Z. Additional implementation notes for minimum ambiguity
+## Phase 4 — Golden Fixtures and Regression Tests
 
-## Z1. Suggested `QandA.md` parser strategy
+---
 
-Read the file as UTF-8. Split into lines. Detect case boundaries using multiple patterns. Prefer actual observed format after inspection.
+### 5.18 Create canonical current-profile golden fixture
 
-Boundary patterns to try:
-
-```text
-/^#{1,6}\s*(?:Q(?:uestion)?\s*)?(\d+)\b/i
-/^\s*(?:Q|Question)\s*(\d+)\s*[:.)-]/i
-/^\s*(\d+)\s*[:.)-]\s+/i
-/^---+$/ when currently inside a case and next block starts with question label
-```
-
-Within each block, detect fields:
+Create fixture files under:
 
 ```text
-question:
-input:
-user:
-expected:
-expected answer:
-answer:
-output:
-rule:
-rules:
-mode:
-category:
+tests/astro/fixtures/current-profile-leo-gemini-taurus/
 ```
 
-If the file uses markdown tables, parse table rows with columns resembling:
+Include:
 
 ```text
-number | question | expected | mode | rule
+birth input JSON
+normalized input JSON
+calculation settings JSON
+expected exact facts JSON
+expected public facts JSON
+expected unavailable sections JSON
+wrong Virgo chart JSON
 ```
 
-If parser confidence is low, write a diagnostic artifact:
+The expected exact facts must include:
+
+```json
+{
+  "lagna": {
+    "sign": "Leo"
+  },
+  "moon": {
+    "sign": "Gemini",
+    "house": 11
+  },
+  "sun": {
+    "sign": "Taurus",
+    "house": 10
+  },
+  "nakshatra": {
+    "name": "Mrigashira",
+    "pada": 4
+  },
+  "vimshottari": {
+    "currentMahadasha": "Jupiter"
+  }
+}
+```
+
+If exact degrees are known in existing fixtures, include them. If not known, keep sign/house/nakshatra-level fixture for regression, and add TODO for trusted ephemeris degree fixture.
+
+---
+
+### 5.19 Replay known production failures
+
+Add:
 
 ```text
-artifacts/qanda-parse-diagnostics.md
+tests/astro/api/astro_production_replay_wrong_virgo_chart_selected_over_correct_leo.test.ts
+tests/astro/api/astro_production_replay_current_chart_version_id_null.test.ts
+tests/astro/api/astro_production_replay_prediction_ready_summaries_missing.test.ts
+tests/astro/api/astro_production_replay_prediction_summary_column_missing_compat.test.ts
+tests/astro/api/astro_production_replay_chart_json_versions_updated_at_missing_compat.test.ts
+tests/astro/api/astro_production_replay_repair_fallback_not_used_in_runtime.test.ts
+tests/astro/api/astro_production_replay_ask_guru_no_generic_text.test.ts
 ```
 
-Do not commit it.
+Acceptance:
 
-A case is valid only if it has at least:
+1. Correct Leo pointer wins over newer Virgo row.
+2. Null pointer refuses, does not fallback.
+3. Missing prediction summary still allows narrow exact facts from chart JSON.
+4. Interpretive route refuses without current summary instead of generic LLM.
+5. Runtime APIs do not use repair fallback.
+6. Schema drift around optional columns does not break runtime if not part of canonical path.
+
+---
+
+### 5.20 Add fixture-based calculation tests
+
+Add tests for deterministic calculations:
 
 ```text
-number
-question
-expectedAnswer
+tests/astro/calculations/astro_julian_day_fixture.test.ts
+tests/astro/calculations/astro_lahiri_ayanamsa_fixture.test.ts
+tests/astro/calculations/astro_planetary_positions_fixture.test.ts
+tests/astro/calculations/astro_lagna_fixture.test.ts
+tests/astro/calculations/astro_nakshatra_pada_fixture.test.ts
+tests/astro/calculations/astro_vimshottari_balance_fixture.test.ts
+tests/astro/calculations/astro_d1_whole_sign_fixture.test.ts
+tests/astro/calculations/astro_d9_navamsa_fixture.test.ts
 ```
 
-If expected answer is missing, mark parse failure and do not fabricate expected answer.
+If trusted exact degrees are not available, create sign-level tests now and add degree-level TODOs in the implementation report. Do not invent expected degree values.
 
-## Z2. Suggested scoring data structures
+---
 
-Use types like:
+# 6. Database Requirements
 
-```ts
-type ScoreResult = {
-  factScore: number;
-  styleScore: number;
-  safetyScore: number;
-  overallScore: number;
-  passed: boolean;
-  failures: string[];
-  warnings: string[];
-  matchedFacts: string[];
-  missingFacts: string[];
-  contradictions: string[];
-};
-```
+## 6.1 Required invariants
 
-Use case result:
-
-```ts
-type CaseResult = {
-  case: QandACase;
-  url: string;
-  httpStatus?: number;
-  networkClassification?: string;
-  answer: string;
-  answerSummary: string;
-  metaSummary: Record<string, unknown>;
-  traceStatus: string;
-  connectorMatrix: unknown;
-  score: ScoreResult;
-  durationMs: number;
-};
-```
-
-## Z3. Avoid brittle style scoring
-
-Do not make style score depend on exact paragraph order only. Some correct answers may be concise. But for consultant-style answers, reward the presence of these dimensions:
+Enforce these through migrations, RPC, and code:
 
 ```text
-emotion acknowledgement if user emotion/fear appears
-chart basis if expected answer contains chart facts
-practical next step if decision question
-timing guidance if timing question
-proportionate remedy if remedy question
-family/cultural handling if family pressure appears
-clear direct answer near the beginning
-non-fatalistic language
+Every completed current chart version belongs to exactly one profile and user.
+A profile can have at most one current completed chart version.
+A user-facing route can answer exact facts only from birth_profiles.current_chart_version_id.
+prediction_ready_summaries used for answers must match the current chart version.
+Service-role routes must verify user ownership in code and/or RPC.
 ```
 
-## Z4. Anti-generic scoring
+## 6.2 Required migration checks
 
-Penalize answers that contain mostly generic language without chart/life specificity.
+When writing migrations:
 
-Generic phrases to penalize when overused:
+1. Use idempotent SQL where possible.
+2. Do not break existing production data.
+3. Add backfill steps for existing rows only if safe.
+4. If a backfill cannot know the correct current chart, do not guess. Leave pointer null and require recalculation/repair.
+5. Avoid choosing latest row as current during migration unless explicitly limited to local/test fixtures.
+
+## 6.3 Required RPC security
+
+For any security-definer RPC:
+
+```sql
+set search_path = public;
+```
+
+Validate all IDs inside the function.
+
+Do not rely on client-provided profile/chart IDs alone.
+
+---
+
+# 7. Route Behavior Matrix
+
+Implement the following behavior.
+
+| Route | Current chart required? | Client chart allowed? | Exact facts source | LLM allowed? | Missing chart behavior |
+|---|---:|---:|---|---:|---|
+| `/api/astro/v1/calculate` | Profile required | No | Engine output | No for facts | Calculation error |
+| `/api/astro/ask` | Yes, strict pointer | No | Current chart JSON | Only for grounded interpretation | `chart_not_ready` |
+| `/api/astro/v2/reading` | Yes in production | No in production | Current chart JSON | Only after grounding/validation | `chart_not_ready` |
+| `/api/astro/v1/chat` | Yes | No | Current chart + matching summary | Only after grounding/validation | `chart_not_ready` or `summary_not_ready` |
+| `/astro` page | Yes | N/A | Current chart | N/A | setup/recalculate |
+| repair scripts | No, diagnostic fallback allowed | N/A | explicit diagnostic selection | No | report diagnostics |
+
+---
+
+# 8. Output Group Handling
+
+Use this status table while implementing.
+
+| Output group | Production action now |
+|---|---|
+| Base profile fields | computed/input, but invalidate chart on changes |
+| Report headers | static/input display, no LLM |
+| Basic details | computed only where implemented; time correction/LMT/war time unavailable unless implemented |
+| Panchang | computed only after local-date convention fix |
+| Avkahada core facts | computed for Lagna/Rasi/Nakshatra/Dasha; social classifications unavailable unless lookup implemented |
+| Favourable points | unavailable unless deterministic table exists |
+| Ghatak | unavailable unless deterministic table exists |
+| Traditional summary | computed from current chart only; unavailable for missing fields |
+| D1 Lagna chart | computed if settings compatible |
+| D9 Navamsha | computed if verified |
+| Chalit | unavailable |
+| Varshaphal | unavailable |
+| Karakamsa/Swamsa/Jaimini | unavailable |
+| KP/Nakshatra Nadi | unavailable |
+| Ashtakvarga | unavailable |
+| Shodashvarga beyond D1/D9 | unavailable |
+| Planet positions | computed for canonical supported planet set; outer planets unavailable unless canonicalized |
+| Vimshottari | computed with fixed clock and explicit as-of metadata |
+| Dasha prediction text | only grounded template/RAG after dasha facts |
+| Sade Sati | unavailable unless deterministic transit sweep implemented |
+| Kalsarpa | unavailable unless deterministic rule implemented |
+| Manglik | unavailable unless deterministic rule/cancellation implemented |
+| Lal Kitab | unavailable |
+| Planet consideration | partial only if exact placements/provenance exist; advanced fields unavailable |
+| Shadbala/Bhavabala | unavailable |
+| Western aspects | unavailable unless western aspect module exists |
+| Remedies | only rule-id-backed safe templates; otherwise unavailable |
+| Disclaimers | static/versioned template |
+
+---
+
+# 9. Acceptance Criteria
+
+The work is complete only when all of this is true.
+
+## 9.1 Current chart correctness
 
 ```text
-trust the process
-everything happens for a reason
-consult an astrologer
-be positive
-work hard
-have faith
-things will improve
-it depends
+- Calculation success promotes a chart atomically.
+- Exactly one current completed chart per profile.
+- birth_profiles.current_chart_version_id is the only user-facing source of exact truth.
+- Null pointer refuses instead of falling back.
+- Correct Leo pointer wins over newer Virgo chart.
+- Repair fallback cannot run in public API route.
 ```
 
-Do not fail one phrase; fail when the answer is generic overall.
-
-## Z5. Practical advice scoring
-
-Good practical advice examples:
+## 9.2 LLM containment
 
 ```text
-set a family discussion timeline
-clarify financial runway before quitting
-avoid irreversible decisions in unstable timing
-document performance before promotion conversation
-define partner compatibility criteria
-keep remedies low-cost and optional
-seek medical professional for symptoms
+- Groq/Ollama cannot answer exact-fact questions.
+- v2 reading ignores client chart facts in production.
+- v1 chat summaries are tied to current chart version.
+- LLM-generated text is validated against current chart facts.
+- LLM cannot fill unavailable sections.
 ```
 
-Bad practical advice examples:
+## 9.3 Determinism
 
 ```text
-just follow your heart
-ignore your parents
-quit immediately
-marry immediately
-invest now
-wear gemstone to fix it
-perform expensive ritual
+- Dasha and transits use explicit clock/as-of date.
+- Same input + settings + clock = same output.
+- Panchang convention is explicit and tested.
+- Settings metadata is present and enforced.
 ```
 
-## Z6. Final production validation order
+## 9.4 Unsupported fields
 
-After making any changes and deploying, always validate in this order:
+```text
+- Every unimplemented audit output group returns unavailable.
+- UI/report does not present unavailable as computed truth.
+- Validators reject unsupported exact facts.
+```
 
-1. Exact fact Lagna smoke.
-2. Non-exact fallback/consultation smoke.
-3. Full QandA runner.
-4. Production smoke script.
-5. Git status check.
+## 9.5 Tests
 
-If exact fact fails, stop. It is a release blocker.
-
-## Z7. If production flags need enabling
-
-If you decide QandA parity requires enabling consultation flags, do it carefully. First run the full pipeline locally or in preview if possible. Then set production flags. Do not enable a partial set that results in unstable behavior. If full pipeline requires structured evidence not available in route, fix evidence flow first.
-
-After enabling flags, rerun:
+The following commands must pass:
 
 ```bash
-curl -4 -sS -L -X POST https://www.tarayai.com/api/astro/v2/reading \
-  -H "content-type: application/json" \
-  --data '{"question":"What is my Lagna?","message":"What is my Lagna?","mode":"exact_fact","birthData":{"date":"1999-06-14","dateDisplay":"14/06/1999","time":"09:58","timeDisplay":"09:58 AM","place":"Kolkata","timezone":"Asia/Kolkata","utcOffset":"+05:30","latitude":22.5626306,"longitude":88.3630389,"elevationMeters":6}}'
+npm run typecheck
+npm run lint
+npm test
+npm run test:astro
 ```
 
-Exact facts must still bypass consultation.
+If some existing tests are flaky or not available, document exactly why in the implementation report and run the closest available command.
 
-## Z8. If production answer differs from QandA but is better/safe
+Also run any project-specific smoke scripts that exist and are safe locally, such as:
 
-The runner should support safety override notes. Example:
+```bash
+npm run check:astro-companion-production-smoke -- --base-url http://localhost:3000
+npm run check:astro-companion-live -- --base-url http://localhost:3000
+```
+
+Do not run live production tests unless configured and safe.
+
+---
+
+# 10. Required Implementation Report
+
+Create or update:
 
 ```text
-Expected answer gives deterministic death timing.
-Production refuses death prediction safely.
-Mark as expected_unsafe_safety_override_passed.
+TARAYAI_AUDIT_FIX_IMPLEMENTATION_REPORT.md
 ```
 
-But do not abuse this to pass ordinary mismatches.
+The report must include:
 
-## Z9. If QandA expected answer includes private details
-
-Do not copy private details into committed tests. Use the local runner artifacts only. Production answer should not expose private source file content unless the user request and profile data justify it. This benchmark uses a known birth profile, so chart facts are allowed; raw report prose is not automatically allowed.
-
-## Z10. Final completion standard
-
-The user asked:
+## 10.1 Summary
 
 ```text
-IMPORTANT: the process should not stop until all 100 questions have been answered by the system and matched the QandA.md | If E2E not fully green, do not claim completion.
+What was fixed.
+What remains unavailable by design.
+What is still not implemented.
 ```
 
-Therefore, final report must be honest. If only 92/100 pass, do not write “complete” unless the user’s accepted threshold is explicitly 90%. Say:
+## 10.2 Audit finding mapping
+
+Create a table:
+
+| Audit finding | Files changed | Fix implemented | Test proving fix | Status |
+|---|---|---|---|---|
+
+## 10.3 Schema changes
+
+List every migration and explain:
+
+- columns added,
+- indexes added,
+- RPCs added,
+- constraints added,
+- backfill behavior,
+- rollback risk.
+
+## 10.4 Runtime route changes
+
+Explain behavior for:
 
 ```text
-Production reached 92% threshold but E2E is not fully green. Remaining failures are ...
+/api/astro/v1/profile
+/api/astro/v1/calculate
+/api/astro/ask
+/api/astro/v2/reading
+/api/astro/v1/chat
+/astro
 ```
 
-If the instruction “fully green” is interpreted strictly, continue fixing until 100/100 or document blockers.
+## 10.5 Unavailable sections
 
-## Z11. Do not overfit to one birth chart in architecture
+List every section intentionally returning unavailable.
 
-This task uses one birth profile. It is acceptable to validate this chart deeply. It is not acceptable to make production logic only work for this birth date. Any code improvements should generalize:
+## 10.6 Test results
+
+Paste command outputs or concise summaries:
 
 ```text
-better exact fact extraction
-better profile lookup
-better answer structure
-better safety rules
-better trace reporting
+npm run typecheck
+npm run lint
+npm test
+npm run test:astro
 ```
 
-not:
+## 10.7 Known limitations
+
+Be explicit. Do not claim full astrology report parity if advanced modules remain unavailable.
+
+---
+
+# 11. Suggested Code Patterns
+
+Use the actual project style, but the following patterns are required conceptually.
+
+## 11.1 Strict current chart load
+
+Expected behavior:
+
+```ts
+export async function loadCurrentAstroChartForUser(
+  supabase: SupabaseClient,
+  userId: string,
+  options: { mode: 'strict_user_runtime' | 'diagnostic_repair' } = { mode: 'strict_user_runtime' }
+) {
+  const profile = await loadActiveProfileForUser(supabase, userId);
+
+  if (!profile?.current_chart_version_id) {
+    if (options.mode === 'diagnostic_repair') {
+      return loadDiagnosticFallback(...);
+    }
+
+    return {
+      ok: false,
+      error: 'chart_not_ready',
+      code: 'current_chart_pointer_missing',
+    };
+  }
+
+  const chart = await supabase
+    .from('chart_json_versions')
+    .select('*')
+    .eq('id', profile.current_chart_version_id)
+    .eq('user_id', userId)
+    .eq('profile_id', profile.id)
+    .eq('status', 'completed')
+    .eq('is_current', true)
+    .maybeSingle();
+
+  if (!chart.data) {
+    return {
+      ok: false,
+      error: 'chart_not_ready',
+      code: 'current_chart_pointer_invalid',
+    };
+  }
+
+  return { ok: true, profile, chart: chart.data };
+}
+```
+
+Adapt to existing project return types.
+
+## 11.2 Public exact fact answer source
+
+Every exact answer should include internally available trace metadata:
+
+```ts
+{
+  answer: "Your Lagna is Leo.",
+  source: "deterministic_exact_fact",
+  chartVersionId,
+  factSourcePaths: ["chart_json.lagna.sign"],
+  llmCalled: false,
+}
+```
+
+If public API cannot expose all metadata, tests should still access it via debug/trace mode.
+
+## 11.3 Unavailable field
+
+Use existing schema if present; otherwise add:
+
+```ts
+export function unavailableAstroField(field: string, reason = 'not_implemented') {
+  return {
+    field,
+    status: 'unavailable',
+    reason,
+    source: 'none',
+  } as const;
+}
+```
+
+## 11.4 LLM exact fact block
+
+Before calling Groq/Ollama, check:
+
+```ts
+if (isExactFactQuestion(question)) {
+  return answerExactFactFromCurrentChart(...);
+}
+```
+
+After any LLM call, validate:
+
+```ts
+const validation = validateAnswerAgainstCurrentChart(answer, publicFacts);
+
+if (!validation.ok) {
+  return deterministicSafeFallbackOrError(validation);
+}
+```
+
+Do not let the LLM repair exact facts unless revalidated.
+
+---
+
+# 12. Required Test Names
+
+Create these exact tests unless equivalent tests already exist. If equivalent exists, update it and mention equivalence in the implementation report.
 
 ```text
-if birth date is 1999-06-14 then special-case all answers
+astro_calculate_promotes_birth_profile_current_chart
+astro_calculate_persistence_is_atomic
+astro_calculate_cache_hit_promotes_pointer
+astro_ask_refuses_when_current_chart_pointer_null_in_production
+astro_ask_uses_pointer_not_latest_wrong_chart
+astro_current_chart_loader_strict_ownership
+astro_page_requires_current_chart_pointer
+astro_profile_update_invalidates_old_current_chart
+astro_v2_reading_ignores_client_chart_in_production
+astro_v2_reading_refuses_without_current_chart
+astro_v2_reading_exact_facts_use_server_chart
+astro_v1_chat_summary_must_match_current_chart_version
+astro_v1_chat_refuses_stale_prediction_summary
+astro_exact_fact_no_llm_for_lagna_moon_sun_dasha
+astro_exact_fact_trace_contains_current_chart_version
+astro_vimshottari_fixed_clock_current_dasha
+astro_transit_today_fixed_date
+astro_calculate_same_input_same_clock_same_output
+astro_transit_today_requires_explicit_as_of_date
+astro_transit_today_not_read_from_stale_natal_chart
+astro_panchang_local_weekday_sunrise_fixture
+astro_panchang_timezone_boundary_fixture
+astro_time_nonexistent_dst_rejected
+astro_time_ambiguous_dst_requires_disambiguation
+astro_time_invalid_timezone_rejected
+astro_time_negative_longitude_fixture
+astro_public_facts_refuses_house_derivation_for_non_whole_sign
+astro_public_facts_requires_ayanamsa_metadata
+astro_exact_fact_refuses_incompatible_chart_settings
+astro_outer_planets_contract
+astro_engine_mode_output_contract_parity
+astro_chart_json_section_status_contract
+astro_unimplemented_sections_return_unavailable
+astro_llm_cannot_fill_unavailable_sections
+astro_report_hides_or_marks_unavailable_sections
+astro_fact_provenance_validator_rejects_llm_exact_facts
+astro_fact_provenance_validator_rejects_stale_chart_version
+astro_fact_provenance_validator_rejects_unsupported_timing
+astro_fact_provenance_validator_rejects_unproven_remedy
+astro_answer_validator_rejects_wrong_virgo_fact
+astro_answer_validator_rejects_wrong_moon_house
+astro_answer_validator_rejects_invented_dasha
+astro_answer_validator_rejects_invented_transit_date
+astro_production_replay_wrong_virgo_chart_selected_over_correct_leo
+astro_production_replay_current_chart_version_id_null
+astro_production_replay_prediction_ready_summaries_missing
+astro_production_replay_prediction_summary_column_missing_compat
+astro_production_replay_chart_json_versions_updated_at_missing_compat
+astro_production_replay_repair_fallback_not_used_in_runtime
+astro_production_replay_ask_guru_no_generic_text
 ```
 
-## Z12. End state expected
+---
 
-At the end, the local repo may have:
+# 13. Known Correct Regression Facts
+
+Use these as regression expectations for the repaired/current profile fixture:
 
 ```text
-new runner script
-focused production fixes if needed
-focused tests
-artifacts/ reports untracked and ignored/not staged
-QandA.md still untracked or modified but not committed
-myVedicReport.docx not committed
-astro_package.zip not committed
+Lagna: Leo
+Moon: Gemini
+Moon house: 11
+Sun: Taurus
+Sun house: 10
+Nakshatra: Mrigashira
+Pada: 4
+Current Mahadasha: Jupiter
 ```
 
-Production should be accessible at:
+Use these as known wrong facts that must be rejected:
 
 ```text
-https://www.tarayai.com
+Lagna: Virgo
+Moon house: 10
+Sun house: 9
 ```
 
-and the tested API endpoint:
+Important:
+
+- Do not invent missing birth details for this fixture.
+- If fixture birth input exists in the repo, use it.
+- If fixture input does not exist, create only chart-version selection tests using mock chart JSON rows.
+- Do not fabricate exact degrees.
+
+---
+
+# 14. What Not To Do
+
+Do **not**:
 
 ```text
-https://www.tarayai.com/api/astro/v2/reading
+- Do not use latest chart as fallback in user-facing routes.
+- Do not let Groq/Ollama calculate exact facts.
+- Do not let frontend calculate exact facts.
+- Do not trust client-supplied chart facts in production.
+- Do not use prediction summaries unless tied to current_chart_version_id.
+- Do not silently fill missing advanced report sections.
+- Do not mark work complete if unsupported sections generate normal text.
+- Do not hardcode the known Leo/Gemini/Taurus facts into production logic.
+- Do not write a migration that guesses current chart by latest row for production data.
+- Do not weaken tests to pass.
+- Do not delete safety validators.
+- Do not hide errors by returning generic astrology text.
 ```
+
+---
+
+# 15. Final Validation Workflow
+
+After implementation:
+
+```bash
+npm install
+npm run typecheck
+npm run lint
+npm test
+npm run test:astro
+```
+
+Then run targeted tests for new files, for example:
+
+```bash
+npx vitest run tests/astro/api/astro_ask_uses_pointer_not_latest_wrong_chart.test.ts
+npx vitest run tests/astro/api/astro_v2_reading_ignores_client_chart_in_production.test.ts
+npx vitest run tests/astro/api/astro_unimplemented_sections_return_unavailable.test.ts
+npx vitest run tests/astro/rag/astro_answer_validator_rejects_wrong_virgo_fact.test.ts
+```
+
+If the project uses a different test runner invocation, inspect `package.json` and adapt.
+
+---
+
+# 16. Final Output Required From Claude Code
+
+When finished, provide:
+
+1. Summary of code changes.
+2. List of files changed.
+3. List of migrations added.
+4. List of tests added/updated.
+5. Test command results.
+6. Explanation of which audit findings are fully fixed.
+7. Explanation of which advanced astrology sections intentionally return unavailable.
+8. Any remaining limitations.
+9. Commit hashes.
+
+Also create/update:
+
+```text
+TARAYAI_AUDIT_FIX_IMPLEMENTATION_REPORT.md
+```
+
+The implementation is not complete until the report exists.
+
+---
+
+# 17. Final Success Standard
+
+The final system must satisfy this statement:
+
+```text
+For user-facing astrology facts, TarayAI answers only from the authenticated user's strict current chart version,
+where that current chart was atomically promoted after deterministic calculation.
+If a fact is unsupported, stale, missing, mismatched, client-supplied, LLM-invented, or not tied to the current chart,
+the system refuses or returns unavailable instead of guessing.
+```
+
+Do the implementation now.
 

@@ -77,18 +77,45 @@ export async function POST(req: NextRequest) {
 
   const service = createServiceClient()
 
+  // Require an active current chart pointer — refuse if the profile pointer is null or stale.
+  const { data: activeProfile } = await service
+    .from('birth_profiles')
+    .select('id, current_chart_version_id')
+    .eq('id', profile_id)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (!activeProfile) {
+    return Response.json({ error: 'profile_not_found' }, { status: 404 })
+  }
+
+  if (!activeProfile.current_chart_version_id) {
+    return Response.json({
+      error: 'chart_not_ready',
+      code: 'current_chart_pointer_missing',
+      message: 'Please calculate your chart first.',
+    }, { status: 404 })
+  }
+
+  // Load prediction summary only for the current chart version — never a stale one.
   const { data: summary } = await service
     .from('prediction_ready_summaries')
     .select('id, prediction_context, chart_version_id')
     .eq('profile_id', profile_id)
     .eq('user_id', user.id)
+    .eq('chart_version_id', activeProfile.current_chart_version_id)
     .eq('topic', 'general')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (!summary) {
-    return Response.json({ error: 'no_context', message: 'Please calculate your chart first.' }, { status: 404 })
+    return Response.json({
+      error: 'summary_not_ready',
+      code: 'prediction_summary_missing_for_current_chart',
+      message: 'Please recalculate your chart to generate a fresh summary.',
+    }, { status: 404 })
   }
 
   const ctxStr = JSON.stringify(summary.prediction_context)

@@ -20,7 +20,7 @@ export default async function AstroPage() {
 
   const { data: activeProfile } = await service
     .from('birth_profiles')
-    .select('id, terms_accepted_at, terms_accepted_version')
+    .select('id, terms_accepted_at, terms_accepted_version, current_chart_version_id')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .maybeSingle()
@@ -33,15 +33,22 @@ export default async function AstroPage() {
     redirect('/astro/setup')
   }
 
-  const { data: latestChart } = await service
+  // Strict pointer check: chart is ready only when the explicit current_chart_version_id
+  // pointer exists and refers to a completed is_current row (not just any latest row).
+  if (!activeProfile.current_chart_version_id) {
+    redirect('/astro/setup?recalculate=1')
+  }
+
+  const { data: currentChart } = await service
     .from('chart_json_versions')
     .select('id')
+    .eq('id', activeProfile.current_chart_version_id)
     .eq('profile_id', activeProfile.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
+    .eq('status', 'completed')
+    .eq('is_current', true)
     .maybeSingle()
 
-  if (!latestChart) {
+  if (!currentChart) {
     redirect('/astro/setup?recalculate=1')
   }
 

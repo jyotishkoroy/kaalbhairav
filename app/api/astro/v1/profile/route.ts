@@ -113,6 +113,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Birth data is changing — clear the current chart pointer so stale chart cannot be used.
+    // The user must recalculate after updating birth details.
     const { error: updateError } = await service
       .from('birth_profiles')
       .update({
@@ -128,6 +130,11 @@ export async function POST(req: NextRequest) {
         birth_details_change_available_at: changeAvailableAt.toISOString(),
         terms_accepted_at: input.terms_accepted_version ? now.toISOString() : undefined,
         terms_accepted_version: input.terms_accepted_version ?? undefined,
+        // Invalidate the current chart pointer so the stale chart cannot be used.
+        // All calculation-affecting fields are re-encrypted together; we cannot diff
+        // individual fields, so we always clear the pointer on any profile update.
+        current_chart_version_id: null,
+        input_hash: null,
       })
       .eq('id', existingProfile.id)
       .eq('user_id', user.id)

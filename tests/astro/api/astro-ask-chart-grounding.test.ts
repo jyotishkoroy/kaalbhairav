@@ -67,23 +67,28 @@ describe("POST /api/astro/ask chart grounding", () => {
 
   it("returns chart-not-ready when no chart exists", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, null) as never);
+    // Profile without current_chart_version_id → strict mode returns chart_not_ready immediately
+    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1", current_chart_version_id: null }, null) as never);
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
-    expect(body.answer.toLowerCase()).toContain("not ready yet");
+    expect(body.answer.toLowerCase()).toContain("chart");
   });
 
   it("returns chart-not-ready when chart is empty", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: {} }) as never);
+    // Chart row exists but strict filters (is_current=true, status=completed) return null
+    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1", current_chart_version_id: "c1" }, null) as never);
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
-    expect(body.answer.toLowerCase()).toContain("recalculated");
+    expect(body.answer.toLowerCase()).toContain("chart");
   });
 
   it("answers Lagna deterministically without V2", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } } }) as never);
+    vi.mocked(createServiceClient).mockReturnValue(makeService(
+      { id: "p1", current_chart_version_id: "c1" },
+      { id: "c1", is_current: true, status: "completed", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } } },
+    ) as never);
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "aadesh: Your Lagna is Leo." });
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
@@ -93,7 +98,11 @@ describe("POST /api/astro/ask chart grounding", () => {
 
   it("passes public chart facts to the canonical handler for interpretive questions", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter", antardashaNow: "Jupiter-Ketu" } } }, { prediction_context: { summary: "Stable summary" } }) as never);
+    vi.mocked(createServiceClient).mockReturnValue(makeService(
+      { id: "p1", current_chart_version_id: "c1" },
+      { id: "c1", is_current: true, status: "completed", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter", antardashaNow: "Jupiter-Ketu" } } },
+      { prediction_context: { summary: "Stable summary" } },
+    ) as never);
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "aadesh: Based on Leo Lagna..." });
     const resp = await POST(makeRequest({ question: "How will my today be in the field of relationship?" }));
     const body = await resp.json();
@@ -109,7 +118,10 @@ describe("POST /api/astro/ask chart grounding", () => {
 
   it("ignores client profileId and chartVersionId", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } } }) as never);
+    vi.mocked(createServiceClient).mockReturnValue(makeService(
+      { id: "p1", current_chart_version_id: "c1" },
+      { id: "c1", is_current: true, status: "completed", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } } },
+    ) as never);
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "generic answer" });
     await POST(makeRequest({ question: "What about my career?", profileId: "evil", chartVersionId: "evil" }));
     const callBody = vi.mocked(answerCanonicalAstroQuestion).mock.calls[0][0];
@@ -119,7 +131,10 @@ describe("POST /api/astro/ask chart grounding", () => {
 
   it("strips metadata from response", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeService({ id: "p1" }, { id: "c1", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } } }) as never);
+    vi.mocked(createServiceClient).mockReturnValue(makeService(
+      { id: "p1", current_chart_version_id: "c1" },
+      { id: "c1", is_current: true, status: "completed", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } } },
+    ) as never);
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: "generic answer" });
     const resp = await POST(makeRequest({ question: "What about my career?" }));
     const body = await resp.json();

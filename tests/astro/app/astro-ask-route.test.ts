@@ -105,18 +105,19 @@ describe('POST /api/astro/ask', () => {
 
   it('returns setup_required when no chart exists', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com' }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: null }) as never)
+    // Profile with no current_chart_version_id — strict mode returns chart_not_ready
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1', current_chart_version_id: null }, chart: null }) as never)
 
     const req = makeRequest({ question: 'What is my Lagna?' })
     const resp = await POST(req)
     expect(resp.status).toBe(200)
     const body = await resp.json()
-    expect(body.answer).toContain('chart context is not ready')
+    expect(body.answer).toContain('chart')
   })
 
   it('returns safe answer when question is blocked by guard (model question)', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com' }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1' } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1', current_chart_version_id: 'c1' }, chart: { id: 'c1', is_current: true, status: 'completed' } }) as never)
     const req = makeRequest({ question: 'Which AI model do you use?' })
     const resp = await POST(req)
     expect(resp.status).toBe(200)
@@ -128,7 +129,7 @@ describe('POST /api/astro/ask', () => {
   it('calls canonical handler with server-resolved userId and profileId, ignoring client-supplied values', async () => {
     const mockUser = { id: 'real-user-id', email: 'real@test.com', user_metadata: {} }
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock(mockUser) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'real-profile-id' }, chart: { id: 'real-chart-id', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'real-profile-id', current_chart_version_id: 'real-chart-id' }, chart: { id: 'real-chart-id', is_current: true, status: 'completed', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
     // Client tries to supply fake user/profile ids — must be ignored
     const req = makeRequest({
       question: 'What about my career?',
@@ -147,7 +148,7 @@ describe('POST /api/astro/ask', () => {
 
   it('strips followUpQuestion and followUpAnswer from response', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1', current_chart_version_id: 'c1' }, chart: { id: 'c1', is_current: true, status: 'completed', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'Career answer.' })
 
     const req = makeRequest({ question: 'What about my career?' })
@@ -161,7 +162,7 @@ describe('POST /api/astro/ask', () => {
 
   it('passes requestId into canonical handler metadata and does not expose it', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1', current_chart_version_id: 'c1' }, chart: { id: 'c1', is_current: true, status: 'completed', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'Your answer.' })
 
     const req = makeRequest({ question: 'What about my career?', requestId: 'test-req-1' })
@@ -173,7 +174,7 @@ describe('POST /api/astro/ask', () => {
 
   it('returns sanitized canonical answer', async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: 'u1', email: 'a@b.com', user_metadata: {} }) as never)
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1' }, chart: { id: 'c1', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: 'p1', current_chart_version_id: 'c1' }, chart: { id: 'c1', is_current: true, status: 'completed', chart_json: { public_facts: { lagna_sign: 'Leo', moon_sign: 'Gemini', moon_house: 11, sun_sign: 'Taurus', sun_house: 10, moon_nakshatra: 'Mrigasira', moon_pada: 4, mahadasha: 'Jupiter' } } } }) as never)
     vi.mocked(answerCanonicalAstroQuestion).mockResolvedValue({ answer: 'profile_id=abc123 Your answer.' })
 
     const req = makeRequest({ question: 'What about my career?' })

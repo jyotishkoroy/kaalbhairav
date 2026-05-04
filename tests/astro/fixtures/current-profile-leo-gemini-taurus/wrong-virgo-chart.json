@@ -1,0 +1,14 @@
+{
+  "_comment": "Known WRONG chart facts that must be rejected by the system. These were produced by the production bug.",
+  "lagna": {
+    "sign": "Virgo"
+  },
+  "moon": {
+    "sign": "Gemini",
+    "house": 10
+  },
+  "sun": {
+    "sign": "Taurus",
+    "house": 9
+  }
+}

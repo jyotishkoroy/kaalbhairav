@@ -10,8 +10,18 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const state = vi.hoisted(() => ({
   user: null as null | { id: string; email?: string; user_metadata?: Record<string, unknown> },
   activeProfile: null as null | Record<string, unknown>,
-  latestChart: null as null | Record<string, unknown>,
+  currentChart: null as null | Record<string, unknown>,
 }))
+
+// Chainable mock: all methods return `this`, maybeSingle resolves to given data.
+function makeChainableMock(resolvedValue: unknown) {
+  const obj: Record<string, unknown> = {}
+  const methods = ['select', 'eq', 'order', 'limit', 'single']
+  for (const m of methods) obj[m] = () => obj
+  obj['maybeSingle'] = async () => ({ data: resolvedValue, error: null })
+  obj['single'] = async () => ({ data: resolvedValue, error: null })
+  return obj
+}
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -20,26 +30,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn(() => ({
     from: vi.fn((table: string) => {
       if (table === 'birth_profiles') {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({ maybeSingle: async () => ({ data: state.activeProfile, error: null }) }),
-            }),
-          }),
-        }
+        return makeChainableMock(state.activeProfile)
       }
       if (table === 'chart_json_versions') {
-        return {
-          select: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () => ({ maybeSingle: async () => ({ data: state.latestChart, error: null }) }),
-              }),
-            }),
-          }),
-        }
+        return makeChainableMock(state.currentChart)
       }
-      return { select: () => ({}) }
+      return makeChainableMock(null)
     }),
   })),
 }))
@@ -77,8 +73,13 @@ describe('astro routing', () => {
 
   it('renders the page when a profile and chart exist', async () => {
     state.user = { id: 'u1' }
-    state.activeProfile = { id: 'p1', terms_accepted_at: '2026-05-01T00:00:00.000Z', terms_accepted_version: '1' }
-    state.latestChart = { id: 'c1' }
+    state.activeProfile = {
+      id: 'p1',
+      terms_accepted_at: '2026-05-01T00:00:00.000Z',
+      terms_accepted_version: '1',
+      current_chart_version_id: 'c1',
+    }
+    state.currentChart = { id: 'c1', status: 'completed', is_current: true }
     const { default: AstroPage } = await import('@/app/astro/page')
     const html = renderToStaticMarkup(await AstroPage())
     expect(html).toContain('Ask Guru')

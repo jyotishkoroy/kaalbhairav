@@ -1,0 +1,21 @@
+{
+  "_comment": "Known regression facts for the current production profile. Do NOT change these values.",
+  "lagna": {
+    "sign": "Leo"
+  },
+  "moon": {
+    "sign": "Gemini",
+    "house": 11
+  },
+  "sun": {
+    "sign": "Taurus",
+    "house": 10
+  },
+  "nakshatra": {
+    "name": "Mrigashira",
+    "pada": 4
+  },
+  "vimshottari": {
+    "currentMahadasha": "Jupiter"
+  }
+}

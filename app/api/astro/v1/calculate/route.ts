@@ -64,6 +64,7 @@ async function persistCalculatedOutput(args: {
 }) {
   const chartVersionId = args.chartJson.metadata.chart_version_id
 
+  // 1. Insert chart JSON row (immutable — no is_current/status set here).
   const { error: chartErr } = await args.service
     .from('chart_json_versions')
     .insert({
@@ -81,6 +82,7 @@ async function persistCalculatedOutput(args: {
     })
   if (chartErr) throw new Error(`chart_insert_failed: ${chartErr.message}`)
 
+  // 2. Insert prediction summary tied to this exact chart version.
   const { error: predictionErr } = await args.service.from('prediction_ready_summaries').insert({
     user_id: args.userId,
     profile_id: args.profileId,
@@ -90,16 +92,19 @@ async function persistCalculatedOutput(args: {
   })
   if (predictionErr) throw new Error(`prediction_insert_failed: ${predictionErr.message}`)
 
-  const { error: calcCompleteErr } = await args.service
-    .from('chart_calculations')
-    .update({
-      status: 'completed',
-      current_chart_version_id: chartVersionId,
-      completed_at: new Date().toISOString(),
-    })
-    .eq('id', args.calcId)
-  if (calcCompleteErr) throw new Error(`calc_complete_failed: ${calcCompleteErr.message}`)
+  // 3. Atomically promote this chart version as the current chart via RPC.
+  // This marks older rows non-current, sets is_current=true on the new row,
+  // updates chart_calculations, and points birth_profiles to the new chart.
+  const { error: rpcErr } = await args.service.rpc('promote_current_chart_version', {
+    p_user_id: args.userId,
+    p_profile_id: args.profileId,
+    p_calc_id: args.calcId,
+    p_chart_version_id: chartVersionId,
+    p_input_hash: args.inputHash,
+  })
+  if (rpcErr) throw new Error(`promote_current_chart_failed: ${rpcErr.message}`)
 
+  // 4. Audit log.
   const { error: auditErr } = await args.service.from('calculation_audit_logs').insert({
     user_id: args.userId,
     profile_id: args.profileId,
@@ -276,33 +281,61 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (cached?.current_chart_version_id) {
-      const { data: latestChart } = await service
-      .from('chart_json_versions')
-      .select('chart_json')
-      .eq('id', cached.current_chart_version_id)
-      .maybeSingle()
+      // Verify the cached chart version is still current and matches the profile pointer.
+      const { data: profilePointer } = await service
+        .from('birth_profiles')
+        .select('current_chart_version_id')
+        .eq('id', profileId)
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-      if (latestChart?.chart_json) {
-        const cachedChart = latestChart.chart_json as Record<string, unknown>
-        const cachedEngineOutput = (cachedChart.astronomical_data && typeof cachedChart.astronomical_data === 'object')
-          ? (cachedChart.astronomical_data as Record<string, unknown>)
-          : cachedChart
-        const mergedCachedChart = mergeAvailableJyotishSectionsIntoChartJson(cachedChart, cachedEngineOutput)
-        return NextResponse.json(mergedCachedChart)
+      const pointerMatchesCached = profilePointer?.current_chart_version_id === cached.current_chart_version_id
+
+      if (pointerMatchesCached) {
+        const { data: cachedChartRow } = await service
+          .from('chart_json_versions')
+          .select('chart_json')
+          .eq('id', cached.current_chart_version_id)
+          .eq('is_current', true)
+          .eq('status', 'completed')
+          .maybeSingle()
+
+        if (cachedChartRow?.chart_json) {
+          const cachedChart = cachedChartRow.chart_json as Record<string, unknown>
+          const cachedEngineOutput = (cachedChart.astronomical_data && typeof cachedChart.astronomical_data === 'object')
+            ? (cachedChart.astronomical_data as Record<string, unknown>)
+            : cachedChart
+          const mergedCachedChart = mergeAvailableJyotishSectionsIntoChartJson(cachedChart, cachedEngineOutput)
+          return NextResponse.json(mergedCachedChart)
+        }
       }
 
-      return NextResponse.json({
-        calculation_id: cached.id,
-        chart_version_id: cached.current_chart_version_id,
-        reused_cache: true,
-        calculation_status: 'partial',
-        schema_version: SCHEMA_VERSION,
-        warnings: [],
-      } satisfies Partial<MasterAstroCalculationOutput> & {
-        calculation_id: string
-        chart_version_id: string
-        reused_cache: true
-      })
+      // Cache hit exists but profile pointer is stale — promote the cached chart atomically.
+      if (!pointerMatchesCached && cached.current_chart_version_id) {
+        const { error: promoteErr } = await service.rpc('promote_current_chart_version', {
+          p_user_id: user.id,
+          p_profile_id: profileId,
+          p_calc_id: cached.id,
+          p_chart_version_id: cached.current_chart_version_id,
+          p_input_hash: inputHash,
+        })
+        if (!promoteErr) {
+          const { data: promotedChartRow } = await service
+            .from('chart_json_versions')
+            .select('chart_json')
+            .eq('id', cached.current_chart_version_id)
+            .maybeSingle()
+          if (promotedChartRow?.chart_json) {
+            const cachedChart = promotedChartRow.chart_json as Record<string, unknown>
+            const cachedEngineOutput = (cachedChart.astronomical_data && typeof cachedChart.astronomical_data === 'object')
+              ? (cachedChart.astronomical_data as Record<string, unknown>)
+              : cachedChart
+            const mergedCachedChart = mergeAvailableJyotishSectionsIntoChartJson(cachedChart, cachedEngineOutput)
+            return NextResponse.json(mergedCachedChart)
+          }
+        }
+        // Promotion failed — fall through to recalculation
+      }
     }
   }
 
