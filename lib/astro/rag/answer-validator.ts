@@ -11,6 +11,8 @@ import { validateAnswerTiming } from "./validators/timing-validator";
 import { validateAnswerRemedies } from "./validators/remedy-validator";
 import { validateGenericness } from "./validators/genericness-validator";
 import { buildIssue, clampScore, extractAnswerText, textIncludesLoose, uniqueStrings } from "./validators/validator-utils";
+import type { PublicChartFacts } from "../public-chart-facts.ts";
+import { extractAstroClaimsFromAnswer, validateExtractedClaimsAgainstPublicFacts } from "./extract-answer-claims";
 
 function emptyResult(): AnswerValidationResult {
   return {
@@ -186,6 +188,15 @@ export function validateRagAnswer(input?: Partial<AnswerValidationInput>): Answe
       warningCount,
     },
   };
+}
+
+export function validateAstroAnswerAgainstPublicFacts(args: {
+  answer: string;
+  publicFacts: PublicChartFacts;
+  unavailableFields?: Set<string>;
+}): AnswerValidationResult {
+  const claims = extractAstroClaimsFromAnswer(args.answer);
+  return validateExtractedClaimsAgainstPublicFacts({ claims, publicFacts: args.publicFacts, unavailableFields: args.unavailableFields });
 }
 
 export async function storeValidationResult(input: StoreValidationResultInput): Promise<{ ok: boolean; id?: string; error?: string }> {

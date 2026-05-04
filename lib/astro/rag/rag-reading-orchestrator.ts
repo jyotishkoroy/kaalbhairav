@@ -19,11 +19,12 @@ import { checkSufficiency, type SufficiencyDecision } from "./sufficiency-checke
 import { buildAnswerContract } from "./answer-contract-builder";
 import type { AnswerContract } from "./answer-contract-types";
 import { writeGroqRagAnswer, type GroqAnswerWriterResult } from "./groq-answer-writer";
-import { validateRagAnswer } from "./answer-validator";
+import { validateAstroAnswerAgainstPublicFacts, validateRagAnswer } from "./answer-validator";
 import type { AnswerValidationResult } from "./validation-types";
 import { critiqueAnswerWithLocalOllama, type LocalCriticClientResult } from "./local-critic";
 import { runRetryAndFallbackController, type RetryControllerResult } from "./retry-controller";
 import { buildFallbackAnswer, type FallbackAnswerResult } from "./fallback-answer";
+import { buildPublicChartFacts, sanitizeVisibleAstroAnswer } from "../public-chart-facts.ts";
 import {
   createSupabaseCompanionMemoryRepository,
   mergeCompanionMemory,
@@ -38,6 +39,7 @@ export type RagReadingOrchestratorInput = {
   userId: string;
   profileId?: string | null;
   chartVersionId?: string | null;
+  publicFacts?: ReturnType<typeof buildPublicChartFacts>;
   supabase?: SupabaseLikeClient;
   env?: Record<string, string | undefined>;
   flags?: AstroRagFlags;
@@ -631,6 +633,18 @@ export async function ragReadingOrchestrator(
   };
 
   await maybeStoreCompanionMemory(input, flags, companionMemory, result, plan.domain);
+
+  if (input.publicFacts) {
+    const publicValidation = validateAstroAnswerAgainstPublicFacts({ answer: result.answer, publicFacts: input.publicFacts });
+    if (!publicValidation.ok) {
+      const fallback = buildFallbackAnswer({ reason: "generic_failure", question });
+      result.answer = sanitizeVisibleAstroAnswer(fallback.answer || "aadesh: I cannot verify one or more exact chart claims in that answer from your current chart, so I will not guess. Please ask for a specific chart fact or regenerate after recalculation.");
+      result.meta.validationPassed = false;
+      result.meta.fallbackUsed = true;
+      result.artifacts.validation = publicValidation;
+      result.status = "fallback";
+    }
+  }
 
   return result;
 }
