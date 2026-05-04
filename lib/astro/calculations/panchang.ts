@@ -19,10 +19,12 @@ import { calculateAllPlanets } from './planets.ts'
 import { assertEphemerisRange } from '../engine/diagnostics.ts'
 import type { NakshatraPlacement } from './nakshatra.ts'
 import type { SignPlacement } from './sign.ts'
+import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 
 export type PanchangResult = {
   panchang_local_date: string
   calculation_instant_utc: string
+  as_of_date?: string
   sunrise_convention: {
     convention: 'local_sunrise_to_local_sunrise'
     sunrise_basis: 'local_civil_date'
@@ -81,8 +83,10 @@ export function calculatePanchangResult(params: {
   latitude: number
   longitude: number
   altitude?: number
+  runtimeClockInput?: Partial<AstroRuntimeClock>
 }): PanchangResult {
   const { calculationInstantUtc, localDate, timezone, latitude, longitude, altitude = 0 } = params
+  const runtimeClock = normalizeRuntimeClock(params.runtimeClockInput)
   const warnings: string[] = []
   const jdStart = calculateJulianDay(calculationInstantUtc, sweJulday).jd_ut
   assertEphemerisRange(jdStart)
@@ -187,6 +191,7 @@ export function calculatePanchangResult(params: {
   return {
     panchang_local_date: localDate,
     calculation_instant_utc: calculationInstantUtc,
+    as_of_date: runtimeClock.asOfDate,
     sunrise_convention: {
       convention: 'local_sunrise_to_local_sunrise',
       sunrise_basis: 'local_civil_date',
@@ -234,11 +239,12 @@ const VARA_MAP_LEGACY: Record<number, VaraType> = {
 }
 
 export async function calculatePanchang(input: PanchangInput): Promise<Panchang> {
-  const now = new Date().toISOString()
+  const now = input.now_utc
+  const nowDate = new Date(input.now_utc)
   if (input.engine_mode !== 'real') {
     return {
       status: 'stub', calculated_at: now, date_local: '',
-      vara: VARA_MAP_LEGACY[new Date().getDay()] ?? 'Sunday',
+      vara: VARA_MAP_LEGACY[nowDate.getUTCDay()] ?? 'Sunday',
       tithi: null, nakshatra: null, yoga: null, karana: null,
       sunrise_utc: null, sunset_utc: null,
       warnings: ['Engine is in stub mode. Panchang requires ASTRO_ENGINE_MODE=real.'],
@@ -246,7 +252,7 @@ export async function calculatePanchang(input: PanchangInput): Promise<Panchang>
   }
   return {
     status: 'not_available', calculated_at: now, date_local: now.split('T')[0],
-    vara: VARA_MAP_LEGACY[new Date().getDay()] ?? 'Sunday',
+    vara: VARA_MAP_LEGACY[nowDate.getUTCDay()] ?? 'Sunday',
     tithi: null, nakshatra: null, yoga: null, karana: null,
     sunrise_utc: null, sunset_utc: null,
     warnings: ['Use calculatePanchangResult() for real panchang data.'],

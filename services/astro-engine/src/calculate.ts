@@ -2,6 +2,7 @@ import type { AstrologySettings, BirthProfileInput } from '../../../lib/astro/ty
 import type { NormalizedBirthInput } from '../../../lib/astro/normalize.ts'
 import { calculateMasterAstroOutput } from '../../../lib/astro/calculations/master.ts'
 import type { MasterAstroCalculationOutput } from '../../../lib/astro/schemas/master.ts'
+import type { AstroRuntimeClock } from '../../../lib/astro/calculations/runtime-clock.ts'
 import {
   calculateWithPythonEngine,
   summarizePythonError,
@@ -13,6 +14,7 @@ type CalculateArgs = {
   normalized: NormalizedBirthInput
   settings: AstrologySettings
   runtime: { user_id: string; profile_id: string; current_utc: string; production: boolean }
+  runtimeClock?: Partial<AstroRuntimeClock>
 }
 
 type AstroEngineImpl = 'ts' | 'python' | 'shadow'

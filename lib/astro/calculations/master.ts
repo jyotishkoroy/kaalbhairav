@@ -30,6 +30,7 @@ import { calculateLifeAreas } from './life-areas.ts'
 import { calculateTransits } from './transits.ts'
 import { calculateConfidence } from './confidence.ts'
 import { collectWarnings } from './warnings.ts'
+import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 
 const FORBIDDEN_PREDICTION_KEYS = new Set([
   'birth_date',
@@ -60,8 +61,10 @@ export async function calculateMasterAstroOutput(args: {
   normalized: NormalizedBirthInput
   settings: AstrologySettings
   runtime: { user_id: string; profile_id: string; current_utc: string; production: boolean }
+  runtimeClock?: Partial<AstroRuntimeClock>
 }): Promise<MasterAstroCalculationOutput> {
   const { normalized, settings, runtime } = args
+  const runtimeClock = normalizeRuntimeClock(args.runtimeClock ?? { currentUtc: runtime.current_utc })
 
   const startupValidation = runStartupValidation()
   if (!isSwissEphemerisAvailable() || isMoshierFallback() || !startupValidation.passed) {
@@ -96,20 +99,21 @@ export async function calculateMasterAstroOutput(args: {
   const whole_sign_houses = calculateWholeSignHouses(lagna)
   const d1_rashi_chart = calculateD1Chart(planets, lagna, whole_sign_houses)
   const navamsa_d9 = calculateNavamsaChart(planets, lagna)
-  const vimshottari_dasha = moon ? calculateVimshottari(moon.sidereal_longitude, birthTimeResult.birth_utc) : null
+  const vimshottari_dasha = moon ? calculateVimshottari(moon.sidereal_longitude, birthTimeResult.birth_utc, runtimeClock) : null
   const panchang = moon && sun ? calculatePanchangResult({
     calculationInstantUtc: birthTimeResult.birth_utc,
     localDate: birthTimeResult.birth_local_wall_time.split('T')[0],
     timezone: normalized.timezone,
     latitude: normalized.latitude_full,
     longitude: normalized.longitude_full,
+    runtimeClockInput: runtimeClock,
   }) : null
   const planetary_aspects_drishti = calculateGrahaDrishti(d1_rashi_chart, false)
   const yogas = calculateYogas(d1_rashi_chart, planetary_aspects_drishti, navamsa_d9)
   const doshas = calculateDoshas(d1_rashi_chart, planetary_aspects_drishti, planets)
   const strength_weakness_indicators = calculateStrength(planets, d1_rashi_chart, navamsa_d9, planetary_aspects_drishti)
   const life_area_signatures = calculateLifeAreas(d1_rashi_chart, planetary_aspects_drishti, strength_weakness_indicators.indicators, lagna)
-  const daily_transits = calculateTransits(moon?.sign_index ?? 0, lagna)
+  const daily_transits = calculateTransits(moon?.sign_index ?? 0, lagna, runtimeClock)
   const confidence = calculateConfidence({
     birth_time_known: normalized.birth_time_known,
     birth_time_precision: normalized.birth_time_precision,
@@ -160,6 +164,10 @@ export async function calculateMasterAstroOutput(args: {
       sidereal_method: 'tropical_minus_ayanamsa',
       moshier_fallback: isMoshierFallback(),
     },
+    runtime_clock: {
+      current_utc: runtimeClock.currentUtc,
+      as_of_date: runtimeClock.asOfDate,
+    },
     constants_version: { constants_version: CONSTANTS_VERSION, rashi_map_version: RASHI_MAP_VERSION, nakshatra_map_version: NAKSHATRA_MAP_VERSION, dasha_order_version: DASHA_ORDER_VERSION, panchang_sequence_version: PANCHANG_SEQUENCE_VERSION, tradition_settings: { node_type: settings.node_type, ayanamsa: 'lahiri' } },
     planetary_positions: planets,
     sun_position: sun,
@@ -187,7 +195,7 @@ export async function calculateMasterAstroOutput(args: {
     strength_weakness_indicators,
     life_area_signatures,
     prediction_ready_context: stripForbiddenKeys({
-      calculation_metadata: { ephemeris_engine: 'swiss_ephemeris', swiss_ephemeris_version: getSweVersion(), timezone_engine: 'luxon', ayanamsa: 'lahiri', node_type: settings.node_type, sidereal_method: 'tropical_minus_ayanamsa', moshier_fallback: isMoshierFallback(), constants_version: CONSTANTS_VERSION, rashi_map_version: RASHI_MAP_VERSION, nakshatra_map_version: NAKSHATRA_MAP_VERSION, dasha_order_version: DASHA_ORDER_VERSION, panchang_sequence_version: PANCHANG_SEQUENCE_VERSION },
+      calculation_metadata: { ephemeris_engine: 'swiss_ephemeris', swiss_ephemeris_version: getSweVersion(), timezone_engine: 'luxon', ayanamsa: 'lahiri', node_type: settings.node_type, sidereal_method: 'tropical_minus_ayanamsa', moshier_fallback: isMoshierFallback(), constants_version: CONSTANTS_VERSION, rashi_map_version: RASHI_MAP_VERSION, nakshatra_map_version: NAKSHATRA_MAP_VERSION, dasha_order_version: DASHA_ORDER_VERSION, panchang_sequence_version: PANCHANG_SEQUENCE_VERSION, runtime_clock: { current_utc: runtimeClock.currentUtc, as_of_date: runtimeClock.asOfDate } },
       core_natal_summary: { ascendant: lagna, sun_sign: calculateSign(sun?.sidereal_longitude ?? 0), moon_sign: calculateSign(moon?.sidereal_longitude ?? 0), moon_nakshatra: calculateNakshatra(moon?.sidereal_longitude ?? 0), birth_tithi: panchang?.tithi ?? null, dasha_at_birth: vimshottari_dasha ? { lord: vimshottari_dasha.birth_dasha_lord, elapsed_years: vimshottari_dasha.dasha_elapsed_years, remaining_years: vimshottari_dasha.dasha_remaining_years } : null, confidence, warnings },
       planet_positions: Object.values(planets),
       lagna,

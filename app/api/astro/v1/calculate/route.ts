@@ -23,6 +23,7 @@ import { buildProfileChartJsonFromMasterOutput } from '@/lib/astro/profile-chart
 import { mergeAvailableJyotishSectionsIntoChartJson } from '@/lib/astro/chart-json-persistence'
 import { DEFAULT_SETTINGS, hashSettings } from '@/lib/astro/settings'
 import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
+import { normalizeRuntimeClock, type AstroRuntimeClock } from '@/lib/astro/calculations/runtime-clock'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -150,6 +151,33 @@ function buildPersistFailureDiagnostic(args: {
       outputStatus: typeof args.outputStatus === 'string' ? args.outputStatus : null,
     },
   }
+}
+
+function buildRequestRuntimeClock(body: unknown): AstroRuntimeClock {
+  const allowClientClock =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.ASTRO_ALLOW_CLIENT_RUNTIME_CLOCK === 'true'
+
+  const objectBody = body && typeof body === 'object' ? body as Record<string, unknown> : {}
+  const runtimeClockBody = objectBody.runtimeClock && typeof objectBody.runtimeClock === 'object'
+    ? objectBody.runtimeClock as Record<string, unknown>
+    : {}
+  const runtimeClockSnake = objectBody.runtime_clock && typeof objectBody.runtime_clock === 'object'
+    ? objectBody.runtime_clock as Record<string, unknown>
+    : {}
+
+  return normalizeRuntimeClock({
+    currentUtc: allowClientClock && typeof runtimeClockBody.currentUtc === 'string'
+      ? runtimeClockBody.currentUtc
+      : allowClientClock && typeof runtimeClockSnake.current_utc === 'string'
+        ? runtimeClockSnake.current_utc
+        : undefined,
+    asOfDate: allowClientClock && typeof runtimeClockBody.asOfDate === 'string'
+      ? runtimeClockBody.asOfDate
+      : allowClientClock && typeof runtimeClockSnake.as_of_date === 'string'
+        ? runtimeClockSnake.as_of_date
+        : undefined,
+  })
 }
 
 function buildInsertFailureDiagnostic(args: {
@@ -305,11 +333,12 @@ export async function POST(req: NextRequest) {
     dasha_year_basis: settings.dasha_year_basis,
   }
   const settingsHash = sha256Canonical(settingsForHash)
+  const runtimeClock = buildRequestRuntimeClock(body)
 
   const runtime = {
     user_id: user.id,
     profile_id: profileId,
-    current_utc: new Date().toISOString(),
+    current_utc: runtimeClock.currentUtc,
     production: process.env.NODE_ENV === 'production',
   }
 
@@ -320,6 +349,7 @@ export async function POST(req: NextRequest) {
       normalized,
       settings: settingsForHash,
       runtime,
+      runtimeClock,
     })
 
     if (remoteOutput.calculation_status === 'rejected') {
@@ -490,6 +520,7 @@ export async function POST(req: NextRequest) {
         normalized,
         settings: settingsForHash,
         runtime,
+        runtimeClock,
       })
     })()
 

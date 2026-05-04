@@ -74,6 +74,10 @@ export type ChartIdentity = {
   schema_version: string
   chart_version: number
   computed_at: ISODateTime
+  runtime_clock?: {
+    current_utc: ISODateTime
+    as_of_date?: ISODate
+  }
 }
 
 export type ChartJson = {

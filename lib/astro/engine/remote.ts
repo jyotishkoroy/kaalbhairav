@@ -5,6 +5,7 @@
  */
 
 import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master.ts'
+import type { AstroRuntimeClock } from '../calculations/runtime-clock.ts'
 import type { AstrologySettings, BirthProfileInput } from '../types.ts'
 import type { NormalizedBirthInput } from '../normalize.ts'
 import { getAstroEngineServiceApiKey, getAstroEngineServiceUrl } from './backend.ts'
@@ -21,6 +22,7 @@ export type RemoteAstroCalculationArgs = {
   normalized: NormalizedBirthInput
   settings: AstrologySettings
   runtime: RemoteAstroRuntime
+  runtimeClock?: Partial<AstroRuntimeClock>
 }
 
 function buildRejectedOutput(reason: string): MasterAstroCalculationOutput {

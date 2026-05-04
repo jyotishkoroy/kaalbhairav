@@ -5,6 +5,7 @@
  */
 
 import type { CurrentTimingContext } from '../engine/types.ts'
+import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 
 export type TimingInput = {
   dasha_sequence: Array<{ lord: string; start_date: string; end_date: string }> | null
@@ -13,10 +14,12 @@ export type TimingInput = {
   observer_longitude: number
   ayanamsa: string
   engine_mode: string
+  runtime_clock?: Partial<AstroRuntimeClock>
 }
 
 export async function calculateCurrentTiming(input: TimingInput): Promise<CurrentTimingContext> {
-  const now = new Date().toISOString()
+  const runtimeClock = normalizeRuntimeClock(input.runtime_clock ?? { currentUtc: input.now_utc })
+  const now = runtimeClock.currentUtc
 
   if (input.engine_mode !== 'real') {
     return {

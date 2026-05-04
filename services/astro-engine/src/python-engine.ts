@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../../../lib/astro/schemas/master.ts'
 import type { AstrologySettings, BirthProfileInput } from '../../../lib/astro/types.ts'
 import type { NormalizedBirthInput } from '../../../lib/astro/normalize.ts'
+import type { AstroRuntimeClock } from '../../../lib/astro/calculations/runtime-clock.ts'
 
 export type PythonAstroEngineArgs = {
   input: BirthProfileInput
@@ -15,6 +16,7 @@ export type PythonAstroEngineArgs = {
     current_utc: string
     production: boolean
   }
+  runtimeClock?: Partial<AstroRuntimeClock>
 }
 
 const pythonOutputSchema = masterAstroOutputSchema.and(z.object({

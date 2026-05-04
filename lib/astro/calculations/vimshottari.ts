@@ -7,6 +7,7 @@
 import { DASHA_SEQUENCE, DASHA_YEARS, NAKSHATRA_MAP, NAKSHATRA_SPAN, DASHA_YEAR_DAYS, VIMSHOTTARI_TOTAL_YEARS, type DashaLord } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNakshatraBoundary } from './boundary.ts'
+import { getRuntimeClockMs, normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 
 export type DashaPeriod = {
   level: 'mahadasha' | 'antardasha' | 'pratyantardasha'
@@ -35,18 +36,21 @@ export type VimshottariDashaResult = {
     pratyantardasha: DashaPeriod | null
   }
   boundary_warnings: string[]
+  as_of_date?: string
+  current_utc?: string
 }
 
 function addDays(iso: string, days: number): string {
   return new Date(new Date(iso).getTime() + days * 86400000).toISOString()
 }
 
-function findCurrent<T extends { start_utc: string; end_utc: string }>(periods: T[]): T | null {
-  const now = Date.now()
-  return periods.find(p => new Date(p.start_utc).getTime() <= now && now < new Date(p.end_utc).getTime()) ?? null
+function findCurrent<T extends { start_utc: string; end_utc: string }>(periods: T[], nowMs: number): T | null {
+  return periods.find(p => new Date(p.start_utc).getTime() <= nowMs && nowMs < new Date(p.end_utc).getTime()) ?? null
 }
 
-export function calculateVimshottari(moonSidereal: number, birthUtcISO: string): VimshottariDashaResult {
+export function calculateVimshottari(moonSidereal: number, birthUtcISO: string, runtimeClockInput?: Partial<AstroRuntimeClock>): VimshottariDashaResult {
+  const runtimeClock = normalizeRuntimeClock(runtimeClockInput)
+  const nowMs = getRuntimeClockMs(runtimeClock)
   const normalized = normalize360(moonSidereal)
   const moon_nakshatra_index = Math.floor(normalized / NAKSHATRA_SPAN)
   const clampedIdx = Math.min(moon_nakshatra_index, 26)
@@ -134,9 +138,9 @@ export function calculateVimshottari(moonSidereal: number, birthUtcISO: string):
     }
   }
 
-  const current_mahadasha = findCurrent(mahadasha_sequence)
-  const current_antardasha = findCurrent(antardasha_sequence)
-  const current_pratyantardasha = findCurrent(pratyantardasha_sequence)
+  const current_mahadasha = findCurrent(mahadasha_sequence, nowMs)
+  const current_antardasha = findCurrent(antardasha_sequence, nowMs)
+  const current_pratyantardasha = findCurrent(pratyantardasha_sequence, nowMs)
 
   return {
     moon_nakshatra_index: clampedIdx,
@@ -155,5 +159,7 @@ export function calculateVimshottari(moonSidereal: number, birthUtcISO: string):
       pratyantardasha: current_pratyantardasha,
     },
     boundary_warnings,
+    as_of_date: runtimeClock.asOfDate,
+    current_utc: runtimeClock.currentUtc,
   }
 }

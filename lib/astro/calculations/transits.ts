@@ -17,11 +17,13 @@ import type { NakshatraPlacement } from './nakshatra.ts'
 import type { TithiResult } from './tithi.ts'
 import type { LagnaResult } from './lagna.ts'
 import type { DailyTransits } from '../engine/types.ts'
+import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 
 // ─── Master-spec Daily Transit Result ─────────────────────────────────────
 
 export type DailyTransitResult = {
   current_utc: string
+  as_of_date?: string
   transit_planets: PlanetPosition[]
   current_moon_rashi: SignPlacement
   current_moon_nakshatra: NakshatraPlacement
@@ -39,8 +41,10 @@ export type DailyTransitResult = {
 export function calculateTransits(
   natalMoonSignIndex: number,
   natalLagna: LagnaResult | null,
+  runtimeClockInput?: Partial<AstroRuntimeClock>,
 ): DailyTransitResult {
-  const current_utc = new Date().toISOString()
+  const runtimeClock = normalizeRuntimeClock(runtimeClockInput)
+  const current_utc = runtimeClock.currentUtc
   const warnings: string[] = []
 
   const jdResult = calculateJulianDay(current_utc, sweJulday)
@@ -68,6 +72,7 @@ export function calculateTransits(
 
   return {
     current_utc,
+    as_of_date: runtimeClock.asOfDate,
     transit_planets: Object.values(planets),
     current_moon_rashi,
     current_moon_nakshatra,
@@ -87,7 +92,7 @@ export type TransitInput = {
 }
 
 export async function calculateDailyTransits(input: TransitInput): Promise<DailyTransits> {
-  const now = new Date().toISOString()
+  const now = input.now_utc
   if (input.engine_mode !== 'real') {
     return { status: 'stub', calculated_at: now, transits: [], warnings: ['Engine is in stub mode.'] }
   }

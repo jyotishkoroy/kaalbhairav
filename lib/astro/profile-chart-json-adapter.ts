@@ -935,6 +935,7 @@ export function buildProfileChartJsonFromMasterOutput(args: {
       chart_version: args.chartVersion,
       computed_at: nowISO(),
       calculation_status: mapChartStatus(args.output.calculation_status),
+      runtime_clock: ((args.output as MaybeObject)?.runtime_clock as { current_utc: string; as_of_date?: string } | undefined) ?? undefined,
     },
     normalized_input: args.normalized,
     calculation_settings: args.settingsForHash,
