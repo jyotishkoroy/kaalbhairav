@@ -1,0 +1,20 @@
+{
+  "id": "timezone-boundary-west-longitude",
+  "description": "Western longitude fixture proving local panchang date is not silently replaced by UTC date.",
+  "input": {
+    "dateOfBirth": "2024-01-01",
+    "timeOfBirth": "00:30:00",
+    "timezone": "America/New_York",
+    "latitude": 40.7128,
+    "longitude": -74.006
+  },
+  "expected": {
+    "convention": "at_birth_time",
+    "localDate": "2024-01-01",
+    "timezone": "America/New_York",
+    "weekday": "Monday",
+    "longitudeSign": "negative"
+  },
+  "referenceStatus": "invariant_only",
+  "todo": "Exact tithi/yoga/karana reference values require trusted almanac fixture."
+}

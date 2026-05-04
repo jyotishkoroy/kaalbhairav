@@ -21,7 +21,7 @@ import { calculateWholeSignHouses } from './houses.ts'
 import { calculateD1Chart } from './d1.ts'
 import { calculateNavamsaChart } from './navamsa.ts'
 import { calculateVimshottari } from './vimshottari.ts'
-import { calculatePanchangResult } from './panchang.ts'
+import { calculatePanchangResult, DEFAULT_PANCHANG_CONVENTION } from './panchang.ts'
 import { calculateGrahaDrishti } from './aspects.ts'
 import { calculateYogas } from './yogas.ts'
 import { calculateDoshas } from './doshas.ts'
@@ -116,6 +116,7 @@ export async function calculateMasterAstroOutput(args: {
     timezone: normalized.timezone,
     latitude: normalized.latitude_full,
     longitude: normalized.longitude_full,
+    convention: DEFAULT_PANCHANG_CONVENTION,
     runtimeClockInput: runtimeClock,
   }) : null
   const planetary_aspects_drishti = calculateGrahaDrishti(d1_rashi_chart, false)

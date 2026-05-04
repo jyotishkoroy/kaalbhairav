@@ -2,6 +2,10 @@
  * Copyright (c) 2026 Jyotishko Roy.
  * Proprietary and confidential. All rights reserved.
  * Project: tarayai — https://tarayai.com
+ *
+ * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+ * commercially use, train models on, scrape, or create derivative works from this
+ * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import { DateTime } from 'luxon'
@@ -12,7 +16,7 @@ import { calculateSign } from './sign.ts'
 import { calculateNakshatra } from './nakshatra.ts'
 import { normalize360 } from './math.ts'
 import { nearYogaBoundary } from './boundary.ts'
-import { YOGA_NAMES, VARA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
+import { YOGA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
 import { calculateTithi, type TithiResult } from './tithi.ts'
 import { calculateAyanamsa } from './ayanamsa.ts'
 import { calculateAllPlanets } from './planets.ts'
@@ -21,15 +25,57 @@ import type { NakshatraPlacement } from './nakshatra.ts'
 import type { SignPlacement } from './sign.ts'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 
+export type PanchangConvention = 'at_birth_time' | 'at_local_sunrise'
+
+export type PanchangUnavailableValue = {
+  status: 'unavailable'
+  reason: 'module_not_implemented' | 'missing_golden_fixture' | 'unsupported_convention' | 'insufficient_input'
+  message: string
+}
+
+export const DEFAULT_PANCHANG_CONVENTION: PanchangConvention = 'at_birth_time'
+
+export function normalizePanchangConvention(input?: string | null): PanchangConvention {
+  return input === 'at_local_sunrise' ? 'at_local_sunrise' : 'at_birth_time'
+}
+
+export function weekdayFromLocalDate(localDate: string, timezone: string): string {
+  const dt = DateTime.fromISO(localDate, { zone: timezone })
+  return dt.isValid ? dt.toFormat('cccc') : 'unavailable'
+}
+
 export type PanchangResult = {
   panchang_local_date: string
   calculation_instant_utc: string
+  status: 'computed' | 'unavailable'
+  convention: PanchangConvention
+  source: 'sun_moon_sidereal_longitude' | 'not_implemented'
+  local_date: string
+  timezone: string
+  fields: {
+    tithi: TithiResult | null
+    paksha: string | null
+    yoga: {
+      yoga_index: number
+      yoga_name: string
+      yoga_fraction_elapsed: number
+      near_yoga_boundary: boolean
+    } | null
+    karana: {
+      karana_half_tithi_index: number
+      karana_name: string
+      karana_fraction_elapsed: number
+      near_karana_boundary: boolean
+    } | null
+    weekday: string | null
+  }
   as_of_date?: string
   sunrise_convention: {
     convention: 'local_sunrise_to_local_sunrise'
     sunrise_basis: 'local_civil_date'
     evaluated_at_sunrise: boolean
   }
+  sunrise?: PanchangUnavailableValue
   sunrise_utc: string | null
   sunset_utc: string | null
   sunrise_local: string | null
@@ -67,7 +113,7 @@ export type PanchangResult = {
     karana_fraction_elapsed: number
     near_karana_boundary: boolean
   } | null
-  status: 'calculated' | 'partial' | 'unavailable'
+  weekday?: string | null
   warnings: string[]
 }
 
@@ -83,9 +129,11 @@ export function calculatePanchangResult(params: {
   latitude: number
   longitude: number
   altitude?: number
+  convention?: PanchangConvention
   runtimeClockInput?: Partial<AstroRuntimeClock>
 }): PanchangResult {
   const { calculationInstantUtc, localDate, timezone, latitude, longitude, altitude = 0 } = params
+  const convention = normalizePanchangConvention(params.convention)
   const runtimeClock = normalizeRuntimeClock(params.runtimeClockInput)
   const warnings: string[] = []
   const jdStart = calculateJulianDay(calculationInstantUtc, sweJulday).jd_ut
@@ -169,12 +217,6 @@ export function calculatePanchangResult(params: {
   const sunrise_nakshatra = calculateNakshatra(sunriseMoonSidereal)
   const sunrise_yoga = yoga
   const sunrise_karana = karana
-  let vara: string | null = null
-  if (sunrise_utc) {
-    const sunriseDate = new Date(sunrise_utc)
-    vara = VARA_NAMES[sunriseDate.getUTCDay()] ?? null
-  }
-
   let sunrise_local: string | null = null
   let sunset_local: string | null = null
   try {
@@ -188,33 +230,55 @@ export function calculatePanchangResult(params: {
     warnings.push('Local time conversion for sunrise/sunset unavailable')
   }
 
+  const weekday = weekdayFromLocalDate(localDate, timezone)
+  const sunriseUnavailable: PanchangUnavailableValue | undefined = convention === 'at_local_sunrise'
+    ? {
+        status: 'unavailable',
+        reason: 'module_not_implemented',
+        message: 'Sunrise-convention panchang is not implemented in this module.',
+      }
+    : undefined
+
   return {
     panchang_local_date: localDate,
     calculation_instant_utc: calculationInstantUtc,
+    status: sunriseUnavailable ? 'unavailable' : 'computed',
+    convention,
+    source: sunriseUnavailable ? 'not_implemented' : 'sun_moon_sidereal_longitude',
+    local_date: localDate,
+    timezone,
+    fields: {
+      tithi: sunriseUnavailable ? null : sunrise_tithi,
+      paksha: sunriseUnavailable ? null : (sunrise_tithi?.paksha ?? null),
+      yoga: sunriseUnavailable ? null : yoga,
+      karana: sunriseUnavailable ? null : karana,
+      weekday,
+    },
     as_of_date: runtimeClock.asOfDate,
     sunrise_convention: {
       convention: 'local_sunrise_to_local_sunrise',
       sunrise_basis: 'local_civil_date',
       evaluated_at_sunrise: true,
     },
+    sunrise: sunriseUnavailable,
     sunrise_utc,
     sunset_utc,
     sunrise_local,
     sunset_local,
-    tithi: sunrise_tithi,
+    tithi: sunriseUnavailable ? null : sunrise_tithi,
     nakshatra,
-    yoga,
-    karana,
-    vara,
+    yoga: sunriseUnavailable ? null : yoga,
+    karana: sunriseUnavailable ? null : karana,
+    vara: weekday === 'unavailable' ? null : weekday,
     moon_rashi,
     sunrise_moon_rashi: calculateSign(sunriseMoonSidereal),
     sunrise_sun_position: sunriseSunPosition,
     sunrise_moon_position: sunriseMoonPosition,
-    sunrise_tithi,
+    sunrise_tithi: sunriseUnavailable ? null : sunrise_tithi,
     sunrise_nakshatra,
-    sunrise_yoga,
-    sunrise_karana,
-    status: sunrise_utc && sunrise_local && sunriseSunPosition && sunriseMoonPosition ? 'calculated' : sunrise_utc || sunset_utc ? 'partial' : 'unavailable',
+    sunrise_yoga: sunriseUnavailable ? null : sunrise_yoga,
+    sunrise_karana: sunriseUnavailable ? null : sunrise_karana,
+    weekday,
     warnings,
   }
 }

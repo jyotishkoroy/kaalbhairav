@@ -40,15 +40,21 @@ export type PanchangDisplay = {
   rows: PanchangDisplayRow[]
   warnings: string[]
   date_local: string | null
+  local_date?: string | null
+  timezone?: string | null
+  source?: 'sun_moon_sidereal_longitude' | 'not_implemented'
+  convention?: 'at_birth_time' | 'at_local_sunrise'
   vara: Panchang['vara'] | null
   tithi: Panchang['tithi'] | null
   nakshatra: Panchang['nakshatra'] | null
   yoga: Panchang['yoga'] | null
   karana: Panchang['karana'] | null
+  fields?: Panchang['fields']
   sunrise_utc: string | null
   sunset_utc: string | null
   sunrise_local?: string | null
   sunset_local?: string | null
+  sunrise?: Panchang['sunrise']
   moon_rashi?: Panchang['moon_rashi'] | null
   sunrise_moon_rashi?: Panchang['sunrise_moon_rashi'] | null
 }
@@ -525,15 +531,21 @@ function adaptPanchang(output: MasterAstroCalculationOutput): PanchangDisplay {
     calculated_at: typeof record.calculation_instant_utc === 'string' ? record.calculation_instant_utc : (typeof record.calculated_at === 'string' ? record.calculated_at : nowISO()),
     rows,
     date_local: typeof record.panchang_local_date === 'string' ? record.panchang_local_date : (typeof record.date_local === 'string' ? record.date_local : null),
+    local_date: typeof record.local_date === 'string' ? record.local_date : (typeof record.panchang_local_date === 'string' ? record.panchang_local_date : null),
+    timezone: typeof record.timezone === 'string' ? record.timezone : null,
+    source: typeof record.source === 'string' ? record.source as 'sun_moon_sidereal_longitude' | 'not_implemented' : undefined,
+    convention: typeof record.convention === 'string' ? record.convention as 'at_birth_time' | 'at_local_sunrise' : undefined,
     vara: (record.vara as Panchang['vara']) ?? null,
     tithi: (record.tithi as Panchang['tithi']) ?? null,
     nakshatra: asNakshatra(record.nakshatra),
     yoga: asYoga(record.yoga),
     karana: asKarana(record.karana),
+    fields: record.fields && typeof record.fields === 'object' && !Array.isArray(record.fields) ? record.fields as Panchang['fields'] : undefined,
     sunrise_utc: typeof record.sunrise_utc === 'string' ? record.sunrise_utc : null,
     sunset_utc: typeof record.sunset_utc === 'string' ? record.sunset_utc : null,
     sunrise_local: typeof record.sunrise_local === 'string' ? record.sunrise_local : null,
     sunset_local: typeof record.sunset_local === 'string' ? record.sunset_local : null,
+    sunrise: record.sunrise && typeof record.sunrise === 'object' && !Array.isArray(record.sunrise) ? record.sunrise as Panchang['sunrise'] : undefined,
     moon_rashi: (record.moon_rashi as Panchang['moon_rashi']) ?? null,
     sunrise_moon_rashi: (record.sunrise_moon_rashi as Panchang['sunrise_moon_rashi']) ?? null,
     warnings,

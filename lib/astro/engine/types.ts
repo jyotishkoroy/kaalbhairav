@@ -78,18 +78,34 @@ export type PanchangKarana =
 export type Vara = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'
 
 export type Panchang = {
-  status: CalcStatus
+  status: 'computed' | 'unavailable' | CalcStatus
+  convention?: 'at_birth_time' | 'at_local_sunrise'
   calculated_at: string
+  local_date?: string
   date_local: string | null
+  timezone?: string
+  source?: 'sun_moon_sidereal_longitude' | 'not_implemented'
   vara: Vara | null
   tithi: Tithi | null
   nakshatra: Nakshatra | null
   yoga: PanchangYoga | null
   karana: PanchangKarana | null
+  fields?: {
+    tithi: Tithi | null
+    paksha: 'shukla' | 'krishna' | null
+    yoga: PanchangYoga | null
+    karana: PanchangKarana | null
+    weekday: Vara | 'unavailable' | null
+  }
   sunrise_utc: string | null
   sunset_utc: string | null
   sunrise_local?: string | null
   sunset_local?: string | null
+  sunrise?: {
+    status: 'unavailable'
+    reason: 'module_not_implemented' | 'missing_golden_fixture' | 'unsupported_convention' | 'insufficient_input'
+    message: string
+  }
   moon_rashi?: SignPlacement | null
   sunrise_moon_rashi?: SignPlacement | null
   warnings: string[]

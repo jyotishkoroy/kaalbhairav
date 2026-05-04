@@ -1,0 +1,18 @@
+{
+  "id": "high-latitude-sunrise-edge",
+  "description": "High latitude fixture proving sunrise convention is explicit and unavailable unless implemented.",
+  "input": {
+    "dateOfBirth": "2024-06-21",
+    "timeOfBirth": "12:00:00",
+    "timezone": "Europe/Oslo",
+    "latitude": 69.6492,
+    "longitude": 18.9553
+  },
+  "expected": {
+    "defaultConvention": "at_birth_time",
+    "sunriseConvention": "at_local_sunrise",
+    "sunriseStatusIfUnsupported": "unavailable"
+  },
+  "referenceStatus": "invariant_only",
+  "todo": "Exact high-latitude sunrise panchang reference requires trusted almanac and sunrise implementation."
+}

@@ -44,6 +44,11 @@ export type PublicChartFacts = {
   antardashaStart?: string;
   antardashaEnd?: string;
   antardashaTimeline?: Array<{ mahadasha: string; antardasha: string; startDate?: string; endDate?: string }>;
+  panchangConvention?: string;
+  panchangSource?: string;
+  panchangLocalDate?: string;
+  panchangTimezone?: string;
+  panchangWeekday?: string;
 
   mangalDosha?: boolean;
   kalsarpaYoga?: boolean;
@@ -219,6 +224,11 @@ export function buildPublicChartFacts(input: {
   const { chartJson, predictionSummary, reportFacts } = input;
   const warnings: string[] = [];
   const sources: string[] = [];
+  const panchangConvention = str(chartJson, ["panchang", "convention"], ["expanded_sections", "panchang", "convention"], ["astronomical_data", "panchang", "convention"]);
+  const panchangSource = str(chartJson, ["panchang", "source"], ["expanded_sections", "panchang", "source"], ["astronomical_data", "panchang", "source"]);
+  const panchangLocalDate = str(chartJson, ["panchang", "local_date"], ["panchang", "panchang_local_date"], ["expanded_sections", "panchang", "local_date"], ["astronomical_data", "panchang", "local_date"]);
+  const panchangTimezone = str(chartJson, ["panchang", "timezone"], ["expanded_sections", "panchang", "timezone"], ["astronomical_data", "panchang", "timezone"]);
+  const panchangWeekday = str(chartJson, ["panchang", "weekday"], ["panchang", "fields", "weekday"], ["expanded_sections", "panchang", "fields", "weekday"], ["astronomical_data", "panchang", "fields", "weekday"]);
 
   // Extract lagna from multiple paths
   const lagnaSign = canonSign(
@@ -361,6 +371,11 @@ export function buildPublicChartFacts(input: {
     antardashaStart,
     antardashaEnd,
     antardashaTimeline: antardashaTimeline.length ? antardashaTimeline : undefined,
+    panchangConvention,
+    panchangSource,
+    panchangLocalDate,
+    panchangTimezone,
+    panchangWeekday,
     mangalDosha,
     kalsarpaYoga,
     placements,
@@ -429,6 +444,9 @@ export function formatPublicChartBasis(facts: PublicChartFacts): string {
     const endPart = facts.antardashaEnd ? `, ${facts.antardashaNow} until ${facts.antardashaEnd}` : "";
     if (endPart) parts.push(facts.antardashaNow + " until " + facts.antardashaEnd);
     else parts.push(facts.antardashaNow + " Antardasha");
+  }
+  if (facts.panchangConvention) {
+    parts.push(`panchang ${facts.panchangConvention}`);
   }
   return parts.join(", ") + (parts.length ? "." : "");
 }

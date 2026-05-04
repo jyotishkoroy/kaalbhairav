@@ -1,0 +1,19 @@
+{
+  "id": "india-standard-time",
+  "description": "IST birth panchang fixture using local birth date and at_birth_time convention.",
+  "input": {
+    "dateOfBirth": "1999-06-14",
+    "timeOfBirth": "09:58:00",
+    "timezone": "Asia/Kolkata",
+    "latitude": 22.5726,
+    "longitude": 88.3639
+  },
+  "expected": {
+    "convention": "at_birth_time",
+    "localDate": "1999-06-14",
+    "timezone": "Asia/Kolkata",
+    "weekday": "Monday"
+  },
+  "referenceStatus": "invariant_only",
+  "todo": "Exact tithi/yoga/karana reference values require trusted almanac fixture."
+}
