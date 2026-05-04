@@ -62,3 +62,4 @@ graphify-out.zip
 generated/
 tmp/astro-source/
 .aider*
+artifacts/auth/
