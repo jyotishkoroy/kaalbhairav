@@ -98,9 +98,9 @@ describe('POST /api/astro/ask', () => {
 
     const req = makeRequest({ question: 'What is my Lagna?' })
     const resp = await POST(req)
-    expect(resp.status).toBe(404)
+    expect(resp.status).toBe(200)
     const body = await resp.json()
-    expect(body.error).toBe('setup_required')
+    expect(body.answer).toMatch(/complete birth profile setup/i)
   })
 
   it('returns setup_required when no chart exists', async () => {

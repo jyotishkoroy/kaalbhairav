@@ -11,11 +11,23 @@ import { analyzeQuestionQuality } from "@/lib/astro/app/question-quality";
 import { answerCanonicalAstroQuestion } from "@/lib/astro/ask/answer-canonical-astro-question";
 import { loadCurrentAstroChartForUser } from "@/lib/astro/current-chart-version";
 import { buildPublicChartFacts, validatePublicChartFacts, sanitizeVisibleAstroAnswer } from "@/lib/astro/public-chart-facts";
+import { extractChartFactsFromVersion } from "@/lib/astro/rag/chart-fact-extractor";
+import { answerExactFactIfPossible } from "@/lib/astro/rag/exact-fact-router";
 import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from "@/lib/security/e2e-rate-limit";
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from "@/lib/security/request-guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function getChartJsonFromCurrentChartResult(result: unknown): Record<string, unknown> | null {
+  if (!result || typeof result !== "object") return null;
+  const maybe = result as { chartVersion?: unknown };
+  if (!maybe.chartVersion || typeof maybe.chartVersion !== "object") return null;
+  const chartVersion = maybe.chartVersion as { chart_json?: unknown };
+  return chartVersion.chart_json && typeof chartVersion.chart_json === "object"
+    ? (chartVersion.chart_json as Record<string, unknown>)
+    : null;
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -46,12 +58,35 @@ export async function POST(req: NextRequest) {
   const service = createServiceClient();
 
   // Load current chart using priority-based selection (not just latest)
-  const loaded = await loadCurrentAstroChartForUser({ service, userId: user.id });
+  const loaded = await loadCurrentAstroChartForUser({
+    service,
+    userId: user.id,
+    options: { mode: "strict_user_runtime" },
+  });
   if (!loaded.ok) {
-    if (loaded.error === "chart_not_ready") {
+    if (loaded.error === "chart_not_ready" || loaded.error === "setup_required") {
       return NextResponse.json({ answer: loaded.message });
     }
     return NextResponse.json({ error: loaded.error, message: loaded.message }, { status: loaded.status });
+  }
+
+  const chartJson = getChartJsonFromCurrentChartResult(loaded);
+  if (!chartJson) {
+    return NextResponse.json({
+      answer: "aadesh: Your current chart is saved, but the structured chart facts are unavailable. Please recalculate once before asking exact chart questions.",
+    });
+  }
+
+  const chartFacts = extractChartFactsFromVersion(chartJson, {
+    userId: user.id,
+    profileId: String(loaded.profile.id),
+    chartVersionId: String(loaded.chartVersion.id),
+  });
+  const exactFactAnswer = answerExactFactIfPossible(question, chartFacts);
+  if (exactFactAnswer?.answer) {
+    return NextResponse.json({
+      answer: exactFactAnswer.answer,
+    });
   }
 
   const predictionContext = loaded.predictionSummary && typeof loaded.predictionSummary === "object"

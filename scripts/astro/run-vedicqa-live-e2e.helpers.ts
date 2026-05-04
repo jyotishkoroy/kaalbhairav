@@ -5,7 +5,7 @@ export const DEFAULT_CDP_URL = "http://127.0.0.1:9222";
 export const DEFAULT_STORAGE_STATE_PATH = "artifacts/auth/production-storage-state.json";
 export const DEFAULT_LIVE_URL = "https://www.tarayai.com/astro";
 
-export function useCdpMode(): boolean {
+export function isCdpModeEnabled(): boolean {
   return process.env.VEDICQA_USE_CDP === "true";
 }
 
@@ -26,7 +26,7 @@ export function hasStorageState(storageStatePath = resolveStorageStatePath()): b
 }
 
 export function shouldRequireStorageState(): boolean {
-  return !useCdpMode();
+  return !isCdpModeEnabled();
 }
 
 export function findAstroPage(context: BrowserContext): Page | undefined {

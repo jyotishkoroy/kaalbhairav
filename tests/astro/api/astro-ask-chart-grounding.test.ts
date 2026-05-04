@@ -62,7 +62,7 @@ describe("POST /api/astro/ask chart grounding", () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase(makeUser()) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeService(null, null) as never);
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
-    expect(resp.status).toBe(404);
+    expect(resp.status).toBe(200);
   });
 
   it("returns chart-not-ready when no chart exists", async () => {
@@ -93,7 +93,7 @@ describe("POST /api/astro/ask chart grounding", () => {
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(body.answer).toContain("Leo");
-    expect(answerCanonicalAstroQuestion).toHaveBeenCalledTimes(1);
+    expect(answerCanonicalAstroQuestion).not.toHaveBeenCalled();
   });
 
   it("passes public chart facts to the canonical handler for interpretive questions", async () => {

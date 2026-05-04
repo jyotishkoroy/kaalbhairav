@@ -10,7 +10,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "@playwri
 import { loadVedicQA } from "../../lib/astro/benchmark/vedicqa-loader.ts";
 import { scoreAnswerMatch } from "../../lib/astro/benchmark/answer-match.ts";
 import { assertNoSecretLeaks, excerptText, hashText, sanitizeEvent, sanitizeUrlPath, type E2ETraceRow, type SanitizedNetworkEvent } from "../../lib/astro/benchmark/e2e-trace.ts";
-import { findAstroPage, hasStorageState, isAstroUrl, resolveCdpFinalStatus, resolveCdpUrl, resolveLiveUrl, resolveStorageStatePath, shouldRequireStorageState, useCdpMode as getUseCdpMode } from "./run-vedicqa-live-e2e.helpers.ts";
+import { findAstroPage, hasStorageState, isAstroUrl, isCdpModeEnabled as getUseCdpMode, resolveCdpFinalStatus, resolveCdpUrl, resolveLiveUrl, resolveStorageStatePath, shouldRequireStorageState } from "./run-vedicqa-live-e2e.helpers.ts";
 
 const inputPath = process.env.VEDICQA_INPUT ?? "vedicQA.md";
 const limit = Number(process.env.VEDICQA_LIMIT ?? "30");

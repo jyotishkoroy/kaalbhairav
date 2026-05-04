@@ -17,7 +17,7 @@ import {
   resolveLiveUrl,
   resolveStorageStatePath,
   shouldRequireStorageState,
-  useCdpMode,
+  isCdpModeEnabled,
 } from "../../scripts/astro/run-vedicqa-live-e2e.helpers.ts";
 
 describe("run-vedicqa-live-e2e helpers", () => {
@@ -31,12 +31,12 @@ describe("run-vedicqa-live-e2e helpers", () => {
 
   it("requires storage state only outside CDP mode", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    expect(useCdpMode()).toBe(false);
+    expect(isCdpModeEnabled()).toBe(false);
     expect(shouldRequireStorageState()).toBe(true);
     expect(hasStorageState()).toBe(false);
 
     process.env.VEDICQA_USE_CDP = "true";
-    expect(useCdpMode()).toBe(true);
+    expect(isCdpModeEnabled()).toBe(true);
     expect(shouldRequireStorageState()).toBe(false);
   });
 

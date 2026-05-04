@@ -394,6 +394,126 @@ function extractBirthFacts(root: unknown, facts: Map<string, FactDraft>): void {
   if (birthTimezone) addFact(facts, factFromSource({ factType: "birth", factKey: "birth_timezone", factValue: birthTimezone, sourcePath: "birth.timezone", source: "chart_json", confidence: "deterministic", tags: ["birth"], metadata }));
 }
 
+function extractPublicFacts(root: unknown, facts: Map<string, FactDraft>): void {
+  const publicFacts = isRecord(getPath(root, ["public_facts"])) ? getPath(root, ["public_facts"]) as Record<string, unknown> : null;
+  if (!publicFacts) return;
+
+  const lagnaSign = normalizeSign(publicFacts.lagna_sign);
+  if (lagnaSign) {
+    addFact(
+      facts,
+      factFromSource({
+        factType: "lagna",
+        factKey: "lagna",
+        factValue: lagnaSign,
+        sourcePath: "public_facts.lagna_sign",
+        source: "chart_json",
+        confidence: "deterministic",
+        planet: "Lagna",
+        sign: lagnaSign,
+        tags: ["lagna", "ascendant", "chart"],
+        metadata: { sourceShape: "public_facts" },
+      }),
+    );
+  }
+
+  const moonSign = normalizeSign(publicFacts.moon_sign);
+  const moonHouse = pickHouseNumber(publicFacts.moon_house);
+  if (moonSign) {
+    addFact(
+      facts,
+      factFromSource({
+        factType: "rasi",
+        factKey: "moon_sign",
+        factValue: moonHouse != null ? `${moonSign}, house ${moonHouse}` : moonSign,
+        sourcePath: "public_facts.moon_sign",
+        source: "chart_json",
+        confidence: "deterministic",
+        planet: "Moon",
+        house: moonHouse,
+        sign: moonSign,
+        tags: ["rasi", "moon", "sign"],
+        metadata: { sourceShape: "public_facts" },
+      }),
+    );
+  }
+
+  const sunSign = normalizeSign(publicFacts.sun_sign);
+  const sunHouse = pickHouseNumber(publicFacts.sun_house);
+  if (sunSign) {
+    addFact(
+      facts,
+      factFromSource({
+        factType: "planet_placement",
+        factKey: "sun",
+        factValue: sunHouse != null ? `${sunSign}, house ${sunHouse}` : sunSign,
+        sourcePath: "public_facts.sun_sign",
+        source: "chart_json",
+        confidence: "deterministic",
+        planet: "Sun",
+        house: sunHouse,
+        sign: sunSign,
+        tags: ["planet_placement", "sun"],
+        metadata: { sourceShape: "public_facts" },
+      }),
+    );
+  }
+
+  const moonNakshatra = asString(publicFacts.moon_nakshatra);
+  if (moonNakshatra) {
+    addFact(
+      facts,
+      factFromSource({
+        factType: "nakshatra",
+        factKey: "moon_nakshatra",
+        factValue: moonNakshatra,
+        sourcePath: "public_facts.moon_nakshatra",
+        source: "chart_json",
+        confidence: "deterministic",
+        planet: "Moon",
+        tags: ["moon", "nakshatra"],
+        metadata: { sourceShape: "public_facts" },
+      }),
+    );
+  }
+
+  const moonPada = publicFacts.moon_pada;
+  if (typeof moonPada === "number" || typeof moonPada === "string") {
+    addFact(
+      facts,
+      factFromSource({
+        factType: "nakshatra",
+        factKey: "moon_nakshatra_pada",
+        factValue: String(moonPada),
+        sourcePath: "public_facts.moon_pada",
+        source: "chart_json",
+        confidence: "deterministic",
+        planet: "Moon",
+        tags: ["moon", "nakshatra"],
+        metadata: { sourceShape: "public_facts" },
+      }),
+    );
+  }
+
+  const mahadasha = asString(publicFacts.mahadasha);
+  if (mahadasha) {
+    addFact(
+      facts,
+      factFromSource({
+        factType: "dasha",
+        factKey: "current_mahadasha",
+        factValue: mahadasha,
+        sourcePath: "public_facts.mahadasha",
+        source: "chart_json",
+        confidence: "deterministic",
+        planet: mahadasha,
+        tags: ["dasha", "mahadasha"],
+        metadata: { sourceShape: "public_facts" },
+      }),
+    );
+  }
+}
+
 function extractLagnaFacts(root: unknown, facts: Map<string, FactDraft>): void {
   const candidates = PATHS.lagna.map((path) => getPath(root, path));
   const lagnaValue = candidates.find((candidate) => candidate != null);
@@ -817,6 +937,7 @@ export function extractChartFactsFromVersion(chartJson: unknown, options: Extrac
   const root = chartJson;
   const facts = new Map<string, FactDraft>();
   extractBirthFacts(root, facts);
+  extractPublicFacts(root, facts);
   extractLagnaFacts(root, facts);
   extractMoonSignAndNakshatra(root, facts);
   extractPlanetFacts(root, facts);
