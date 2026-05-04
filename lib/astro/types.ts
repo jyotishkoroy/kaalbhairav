@@ -78,6 +78,7 @@ export type ChartIdentity = {
     current_utc: ISODateTime
     as_of_date?: ISODate
   }
+  canonical_schema_version?: string
 }
 
 export type ChartJson = {
@@ -117,6 +118,7 @@ export type ChartJson = {
   favourable_points?: Record<string, unknown>
   ghatak?: Record<string, unknown>
   shadbala?: Record<string, unknown>
+  canonical_chart_json_v2?: Record<string, unknown>
 }
 
 export type PredictionContext = {

@@ -7,6 +7,10 @@
 import type { ChartJson, AstrologySettings, AstroExpandedSections, ConfidenceScore } from './types.ts'
 import type { MasterAstroCalculationOutput } from './schemas/master.ts'
 import type { DailyTransits, Panchang, CurrentTimingContext, DashaPeriod, TransitPlanet } from './engine/types.ts'
+import { extractCalculationSettingsMetadata } from './calculation-settings-metadata.ts'
+import { buildCanonicalChartJsonV2 } from './schemas/canonical-chart-json.ts'
+import { computedAstroSection, unavailableAstroSection } from './schemas/astro-section-contract.ts'
+import { engineModeToSectionSource } from './engine/engine-section-source.ts'
 
 type MaybeObject = Record<string, unknown> | null | undefined
 
@@ -116,6 +120,83 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : []
+}
+
+function isTruthyObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function getEngineName(output: MasterAstroCalculationOutput): string {
+  const engine = (output as MaybeObject)?.engine
+  return typeof engine === 'string' && engine.trim() ? engine.trim() : 'unknown'
+}
+
+function getEngineVersion(output: MasterAstroCalculationOutput): string | undefined {
+  const engineVersion = (output as MaybeObject)?.engine_version
+  return typeof engineVersion === 'string' && engineVersion.trim() ? engineVersion.trim() : undefined
+}
+
+function getSettingsHash(args: { output: MasterAstroCalculationOutput; settingsHash?: string }): string | undefined {
+  const hash = args.settingsHash ?? (args.output as MaybeObject)?.settings_hash
+  return typeof hash === 'string' && hash.trim() ? hash.trim() : undefined
+}
+
+function sectionComputed<T>(
+  engine: string,
+  output: MasterAstroCalculationOutput,
+  fields: T,
+  warnings?: string[],
+) {
+  return computedAstroSection({
+    source: engineModeToSectionSource((output as MaybeObject)?.engine_mode ?? (output as MaybeObject)?.engineMode ?? (output as MaybeObject)?.engine),
+    engine,
+    engineVersion: getEngineVersion(output),
+    settingsHash: getSettingsHash({ output }),
+    computedAt: typeof (output as MaybeObject)?.computed_at === 'string' ? ((output as MaybeObject)?.computed_at as string) : undefined,
+    fields,
+    warnings,
+  })
+}
+
+function sectionUnavailable(engine: string, output: MasterAstroCalculationOutput, reason: string) {
+  return unavailableAstroSection({
+    reason,
+    source: 'not_implemented',
+    engine,
+    engineVersion: getEngineVersion(output),
+    settingsHash: getSettingsHash({ output }),
+    computedAt: typeof (output as MaybeObject)?.computed_at === 'string' ? ((output as MaybeObject)?.computed_at as string) : undefined,
+  })
+}
+
+function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_sections: AstroExpandedSections | null | undefined) {
+  const engine = getEngineName(output)
+  const planetaryPositions = (output as MaybeObject)?.planetary_positions
+  const lagna = (output as MaybeObject)?.lagna
+  const houses = (output as MaybeObject)?.houses
+  const panchang = expanded_sections?.panchang ?? (output as MaybeObject)?.panchang
+  const d1Chart = (output as MaybeObject)?.d1_chart
+  const d9Chart = expanded_sections?.navamsa_d9 ?? (output as MaybeObject)?.navamsa_d9
+  const vimshottari = expanded_sections?.vimshottari_dasha ?? (output as MaybeObject)?.vimshottari_dasha
+  const transits = expanded_sections?.daily_transits ?? (output as MaybeObject)?.daily_transits
+  const timeFacts = (output as MaybeObject)?.runtime_clock ?? (output as MaybeObject)?.prediction_ready_context
+
+  return {
+    timeFacts: isTruthyObject(timeFacts) ? sectionComputed(engine, output, timeFacts) : sectionUnavailable(engine, output, 'time_facts_not_available'),
+    planetaryPositions: isTruthyObject(planetaryPositions) ? sectionComputed(engine, output, planetaryPositions) : sectionUnavailable(engine, output, 'planetary_positions_not_available'),
+    lagna: isTruthyObject(lagna) ? sectionComputed(engine, output, lagna) : sectionUnavailable(engine, output, 'lagna_not_available'),
+    houses: isTruthyObject(houses) ? sectionComputed(engine, output, houses) : sectionUnavailable(engine, output, 'houses_not_available'),
+    panchang: isTruthyObject(panchang)
+      ? sectionComputed(engine, output, panchang)
+      : sectionUnavailable(engine, output, 'panchang_not_available'),
+    d1Chart: isTruthyObject(d1Chart) ? sectionComputed(engine, output, d1Chart) : sectionUnavailable(engine, output, 'd1_chart_not_available'),
+    d9Chart: isTruthyObject(d9Chart) ? sectionComputed(engine, output, d9Chart) : sectionUnavailable(engine, output, 'd9_chart_not_available'),
+    vimshottari: isTruthyObject(vimshottari) ? sectionComputed(engine, output, vimshottari) : sectionUnavailable(engine, output, 'vimshottari_not_available'),
+    transits: isTruthyObject(transits) ? sectionComputed(engine, output, transits) : sectionUnavailable(engine, output, 'transits_not_available'),
+    advanced: {
+      outerPlanets: sectionUnavailable(engine, output, 'outer_planets_not_enabled_for_all_engine_modes'),
+    },
+  }
 }
 
 function isAvailableSection(value: unknown): value is {
@@ -932,6 +1013,44 @@ export function buildProfileChartJsonFromMasterOutput(args: {
 }): ChartJson {
   const expanded_sections = buildProfileExpandedSectionsFromMasterOutput(args.output)
   const confidence = ((args.output as MaybeObject)?.confidence ?? { value: 0, label: 'not_enough_context', reasons: [] }) as ConfidenceScore
+  const calculationSettings = extractCalculationSettingsMetadata({
+    metadata: {
+      calculation_settings: args.settingsForHash,
+      settings_hash: args.settingsHash,
+      engine_version: args.engineVersion,
+      schema_version: args.schemaVersion,
+      engine: (args.output as MaybeObject)?.engine,
+    },
+    calculation_settings: args.settingsForHash,
+  })
+  if (!calculationSettings.panchangConvention) {
+    const panchangConvention = (args.output as MaybeObject)?.panchang && typeof (args.output as MaybeObject)?.panchang === 'object'
+      ? ((args.output as MaybeObject)?.panchang as Record<string, unknown>).convention
+      : undefined
+    if (typeof panchangConvention === 'string' && panchangConvention.trim()) {
+      calculationSettings.panchangConvention = panchangConvention.trim().toLowerCase().replace(/[\s-]+/g, '_')
+    }
+  }
+  const canonical_chart_json_v2 = buildCanonicalChartJsonV2({
+    metadata: {
+      userId: args.userId,
+      profileId: args.profileId,
+      calculationId: args.calculationId,
+      chartVersionId: args.chartVersionId,
+      inputHash: args.inputHash,
+      settingsHash: args.settingsHash,
+      engine: getEngineName(args.output),
+      engineVersion: args.engineVersion,
+      calculationSettings,
+      runtimeClock: ((args.output as MaybeObject)?.runtime_clock as { current_utc: string; as_of_date?: string } | undefined)
+        ? {
+            currentUtc: ((args.output as MaybeObject)?.runtime_clock as { current_utc: string; as_of_date?: string }).current_utc,
+            asOfDate: ((args.output as MaybeObject)?.runtime_clock as { current_utc: string; as_of_date?: string }).as_of_date,
+          }
+        : undefined,
+    },
+    sections: buildCanonicalSections(args.output, expanded_sections),
+  })
 
   return {
     metadata: {
@@ -948,6 +1067,7 @@ export function buildProfileChartJsonFromMasterOutput(args: {
       computed_at: nowISO(),
       calculation_status: mapChartStatus(args.output.calculation_status),
       runtime_clock: ((args.output as MaybeObject)?.runtime_clock as { current_utc: string; as_of_date?: string } | undefined) ?? undefined,
+      canonical_schema_version: 'chart_json_v2',
     },
     normalized_input: args.normalized,
     calculation_settings: args.settingsForHash,
@@ -974,5 +1094,6 @@ export function buildProfileChartJsonFromMasterOutput(args: {
     jaimini: toRecord((args.output as MaybeObject)?.jaimini),
     life_area_signatures: toRecord((args.output as MaybeObject)?.life_area_signatures),
     timing_signatures: toRecord((args.output as MaybeObject)?.timing_signatures),
+    canonical_chart_json_v2,
   }
 }
