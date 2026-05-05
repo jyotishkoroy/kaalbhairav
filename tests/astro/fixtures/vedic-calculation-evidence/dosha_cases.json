@@ -1,5 +1,486 @@
 {
   "sourceEvidenceVersion": "phase18_sanitized_v1",
   "generatedAt": "1970-01-01T00:00:00.000Z",
-  "cases": []
+  "cases": [
+    {
+      "caseId": "case_001",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_002",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_003",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_004",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_005",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_006",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_007",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_008",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_009",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_010",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_011",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_012",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_013",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_014",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_015",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_016",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_017",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_018",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_019",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_020",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_021",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_022",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_023",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_024",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_025",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_026",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_027",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_028",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": true,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_029",
+      "manglik": true,
+      "manglikFromLagna": true,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_030",
+      "manglik": false,
+      "manglikFromLagna": false,
+      "manglikFromMoon": false,
+      "kalsarpa": null,
+      "kalsarpaType": null
+    },
+    {
+      "caseId": "case_031",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Anant"
+    },
+    {
+      "caseId": "case_032",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Shankhachur"
+    },
+    {
+      "caseId": "case_033",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Shankhachur"
+    },
+    {
+      "caseId": "case_034",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Shankhachur"
+    },
+    {
+      "caseId": "case_035",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Kulik"
+    },
+    {
+      "caseId": "case_036",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_037",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Padma"
+    },
+    {
+      "caseId": "case_038",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_039",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Mahapadam"
+    },
+    {
+      "caseId": "case_040",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": true,
+      "kalsarpaType": "Mahapadam"
+    },
+    {
+      "caseId": "case_041",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Kulik"
+    },
+    {
+      "caseId": "case_042",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Vishdhar"
+    },
+    {
+      "caseId": "case_043",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": true,
+      "kalsarpaType": "Takshak"
+    },
+    {
+      "caseId": "case_044",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_045",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Sheshnag"
+    },
+    {
+      "caseId": "case_046",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Anant"
+    },
+    {
+      "caseId": "case_047",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Vasuki"
+    },
+    {
+      "caseId": "case_048",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Shankhpal"
+    },
+    {
+      "caseId": "case_049",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Shankhpal"
+    },
+    {
+      "caseId": "case_050",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_051",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_052",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Takshak"
+    },
+    {
+      "caseId": "case_053",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_054",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Vishdhar"
+    },
+    {
+      "caseId": "case_055",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": true,
+      "kalsarpaType": "Karkotak"
+    },
+    {
+      "caseId": "case_056",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Padma"
+    },
+    {
+      "caseId": "case_057",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Shankhpal"
+    },
+    {
+      "caseId": "case_058",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Vasuki"
+    },
+    {
+      "caseId": "case_059",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Anant"
+    },
+    {
+      "caseId": "case_060",
+      "manglik": null,
+      "manglikFromLagna": null,
+      "manglikFromMoon": null,
+      "kalsarpa": false,
+      "kalsarpaType": "Mahapadam"
+    }
+  ]
 }

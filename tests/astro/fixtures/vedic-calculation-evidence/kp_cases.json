@@ -1,5 +1,1006 @@
 {
   "sourceEvidenceVersion": "phase18_sanitized_v1",
   "generatedAt": "1970-01-01T00:00:00.000Z",
-  "cases": []
+  "cases": [
+    {
+      "caseId": "case_001",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 259.57666666666665,
+      "rashiLord": "JUP",
+      "nakshatraLord": "VEN",
+      "subLord": "RAH",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_002",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 185.2147222222222,
+      "rashiLord": "VEN",
+      "nakshatraLord": "MAR",
+      "subLord": "SUN",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_003",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 104.82166666666666,
+      "rashiLord": "MON",
+      "nakshatraLord": "SAT",
+      "subLord": "RAH",
+      "subSubLord": "MAR"
+    },
+    {
+      "caseId": "case_004",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 238.26361111111112,
+      "rashiLord": "MAR",
+      "nakshatraLord": "MER",
+      "subLord": "SAT",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_005",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 65.99083333333333,
+      "rashiLord": "MER",
+      "nakshatraLord": "MAR",
+      "subLord": "MON",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_006",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 255.1580555555556,
+      "rashiLord": "JUP",
+      "nakshatraLord": "VEN",
+      "subLord": "VEN",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_007",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 126.64611111111113,
+      "rashiLord": "SUN",
+      "nakshatraLord": "KET",
+      "subLord": "RAH",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_008",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 166.945,
+      "rashiLord": "MER",
+      "nakshatraLord": "MON",
+      "subLord": "SAT",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_009",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 346.945,
+      "rashiLord": "JUP",
+      "nakshatraLord": "MER",
+      "subLord": "MER",
+      "subSubLord": "KET"
+    },
+    {
+      "caseId": "case_010",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 201.97694444444448,
+      "rashiLord": "VEN",
+      "nakshatraLord": "JUP",
+      "subLord": "SAT",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_011",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 233.36027777777775,
+      "rashiLord": "MAR",
+      "nakshatraLord": "MER",
+      "subLord": "MAR",
+      "subSubLord": "MAR"
+    },
+    {
+      "caseId": "case_012",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 173.1725,
+      "rashiLord": "MER",
+      "nakshatraLord": "MON",
+      "subLord": "SUN",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_013",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 315.7283333333333,
+      "rashiLord": "SAT",
+      "nakshatraLord": "RAH",
+      "subLord": "VEN",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_014",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 243.25277777777777,
+      "rashiLord": "JUP",
+      "nakshatraLord": "KET",
+      "subLord": "SUN",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_015",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 348.9188888888889,
+      "rashiLord": "JUP",
+      "nakshatraLord": "MER",
+      "subLord": "KET",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_016",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 319.465,
+      "rashiLord": "SAT",
+      "nakshatraLord": "RAH",
+      "subLord": "MAR",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_017",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 8.675277777777778,
+      "rashiLord": "MAR",
+      "nakshatraLord": "KET",
+      "subLord": "JUP",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_018",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 289.3125,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MON",
+      "subLord": "MER",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_019",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 18.54527777777778,
+      "rashiLord": "MAR",
+      "nakshatraLord": "VEN",
+      "subLord": "RAH",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_020",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 98.18472222222222,
+      "rashiLord": "MON",
+      "nakshatraLord": "SAT",
+      "subLord": "VEN",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_021",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 278.1847222222222,
+      "rashiLord": "SAT",
+      "nakshatraLord": "SUN",
+      "subLord": "VEN",
+      "subSubLord": "SUN"
+    },
+    {
+      "caseId": "case_022",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 294.40527777777777,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MAR",
+      "subLord": "RAH",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_023",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 281.49305555555554,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MON",
+      "subLord": "MAR",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_024",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 228.98638888888888,
+      "rashiLord": "MAR",
+      "nakshatraLord": "MER",
+      "subLord": "KET",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_025",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 336.2275,
+      "rashiLord": "JUP",
+      "nakshatraLord": "SAT",
+      "subLord": "MER",
+      "subSubLord": "SUN"
+    },
+    {
+      "caseId": "case_026",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 208.7888888888889,
+      "rashiLord": "VEN",
+      "nakshatraLord": "JUP",
+      "subLord": "SUN",
+      "subSubLord": "SUN"
+    },
+    {
+      "caseId": "case_027",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 109.52944444444444,
+      "rashiLord": "MON",
+      "nakshatraLord": "MER",
+      "subLord": "VEN",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_028",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 315.44444444444446,
+      "rashiLord": "SAT",
+      "nakshatraLord": "RAH",
+      "subLord": "VEN",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_029",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 231.4986111111111,
+      "rashiLord": "MAR",
+      "nakshatraLord": "MER",
+      "subLord": "VEN",
+      "subSubLord": "KET"
+    },
+    {
+      "caseId": "case_030",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 297.7102777777778,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MAR",
+      "subLord": "JUP",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_031",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 323.1261111111112,
+      "rashiLord": "SAT",
+      "nakshatraLord": "JUP",
+      "subLord": "SAT",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_032",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 193.87583333333333,
+      "rashiLord": "VEN",
+      "nakshatraLord": "RAH",
+      "subLord": "MER",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_033",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 13.875833333333334,
+      "rashiLord": "MAR",
+      "nakshatraLord": "VEN",
+      "subLord": "VEN",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_034",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 276.0338888888889,
+      "rashiLord": "SAT",
+      "nakshatraLord": "SUN",
+      "subLord": "MER",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_035",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 271.40416666666664,
+      "rashiLord": "SAT",
+      "nakshatraLord": "SUN",
+      "subLord": "JUP",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_036",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 216.75916666666663,
+      "rashiLord": "MAR",
+      "nakshatraLord": "SAT",
+      "subLord": "MER",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_037",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 216.57638888888889,
+      "rashiLord": "MAR",
+      "nakshatraLord": "SAT",
+      "subLord": "MER",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_038",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 152.52027777777778,
+      "rashiLord": "MER",
+      "nakshatraLord": "SUN",
+      "subLord": "JUP",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_039",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 198.7461111111111,
+      "rashiLord": "VEN",
+      "nakshatraLord": "RAH",
+      "subLord": "MON",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_040",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 223.2483333333333,
+      "rashiLord": "MAR",
+      "nakshatraLord": "SAT",
+      "subLord": "RAH",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_041",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 76.22333333333333,
+      "rashiLord": "MER",
+      "nakshatraLord": "RAH",
+      "subLord": "VEN",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_042",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 262.8455555555556,
+      "rashiLord": "JUP",
+      "nakshatraLord": "VEN",
+      "subLord": "SAT",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_043",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 257.5905555555555,
+      "rashiLord": "JUP",
+      "nakshatraLord": "VEN",
+      "subLord": "MAR",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_044",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 296.9188888888889,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MAR",
+      "subLord": "JUP",
+      "subSubLord": "KET"
+    },
+    {
+      "caseId": "case_045",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 116.91888888888889,
+      "rashiLord": "MON",
+      "nakshatraLord": "MER",
+      "subLord": "JUP",
+      "subSubLord": "KET"
+    },
+    {
+      "caseId": "case_046",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 249.91111111111115,
+      "rashiLord": "JUP",
+      "nakshatraLord": "KET",
+      "subLord": "SAT",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_047",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 256.9552777777778,
+      "rashiLord": "JUP",
+      "nakshatraLord": "VEN",
+      "subLord": "MON",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_048",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 202.06472222222223,
+      "rashiLord": "VEN",
+      "nakshatraLord": "JUP",
+      "subLord": "SAT",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_049",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 118.40055555555556,
+      "rashiLord": "MON",
+      "nakshatraLord": "MER",
+      "subLord": "SAT",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_050",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 222.92361111111111,
+      "rashiLord": "MAR",
+      "nakshatraLord": "SAT",
+      "subLord": "RAH",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_051",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 36.81555555555556,
+      "rashiLord": "VEN",
+      "nakshatraLord": "SUN",
+      "subLord": "MER",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_052",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 132.0313888888889,
+      "rashiLord": "SUN",
+      "nakshatraLord": "KET",
+      "subLord": "MER",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_053",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 1.2591666666666668,
+      "rashiLord": "MAR",
+      "nakshatraLord": "KET",
+      "subLord": "VEN",
+      "subSubLord": "SUN"
+    },
+    {
+      "caseId": "case_054",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 136.66916666666663,
+      "rashiLord": "SUN",
+      "nakshatraLord": "VEN",
+      "subLord": "MON",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_055",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 93.04444444444444,
+      "rashiLord": "MON",
+      "nakshatraLord": "JUP",
+      "subLord": "RAH",
+      "subSubLord": "SUN"
+    },
+    {
+      "caseId": "case_056",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 213.18027777777775,
+      "rashiLord": "MAR",
+      "nakshatraLord": "JUP",
+      "subLord": "RAH",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_057",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 33.180277777777775,
+      "rashiLord": "VEN",
+      "nakshatraLord": "SUN",
+      "subLord": "SAT",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_058",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 185.5738888888889,
+      "rashiLord": "VEN",
+      "nakshatraLord": "MAR",
+      "subLord": "MON",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_059",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 225.57527777777776,
+      "rashiLord": "MAR",
+      "nakshatraLord": "SAT",
+      "subLord": "JUP",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_060",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 163.97666666666666,
+      "rashiLord": "MER",
+      "nakshatraLord": "MON",
+      "subLord": "JUP",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_061",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 195.00027777777777,
+      "rashiLord": "VEN",
+      "nakshatraLord": "RAH",
+      "subLord": "KET",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_062",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 57.79055555555556,
+      "rashiLord": "VEN",
+      "nakshatraLord": "MAR",
+      "subLord": "JUP",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_063",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 179.375,
+      "rashiLord": "MER",
+      "nakshatraLord": "MAR",
+      "subLord": "SAT",
+      "subSubLord": "MAR"
+    },
+    {
+      "caseId": "case_064",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 210.8155555555556,
+      "rashiLord": "MAR",
+      "nakshatraLord": "JUP",
+      "subLord": "MAR",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_065",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 163.92694444444444,
+      "rashiLord": "MER",
+      "nakshatraLord": "MON",
+      "subLord": "JUP",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_066",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 159.67749999999998,
+      "rashiLord": "MER",
+      "nakshatraLord": "SUN",
+      "subLord": "VEN",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_067",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 93.45305555555557,
+      "rashiLord": "MON",
+      "nakshatraLord": "SAT",
+      "subLord": "SAT",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_068",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 7.72,
+      "rashiLord": "MAR",
+      "nakshatraLord": "KET",
+      "subLord": "JUP",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_069",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 187.72,
+      "rashiLord": "VEN",
+      "nakshatraLord": "RAH",
+      "subLord": "RAH",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_070",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 309.20194444444445,
+      "rashiLord": "SAT",
+      "nakshatraLord": "RAH",
+      "subLord": "JUP",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_071",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 288.7369444444445,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MON",
+      "subLord": "MER",
+      "subSubLord": "MAR"
+    },
+    {
+      "caseId": "case_072",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 236.635,
+      "rashiLord": "MAR",
+      "nakshatraLord": "MER",
+      "subLord": "JUP",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_073",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 23.817777777777778,
+      "rashiLord": "MAR",
+      "nakshatraLord": "VEN",
+      "subLord": "SAT",
+      "subSubLord": "JUP"
+    },
+    {
+      "caseId": "case_074",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 137.2397222222222,
+      "rashiLord": "SUN",
+      "nakshatraLord": "VEN",
+      "subLord": "MON",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_075",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 36.0125,
+      "rashiLord": "VEN",
+      "nakshatraLord": "SUN",
+      "subLord": "MER",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_076",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 38.05583333333333,
+      "rashiLord": "VEN",
+      "nakshatraLord": "SUN",
+      "subLord": "VEN",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_077",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 122.87027777777776,
+      "rashiLord": "SUN",
+      "nakshatraLord": "KET",
+      "subLord": "VEN",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_078",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 12.060555555555556,
+      "rashiLord": "MAR",
+      "nakshatraLord": "KET",
+      "subLord": "MER",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_079",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 356.02722222222224,
+      "rashiLord": "JUP",
+      "nakshatraLord": "MER",
+      "subLord": "RAH",
+      "subSubLord": "MAR"
+    },
+    {
+      "caseId": "case_080",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 353.90666666666664,
+      "rashiLord": "JUP",
+      "nakshatraLord": "MER",
+      "subLord": "MAR",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_081",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 173.90666666666667,
+      "rashiLord": "MER",
+      "nakshatraLord": "MAR",
+      "subLord": "MAR",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_082",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 151.9886111111111,
+      "rashiLord": "MER",
+      "nakshatraLord": "SUN",
+      "subLord": "JUP",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_083",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 212.05444444444444,
+      "rashiLord": "MAR",
+      "nakshatraLord": "JUP",
+      "subLord": "RAH",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_084",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 146.98638888888888,
+      "rashiLord": "SUN",
+      "nakshatraLord": "SUN",
+      "subLord": "SUN",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_085",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 163.45888888888888,
+      "rashiLord": "MER",
+      "nakshatraLord": "MON",
+      "subLord": "RAH",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_086",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 124.88361111111112,
+      "rashiLord": "SUN",
+      "nakshatraLord": "KET",
+      "subLord": "MAR",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_087",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 162.6963888888889,
+      "rashiLord": "MER",
+      "nakshatraLord": "MON",
+      "subLord": "RAH",
+      "subSubLord": "SAT"
+    },
+    {
+      "caseId": "case_088",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 156.1211111111111,
+      "rashiLord": "MER",
+      "nakshatraLord": "SUN",
+      "subLord": "MER",
+      "subSubLord": "MAR"
+    },
+    {
+      "caseId": "case_089",
+      "kind": "planet",
+      "id": "Jupiter",
+      "longitudeDeg": 178.28,
+      "rashiLord": "MER",
+      "nakshatraLord": "MAR",
+      "subLord": "SAT",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_090",
+      "kind": "planet",
+      "id": "Venus",
+      "longitudeDeg": 148.84833333333333,
+      "rashiLord": "SUN",
+      "nakshatraLord": "SUN",
+      "subLord": "MAR",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_091",
+      "kind": "planet",
+      "id": "Saturn",
+      "longitudeDeg": 12.6825,
+      "rashiLord": "MAR",
+      "nakshatraLord": "KET",
+      "subLord": "MER",
+      "subSubLord": "RAH"
+    },
+    {
+      "caseId": "case_092",
+      "kind": "planet",
+      "id": "Rahu",
+      "longitudeDeg": 28.842222222222222,
+      "rashiLord": "MAR",
+      "nakshatraLord": "SUN",
+      "subLord": "MAR",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_093",
+      "kind": "planet",
+      "id": "Ketu",
+      "longitudeDeg": 208.84222222222223,
+      "rashiLord": "VEN",
+      "nakshatraLord": "JUP",
+      "subLord": "SUN",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_094",
+      "kind": "planet",
+      "id": "Uranus",
+      "longitudeDeg": 268.87083333333334,
+      "rashiLord": "JUP",
+      "nakshatraLord": "SUN",
+      "subLord": "MAR",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_095",
+      "kind": "planet",
+      "id": "Neptune",
+      "longitudeDeg": 88.845,
+      "rashiLord": "MER",
+      "nakshatraLord": "JUP",
+      "subLord": "SUN",
+      "subSubLord": "MON"
+    },
+    {
+      "caseId": "case_096",
+      "kind": "planet",
+      "id": "Pluto",
+      "longitudeDeg": 65.36027777777777,
+      "rashiLord": "MER",
+      "nakshatraLord": "MAR",
+      "subLord": "SUN",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_097",
+      "kind": "planet",
+      "id": "Sun",
+      "longitudeDeg": 298.47916666666663,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MAR",
+      "subLord": "SAT",
+      "subSubLord": "MER"
+    },
+    {
+      "caseId": "case_098",
+      "kind": "planet",
+      "id": "Moon",
+      "longitudeDeg": 292.65916666666664,
+      "rashiLord": "SAT",
+      "nakshatraLord": "MON",
+      "subLord": "VEN",
+      "subSubLord": "KET"
+    },
+    {
+      "caseId": "case_099",
+      "kind": "planet",
+      "id": "Mars",
+      "longitudeDeg": 235.4225,
+      "rashiLord": "MAR",
+      "nakshatraLord": "MER",
+      "subLord": "RAH",
+      "subSubLord": "VEN"
+    },
+    {
+      "caseId": "case_100",
+      "kind": "planet",
+      "id": "Mercury",
+      "longitudeDeg": 274.9108333333333,
+      "rashiLord": "SAT",
+      "nakshatraLord": "SUN",
+      "subLord": "SAT",
+      "subSubLord": "JUP"
+    }
+  ]
 }

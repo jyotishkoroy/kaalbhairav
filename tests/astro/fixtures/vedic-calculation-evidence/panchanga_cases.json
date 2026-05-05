@@ -1,5 +1,276 @@
 {
   "sourceEvidenceVersion": "phase18_sanitized_v1",
   "generatedAt": "1970-01-01T00:00:00.000Z",
-  "cases": []
+  "cases": [
+    {
+      "caseId": "case_001",
+      "tithi": "Navami",
+      "paksha": "Krishna",
+      "yoga": "Sukarma",
+      "karana": "Gar",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_002",
+      "tithi": "Navami",
+      "paksha": "Krishna",
+      "yoga": "Vajra",
+      "karana": "Gar",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_003",
+      "tithi": "Panchami",
+      "paksha": "Krishna",
+      "yoga": "Harshana",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_004",
+      "tithi": "Dasami",
+      "paksha": "Krishna",
+      "yoga": "Vishkambha",
+      "karana": "Vishti",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_005",
+      "tithi": "Navami",
+      "paksha": "Shukla",
+      "yoga": "Indra",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_006",
+      "tithi": "Chaturthi",
+      "paksha": "Krishna",
+      "yoga": "Parigha",
+      "karana": "Baalav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_007",
+      "tithi": "Dasami",
+      "paksha": "Shukla",
+      "yoga": "Vyaghata",
+      "karana": "Tetil",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_008",
+      "tithi": "Dvadasi",
+      "paksha": "Krishna",
+      "yoga": "Sadhya",
+      "karana": "Tetil",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_009",
+      "tithi": "Amavasya",
+      "paksha": "Krishna",
+      "yoga": "Variyan",
+      "karana": "Naaga",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_010",
+      "tithi": "Ashtami",
+      "paksha": "Shukla",
+      "yoga": "Sula",
+      "karana": "Bav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_011",
+      "tithi": "Dasami",
+      "paksha": "Shukla",
+      "yoga": "Sadhya",
+      "karana": "Gar",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_012",
+      "tithi": "Dvadasi",
+      "paksha": "Shukla",
+      "yoga": "Vriddhi",
+      "karana": "Bav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_013",
+      "tithi": "Chaturthi",
+      "paksha": "Shukla",
+      "yoga": "Harshana",
+      "karana": "Vanij",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_014",
+      "tithi": "Panchami",
+      "paksha": "Krishna",
+      "yoga": "Brahma",
+      "karana": "Tetil",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_015",
+      "tithi": "Dvitiya",
+      "paksha": "Krishna",
+      "yoga": "Vajra",
+      "karana": "Gar",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_016",
+      "tithi": "Dvitiya",
+      "paksha": "Shukla",
+      "yoga": "Ayusman",
+      "karana": "Baalav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_017",
+      "tithi": "Dvadasi",
+      "paksha": "Krishna",
+      "yoga": "Sula",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_018",
+      "tithi": "Chaturthi",
+      "paksha": "Shukla",
+      "yoga": "Subha",
+      "karana": "Vishti",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_019",
+      "tithi": "Chaturthi",
+      "paksha": "Shukla",
+      "yoga": "Subha",
+      "karana": "Vishti",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_020",
+      "tithi": "Panchami",
+      "paksha": "Shukla",
+      "yoga": "Sukarma",
+      "karana": "Bav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_021",
+      "tithi": "Sashti",
+      "paksha": "Shukla",
+      "yoga": "Ganda",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_022",
+      "tithi": "Sashti",
+      "paksha": "Shukla",
+      "yoga": "Siddha",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_023",
+      "tithi": "Pratipad",
+      "paksha": "Shukla",
+      "yoga": "Subha",
+      "karana": "Kintudhhana",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_024",
+      "tithi": "Ashtami",
+      "paksha": "Krishna",
+      "yoga": "Variyan",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_025",
+      "tithi": "Dasami",
+      "paksha": "Krishna",
+      "yoga": "Dhruva",
+      "karana": "Vanij",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_026",
+      "tithi": "Tritiya",
+      "paksha": "Shukla",
+      "yoga": "Dhruva",
+      "karana": "Tetil",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_027",
+      "tithi": "Sashti",
+      "paksha": "Shukla",
+      "yoga": "Dhruva",
+      "karana": "Kolav",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_028",
+      "tithi": "Amavasya",
+      "paksha": "Krishna",
+      "yoga": "Indra",
+      "karana": "Chatushpada",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_029",
+      "tithi": "Dasami",
+      "paksha": "Shukla",
+      "yoga": "Vajra",
+      "karana": "Tetil",
+      "weekday": null,
+      "hinduWeekday": null
+    },
+    {
+      "caseId": "case_030",
+      "tithi": "Ashtami",
+      "paksha": "Shukla",
+      "yoga": "Siddha",
+      "karana": "Bav",
+      "weekday": null,
+      "hinduWeekday": null
+    }
+  ]
 }

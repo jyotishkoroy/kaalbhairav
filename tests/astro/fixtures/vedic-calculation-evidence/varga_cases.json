@@ -1,5 +1,606 @@
 {
   "sourceEvidenceVersion": "phase18_sanitized_v1",
   "generatedAt": "1970-01-01T00:00:00.000Z",
-  "cases": []
+  "cases": [
+    {
+      "caseId": "case_001",
+      "body": "Lagna",
+      "varga": "D1",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_002",
+      "body": "Sun",
+      "varga": "D1",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_003",
+      "body": "Moon",
+      "varga": "D1",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_004",
+      "body": "Mars",
+      "varga": "D1",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_005",
+      "body": "Mercury",
+      "varga": "D1",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_006",
+      "body": "Jupiter",
+      "varga": "D1",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_007",
+      "body": "Venus",
+      "varga": "D1",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_008",
+      "body": "Saturn",
+      "varga": "D1",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_009",
+      "body": "Rahu",
+      "varga": "D1",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_010",
+      "body": "Ketu",
+      "varga": "D1",
+      "expectedSignNumber": 12
+    },
+    {
+      "caseId": "case_011",
+      "body": "Uranus",
+      "varga": "D1",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_012",
+      "body": "Neptune",
+      "varga": "D1",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_013",
+      "body": "Pluto",
+      "varga": "D1",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_014",
+      "body": "Lagna",
+      "varga": "D2",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_015",
+      "body": "Sun",
+      "varga": "D2",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_016",
+      "body": "Moon",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_017",
+      "body": "Mars",
+      "varga": "D2",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_018",
+      "body": "Mercury",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_019",
+      "body": "Jupiter",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_020",
+      "body": "Venus",
+      "varga": "D2",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_021",
+      "body": "Saturn",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_022",
+      "body": "Rahu",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_023",
+      "body": "Ketu",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_024",
+      "body": "Uranus",
+      "varga": "D2",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_025",
+      "body": "Neptune",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_026",
+      "body": "Pluto",
+      "varga": "D2",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_027",
+      "body": "Lagna",
+      "varga": "D3",
+      "expectedSignNumber": 10
+    },
+    {
+      "caseId": "case_028",
+      "body": "Sun",
+      "varga": "D3",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_029",
+      "body": "Moon",
+      "varga": "D3",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_030",
+      "body": "Mars",
+      "varga": "D3",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_031",
+      "body": "Mercury",
+      "varga": "D3",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_032",
+      "body": "Jupiter",
+      "varga": "D3",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_033",
+      "body": "Venus",
+      "varga": "D3",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_034",
+      "body": "Saturn",
+      "varga": "D3",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_035",
+      "body": "Rahu",
+      "varga": "D3",
+      "expectedSignNumber": 10
+    },
+    {
+      "caseId": "case_036",
+      "body": "Ketu",
+      "varga": "D3",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_037",
+      "body": "Uranus",
+      "varga": "D3",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_038",
+      "body": "Neptune",
+      "varga": "D3",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_039",
+      "body": "Pluto",
+      "varga": "D3",
+      "expectedSignNumber": 2
+    },
+    {
+      "caseId": "case_040",
+      "body": "Lagna",
+      "varga": "D4",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_041",
+      "body": "Sun",
+      "varga": "D4",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_042",
+      "body": "Moon",
+      "varga": "D4",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_043",
+      "body": "Mars",
+      "varga": "D4",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_044",
+      "body": "Mercury",
+      "varga": "D4",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_045",
+      "body": "Jupiter",
+      "varga": "D4",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_046",
+      "body": "Venus",
+      "varga": "D4",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_047",
+      "body": "Saturn",
+      "varga": "D4",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_048",
+      "body": "Rahu",
+      "varga": "D4",
+      "expectedSignNumber": 12
+    },
+    {
+      "caseId": "case_049",
+      "body": "Ketu",
+      "varga": "D4",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_050",
+      "body": "Uranus",
+      "varga": "D4",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_051",
+      "body": "Neptune",
+      "varga": "D4",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_052",
+      "body": "Pluto",
+      "varga": "D4",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_053",
+      "body": "Lagna",
+      "varga": "D7",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_054",
+      "body": "Sun",
+      "varga": "D7",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_055",
+      "body": "Moon",
+      "varga": "D7",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_056",
+      "body": "Mars",
+      "varga": "D7",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_057",
+      "body": "Mercury",
+      "varga": "D7",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_058",
+      "body": "Jupiter",
+      "varga": "D7",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_059",
+      "body": "Venus",
+      "varga": "D7",
+      "expectedSignNumber": 12
+    },
+    {
+      "caseId": "case_060",
+      "body": "Saturn",
+      "varga": "D7",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_061",
+      "body": "Rahu",
+      "varga": "D7",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_062",
+      "body": "Ketu",
+      "varga": "D7",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_063",
+      "body": "Uranus",
+      "varga": "D7",
+      "expectedSignNumber": 11
+    },
+    {
+      "caseId": "case_064",
+      "body": "Neptune",
+      "varga": "D7",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_065",
+      "body": "Pluto",
+      "varga": "D7",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_066",
+      "body": "Lagna",
+      "varga": "D9",
+      "expectedSignNumber": 2
+    },
+    {
+      "caseId": "case_067",
+      "body": "Sun",
+      "varga": "D9",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_068",
+      "body": "Moon",
+      "varga": "D9",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_069",
+      "body": "Mars",
+      "varga": "D9",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_070",
+      "body": "Mercury",
+      "varga": "D9",
+      "expectedSignNumber": 12
+    },
+    {
+      "caseId": "case_071",
+      "body": "Jupiter",
+      "varga": "D9",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_072",
+      "body": "Venus",
+      "varga": "D9",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_073",
+      "body": "Saturn",
+      "varga": "D9",
+      "expectedSignNumber": 2
+    },
+    {
+      "caseId": "case_074",
+      "body": "Rahu",
+      "varga": "D9",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_075",
+      "body": "Ketu",
+      "varga": "D9",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_076",
+      "body": "Uranus",
+      "varga": "D9",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_077",
+      "body": "Neptune",
+      "varga": "D9",
+      "expectedSignNumber": 10
+    },
+    {
+      "caseId": "case_078",
+      "body": "Pluto",
+      "varga": "D9",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_079",
+      "body": "Lagna",
+      "varga": "D10",
+      "expectedSignNumber": 6
+    },
+    {
+      "caseId": "case_080",
+      "body": "Sun",
+      "varga": "D10",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_081",
+      "body": "Moon",
+      "varga": "D10",
+      "expectedSignNumber": 8
+    },
+    {
+      "caseId": "case_082",
+      "body": "Mars",
+      "varga": "D10",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_083",
+      "body": "Mercury",
+      "varga": "D10",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_084",
+      "body": "Jupiter",
+      "varga": "D10",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_085",
+      "body": "Venus",
+      "varga": "D10",
+      "expectedSignNumber": 2
+    },
+    {
+      "caseId": "case_086",
+      "body": "Saturn",
+      "varga": "D10",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_087",
+      "body": "Rahu",
+      "varga": "D10",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_088",
+      "body": "Ketu",
+      "varga": "D10",
+      "expectedSignNumber": 1
+    },
+    {
+      "caseId": "case_089",
+      "body": "Uranus",
+      "varga": "D10",
+      "expectedSignNumber": 2
+    },
+    {
+      "caseId": "case_090",
+      "body": "Neptune",
+      "varga": "D10",
+      "expectedSignNumber": 11
+    },
+    {
+      "caseId": "case_091",
+      "body": "Pluto",
+      "varga": "D10",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_092",
+      "body": "Lagna",
+      "varga": "D12",
+      "expectedSignNumber": 11
+    },
+    {
+      "caseId": "case_093",
+      "body": "Sun",
+      "varga": "D12",
+      "expectedSignNumber": 4
+    },
+    {
+      "caseId": "case_094",
+      "body": "Moon",
+      "varga": "D12",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_095",
+      "body": "Mars",
+      "varga": "D12",
+      "expectedSignNumber": 9
+    },
+    {
+      "caseId": "case_096",
+      "body": "Mercury",
+      "varga": "D12",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_097",
+      "body": "Jupiter",
+      "varga": "D12",
+      "expectedSignNumber": 5
+    },
+    {
+      "caseId": "case_098",
+      "body": "Venus",
+      "varga": "D12",
+      "expectedSignNumber": 3
+    },
+    {
+      "caseId": "case_099",
+      "body": "Saturn",
+      "varga": "D12",
+      "expectedSignNumber": 7
+    },
+    {
+      "caseId": "case_100",
+      "body": "Rahu",
+      "varga": "D12",
+      "expectedSignNumber": 12
+    }
+  ]
 }
