@@ -337,6 +337,7 @@ export function buildPublicChartFacts(input: {
   // Extract lagna from multiple paths
   const lagnaSign = canonSign(
     str(chartJson,
+      ["sections", "lagna", "fields", "sign"], ["sections", "lagna", "fields", "ascendant", "sign"],
       ["public_facts","lagna_sign"], ["publicFacts","lagnaSign"],
       ["d1","lagna","sign"], ["d1","ascendant","sign"], ["d1_chart","lagna","sign"],
       ["rashi","lagna","sign"], ["lagna","sign"], ["ascendant","sign"],
@@ -352,6 +353,7 @@ export function buildPublicChartFacts(input: {
 
   const moonSign = canonSign(
     str(chartJson,
+      ["sections", "planetaryPositions", "fields", "byBody", "Moon", "sign"],
       ["public_facts","moon_sign"], ["publicFacts","moonSign"],
       ["d1","planets","Moon","sign"], ["planets","Moon","sign"], ["moon","sign"]
     ) ??
@@ -363,6 +365,8 @@ export function buildPublicChartFacts(input: {
   );
 
   const moonHouseRaw = num(chartJson,
+    ["sections", "planetaryPositions", "fields", "byBody", "Moon", "house"],
+    ["sections", "d1Chart", "fields", "moonHouse"],
     ["public_facts","moon_house"], ["publicFacts","moonHouse"],
     ["d1","planets","Moon","house"], ["planets","Moon","house"], ["moon","house"]
   ) ?? num(predictionSummary,
@@ -371,6 +375,7 @@ export function buildPublicChartFacts(input: {
 
   const sunSign = canonSign(
     str(chartJson,
+      ["sections", "planetaryPositions", "fields", "byBody", "Sun", "sign"],
       ["public_facts","sun_sign"], ["publicFacts","sunSign"],
       ["d1","planets","Sun","sign"], ["planets","Sun","sign"], ["sun","sign"]
     ) ??
@@ -382,6 +387,8 @@ export function buildPublicChartFacts(input: {
   );
 
   const sunHouseRaw = num(chartJson,
+    ["sections", "planetaryPositions", "fields", "byBody", "Sun", "house"],
+    ["sections", "d1Chart", "fields", "sunHouse"],
     ["public_facts","sun_house"], ["publicFacts","sunHouse"],
     ["d1","planets","Sun","house"], ["planets","Sun","house"], ["sun","house"]
   ) ?? num(predictionSummary,
@@ -404,22 +411,24 @@ export function buildPublicChartFacts(input: {
   }
 
   const nakshatraRaw = v2MoonFacts.nakshatra ?? str(chartJson,
+    ["sections", "planetaryPositions", "fields", "byBody", "Moon", "nakshatra"],
     ["public_facts","moon_nakshatra"], ["publicFacts","moonNakshatra"],
     ["nakshatra"], ["moonNakshatra"], ["moon_nakshatra"],
     ["d1","planets","Moon","nakshatra"], ["planets","Moon","nakshatra"]
   ) ?? str(predictionSummary, ["nakshatra"], ["moonNakshatra"], ["public_facts","moon_nakshatra"], ["publicFacts","moonNakshatra"]);
 
   const nakshatraPadaRaw = v2MoonFacts.pada ?? num(chartJson,
+    ["sections", "planetaryPositions", "fields", "byBody", "Moon", "pada"],
     ["public_facts","moon_pada"], ["publicFacts","moonPada"], ["public_facts","moon_nakshatra_pada"], ["publicFacts","moonNakshatraPada"],
     ["nakshatraPada"], ["nakshatra_pada"],
     ["d1","planets","Moon","pada"], ["planets","Moon","pada"], ["planets","Moon","nakshatra_pada"], ["moon","nakshatra_pada"]
   ) ?? num(predictionSummary, ["nakshatraPada"], ["nakshatra_pada"], ["public_facts","moon_pada"], ["publicFacts","moonPada"], ["public_facts","moon_nakshatra_pada"], ["publicFacts","moonNakshatraPada"]);
 
-  const nakshatraLord = str(chartJson, ["nakshatraLord"], ["nakshatra_lord"], ["publicFacts","nakshatraLord"], ["public_facts","nakshatra_lord"])
+  const nakshatraLord = str(chartJson, ["sections", "kp", "fields", "byBody", "Moon", "nakshatraLord"], ["nakshatraLord"], ["nakshatra_lord"], ["publicFacts","nakshatraLord"], ["public_facts","nakshatra_lord"])
     ?? str(predictionSummary, ["nakshatraLord"], ["nakshatra_lord"]);
-  const lagnaLord = str(chartJson, ["lagnaLord"], ["lagna_lord"], ["publicFacts","lagnaLord"], ["public_facts","lagna_lord"])
+  const lagnaLord = str(chartJson, ["sections", "lagna", "fields", "lagnaLord"], ["lagnaLord"], ["lagna_lord"], ["publicFacts","lagnaLord"], ["public_facts","lagna_lord"])
     ?? str(predictionSummary, ["lagnaLord"], ["lagna_lord"]);
-  const rasiLord = str(chartJson, ["rasiLord"], ["rasi_lord"], ["publicFacts","rasiLord"], ["public_facts","rasi_lord"])
+  const rasiLord = str(chartJson, ["sections", "lagna", "fields", "rasiLord"], ["rasiLord"], ["rasi_lord"], ["publicFacts","rasiLord"], ["public_facts","rasi_lord"])
     ?? str(predictionSummary, ["rasiLord"], ["rasi_lord"]);
   const westernSunSign = str(chartJson, ["westernSunSign"], ["tropicalSunSign"], ["western_sun_sign"])
     ?? str(predictionSummary, ["westernSunSign"], ["western_sun_sign"]);

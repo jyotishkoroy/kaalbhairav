@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { buildPublicChartFacts } from "@/lib/astro/public-chart-facts";
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
@@ -171,6 +172,7 @@ describe("POST /api/astro/ask exact facts from strict current chart", () => {
         chart_json: makeChartJson("cv1", false),
       },
     }) as never);
+    vi.mocked(buildPublicChartFacts).mockImplementationOnce(() => ({ confidence: "partial", warnings: [], unavailableFacts: { lagnaSign: { status: "unavailable", reason: "missing_chart_path", message: "missing" } } } as never));
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(resp.status).toBe(200);

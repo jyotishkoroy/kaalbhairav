@@ -267,7 +267,7 @@ export function buildAstroReportContract(args: {
   for (const entry of registry) {
     if (!entry.enabled) continue;
     const resolvedRaw = resolveField({ chartJson: args.chartJson, profileId: args.profileId, chartVersionId: args.chartVersionId, nowIso, entry });
-    const validation = validateReportFieldProvenance(resolvedRaw, { requireChartVersionId: false, requireProfileId: false });
+    const validation = validateReportFieldProvenance(resolvedRaw, { requireChartVersionId: true, requireProfileId: true });
     const resolved = validation.ok
       ? { ...resolvedRaw, provenance_validation: { status: validation.status } }
       : toUnavailableFromValidation({ field: resolvedRaw, entry, failureCode: validation.failureCode, message: validation.message });
@@ -289,7 +289,7 @@ export function buildAstroReportContract(args: {
     resolvedCount,
     warnings,
   };
-  const provenanceValidation = validateReportContractProvenance(report, { requireChartVersionId: false, requireProfileId: false });
+  const provenanceValidation = validateReportContractProvenance(report, { requireChartVersionId: true, requireProfileId: true });
   if (!provenanceValidation.ok) {
     for (const failure of provenanceValidation.failures) {
       warnings.push(`fact_provenance_invalid:${failure.fieldKey}:${failure.failureCode ?? 'unknown'}`);

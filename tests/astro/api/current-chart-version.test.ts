@@ -12,6 +12,63 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { loadCurrentAstroChartForUser } from "@/lib/astro/current-chart-version";
 
+function computedSection(fields: Record<string, unknown> = {}) {
+  return { status: "computed", source: "deterministic_calculation", fields };
+}
+
+function unavailableSection(requiredModule = "test", fieldKey = "test") {
+  return {
+    status: "unavailable",
+    source: "none",
+    reason: "insufficient_birth_data",
+    fields: {
+      value: {
+        status: "unavailable",
+        value: null,
+        reason: "insufficient_birth_data",
+        source: "none",
+        requiredModule,
+        fieldKey,
+      },
+    },
+  };
+}
+
+function makeChartJson(chartVersionId: string, chartVersion: number) {
+  return {
+    schemaVersion: "chart_json_v2",
+    metadata: {
+      profileId: "p1",
+      chartVersionId,
+      chartVersion,
+      inputHash: "input-hash",
+      settingsHash: "settings-hash",
+      engineVersion: "test-engine",
+      ephemerisVersion: "test-ephemeris",
+      ayanamsha: "lahiri",
+      houseSystem: "whole_sign",
+      runtimeClockIso: "2026-05-05T00:00:00.000Z",
+    },
+    sections: {
+      timeFacts: computedSection({ utcDateTimeIso: "2026-05-05T02:00:00.000Z" }),
+      planetaryPositions: computedSection({ byBody: { Sun: { sign: "Taurus" } } }),
+      lagna: computedSection({ ascendant: { sign: "Leo" } }),
+      houses: computedSection({ placements: { Moon: 11 } }),
+      panchang: computedSection({ tithi: "test-tithi" }),
+      d1Chart: computedSection({ lagnaSign: "Leo" }),
+      d9Chart: computedSection({ byBody: {} }),
+      shodashvarga: computedSection({ byBody: {} }),
+      shodashvargaBhav: computedSection({ byBody: {} }),
+      vimshottari: computedSection({ currentMahadasha: { lord: "Saturn" } }),
+      kp: computedSection({ byBody: {} }),
+      dosha: computedSection({ manglik: { isManglik: false } }),
+      ashtakavarga: computedSection({ sarvashtakavargaTotal: { grandTotal: 292 } }),
+      transits: unavailableSection("transits", "transits"),
+      advanced: unavailableSection("advanced", "advanced"),
+    },
+  };
+}
+
 function makeServiceMock({ profile, currentChart, currentByFlag, completedByStatus, latest }: Record<string, unknown>) {
   const profileQuery = {
     select: vi.fn().mockReturnThis(),
@@ -43,7 +100,7 @@ describe("loadCurrentAstroChartForUser", () => {
   it("recognizes existing valid current chart", async () => {
     const service = makeServiceMock({
       profile: { id: "p1", user_id: "u1", status: "active", current_chart_version_id: "cv1" },
-      currentChart: { id: "cv1", profile_id: "p1", chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11, sun_sign: "Taurus", sun_house: 10, moon_nakshatra: "Mrigasira", moon_pada: 4, mahadasha: "Jupiter" } }, status: "completed", is_current: true },
+      currentChart: { id: "cv1", profile_id: "p1", user_id: "u1", chart_version: 1, chart_json: makeChartJson("cv1", 1), status: "completed", is_current: true, schema_version: "chart_json_v2" },
     }) as never;
 
     const result = await loadCurrentAstroChartForUser({ service, userId: "u1" });

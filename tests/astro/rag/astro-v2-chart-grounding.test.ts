@@ -41,6 +41,18 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+const groundedChartContext = async () => ({
+  publicFacts: {
+    lagna: "Leo",
+    moon: "Gemini / 11",
+    sun: "Taurus / 10",
+    nakshatra: "Mrigashira pada 4",
+    mahadasha: "Jupiter",
+  },
+  chartContext: "Lagna: Leo. Moon: Gemini / 11. Sun: Taurus / 10.",
+  chartVersionId: "test-chart-version",
+});
+
 describe("astro-v2 chart grounding", () => {
   it("threads chartContext into downstream input when grounded", async () => {
     const resp = await handleAstroV2ReadingRequest(request({
@@ -49,7 +61,7 @@ describe("astro-v2 chart grounding", () => {
       metadata: { oneShot: true, disableFollowUps: true, disableMemory: true },
       chartVersionId: "chart-1",
       profileId: "profile-1",
-    }));
+    }), { loadCurrentChartContext: groundedChartContext });
     expect(resp.status).toBe(200);
     expect(ragReadingOrchestrator).toHaveBeenCalled();
     expect(generateReadingV2).toHaveBeenCalled();
@@ -60,7 +72,7 @@ describe("astro-v2 chart grounding", () => {
       question: "How will my today be in the field of relationship?",
       chartContext: "Chart basis: Leo Lagna.",
       metadata: { oneShot: true, disableFollowUps: true, disableMemory: true },
-    }));
+    }), { loadCurrentChartContext: groundedChartContext });
     const body = await resp.json();
     expect(body.followUpQuestion).toBeNull();
     expect(body.followUpAnswer).toBeNull();
@@ -71,7 +83,7 @@ describe("astro-v2 chart grounding", () => {
       question: "How will my today be in the field of relationship?",
       chartContext: "Chart basis: Leo Lagna.",
       metadata: { oneShot: true, disableFollowUps: true, disableMemory: true, requireChartGrounding: true, publicChartBasis: "Chart basis: Leo Lagna." },
-    }));
+    }), { loadCurrentChartContext: groundedChartContext });
     const body = await resp.json();
     expect(body.answer).toContain("Chart basis: Leo Lagna.");
     expect(body.answer).toContain("aadesh:");
@@ -82,7 +94,7 @@ describe("astro-v2 chart grounding", () => {
       question: "What is my exact death date?",
       chartContext: "Chart basis: Leo Lagna.",
       metadata: { oneShot: true, disableFollowUps: true, disableMemory: true, requireChartGrounding: true },
-    }));
+    }), { loadCurrentChartContext: groundedChartContext });
     const body = await resp.json();
     expect(String(body.answer)).not.toContain("exact death date");
   });

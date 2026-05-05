@@ -37,6 +37,41 @@ function makeServiceMock(profile: Record<string, unknown> | null, chartRow: Reco
   };
 }
 
+function makeChartJson(chartVersionId: string) {
+  return {
+    schemaVersion: "chart_json_v2",
+    metadata: {
+      profileId: "p1",
+      chartVersionId,
+      chartVersion: 1,
+      inputHash: "input-hash",
+      settingsHash: "settings-hash",
+      engineVersion: "test-engine",
+      ephemerisVersion: "test-ephemeris",
+      ayanamsha: "lahiri",
+      houseSystem: "whole_sign",
+      runtimeClockIso: "2026-05-05T00:00:00.000Z",
+    },
+    sections: {
+      timeFacts: { status: "computed", source: "deterministic_calculation", fields: { utcDateTimeIso: "2026-05-05T02:00:00.000Z" } },
+      planetaryPositions: { status: "computed", source: "deterministic_calculation", fields: { byBody: { Sun: { sign: "Taurus" }, Moon: { sign: "Gemini" } } } },
+      lagna: { status: "computed", source: "deterministic_calculation", fields: { ascendant: { sign: "Leo" } } },
+      houses: { status: "computed", source: "deterministic_calculation", fields: { placements: { Moon: 11, Sun: 10 } } },
+      panchang: { status: "computed", source: "deterministic_calculation", fields: { tithi: "test-tithi" } },
+      d1Chart: { status: "computed", source: "deterministic_calculation", fields: { lagnaSign: "Leo" } },
+      d9Chart: { status: "computed", source: "deterministic_calculation", fields: {} },
+      shodashvarga: { status: "computed", source: "deterministic_calculation", fields: {} },
+      shodashvargaBhav: { status: "computed", source: "deterministic_calculation", fields: {} },
+      vimshottari: { status: "computed", source: "deterministic_calculation", fields: { currentMahadasha: { lord: "Saturn" } } },
+      kp: { status: "computed", source: "deterministic_calculation", fields: {} },
+      dosha: { status: "computed", source: "deterministic_calculation", fields: { manglik: { isManglik: false } } },
+      ashtakavarga: { status: "computed", source: "deterministic_calculation", fields: { sarvashtakavargaTotal: { grandTotal: 292 } } },
+      transits: { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "transits", fieldKey: "transits" } } },
+      advanced: { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "advanced", fieldKey: "advanced" } } },
+    },
+  };
+}
+
 beforeEach(() => vi.clearAllMocks());
 
 describe("astro_ask_refuses_when_current_chart_pointer_null_in_production", () => {
@@ -71,7 +106,9 @@ describe("astro_ask_refuses_when_current_chart_pointer_null_in_production", () =
       id: "cv1",
       profile_id: "p1",
       user_id: "u1",
-      chart_json: { public_facts: { lagna_sign: "Leo" } },
+      chart_version: 1,
+      schema_version: "chart_json_v2",
+      chart_json: makeChartJson("cv1"),
       status: "completed",
       is_current: true,
     };

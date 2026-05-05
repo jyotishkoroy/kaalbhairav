@@ -25,6 +25,10 @@ function unavailableExact(reason: string): ExactChartFactAnswer {
     answer: `aadesh: That exact chart fact is unavailable because ${reason}. I will not guess it.`,
   };
 }
+
+function unsupportedExact(field: string): ExactChartFactAnswer {
+  return unavailableExact(`the deterministic ${field} calculation is not implemented`);
+}
 function timelineAnswer(facts: AstroChartContext["normalizedFacts"]): string | undefined {
   const row = facts.antardashaTimeline?.find((item) => item.mahadasha === "Jupiter" && item.antardasha === "Ketu") ?? facts.antardashaTimeline?.[0];
   if (!row) return undefined;
@@ -79,6 +83,11 @@ export function answerExactFactFromPublicFacts(question: string, facts: PublicCh
   const nakshatraUnavailable = facts.unavailableFacts?.moonNakshatra ?? facts.unavailableFacts?.moonNakshatraPada;
   const currentMahadasha = facts.currentMahadasha ?? facts.mahadasha;
   const currentAntardasha = facts.currentAntardasha ?? facts.antardashaNow;
+  if (/\blagna\b/.test(q) || /\bascendant\b/.test(q)) {
+    return facts.lagnaSign
+      ? answer(`aadesh: Your Lagna is ${facts.lagnaSign}.`)
+      : unavailableExact("the deterministic Lagna calculation is not available for the current chart");
+  }
   if (/\bmoon\b/.test(q) && /\bhouse\b/.test(q)) {
     if (moonUnavailable) return unavailableExact("the chart settings do not prove a compatible house system");
     return facts.moonHouse !== undefined ? answer(`aadesh: Your Moon is in house ${facts.moonHouse}.`) : { matched: false };
@@ -98,5 +107,13 @@ export function answerExactFactFromPublicFacts(question: string, facts: PublicCh
       ? answer(`aadesh: Your current Antardasha is ${currentMahadasha}-${currentAntardasha}.`)
       : unavailableExact("the deterministic Vimshottari calculation is not available for the current chart");
   }
+  if (/\bshadbala\b/.test(q)) return unsupportedExact("Shadbala");
+  if (/\bkp\b/.test(q) && /significator/.test(q)) return unsupportedExact("KP significator");
+  if (/\bvarshaphal\b/.test(q)) return unsupportedExact("Varshaphal");
+  if (/\byogini dasha\b/.test(q)) return unsupportedExact("Yogini Dasha");
+  if (/\bchara dasha\b/.test(q)) return unsupportedExact("Chara Dasha");
+  if (/\blal kitab\b/.test(q)) return unsupportedExact("Lal Kitab");
+  if (/\bsade sati\b/.test(q) && /(date|dates|when|start|end)/.test(q)) return unsupportedExact("detailed Sade Sati date");
+  if (/\bashtakavarga\b/.test(q) && /(bindu|matrix|matrixes)/.test(q)) return unsupportedExact("Ashtakavarga bindu matrix");
   return { matched: false };
 }

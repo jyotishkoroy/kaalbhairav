@@ -5,6 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import {
   resolveConsultationFeatureFlags,
   runConsultationProductionWrapper,
@@ -26,6 +27,9 @@ import type { ChartEvidence } from "@/lib/astro/consultation/chart-evidence-buil
 import { generateReadingV2 } from "@/lib/astro/reading/reading-orchestrator-v2";
 import type { ReadingMode } from "@/lib/astro/reading/reading-types";
 import { buildDomainAwareCompanionAnswer } from "@/lib/astro/rag/domain-aware-companion-answer";
+import { loadCurrentAstroChartForUser } from "@/lib/astro/current-chart-version";
+import { buildPublicChartFacts } from "@/lib/astro/public-chart-facts";
+import { answerExactFactFromPublicFacts } from "@/lib/astro/exact-chart-facts";
 
 type AstroV2ReadingRequestBody = {
   question?: unknown;
@@ -58,7 +62,17 @@ function normalizeMeta(value: unknown): Record<string, unknown> | undefined { if
 function parseBirthDetails(value: unknown) { if (!isRecord(value)) return undefined; const latitude = readNumber(value.latitude); const longitude = readNumber(value.longitude); return removeUndefinedFields({ dateOfBirth: readString(value.dateOfBirth), timeOfBirth: readString(value.timeOfBirth), placeOfBirth: readString(value.placeOfBirth), latitude, longitude, timezone: readString(value.timezone) }); }
 function parseMetadata(value: unknown): Record<string, unknown> | undefined { if (!isRecord(value)) return undefined; return removeUndefinedFields({ ...value }); }
 function parseChartContext(value: unknown): string | undefined { return typeof value === "string" && value.trim() ? value.trim() : undefined; }
+function stripClientChartContext(body: unknown): Record<string, unknown> { if (!body || typeof body !== "object" || Array.isArray(body)) return {}; const input = body as Record<string, unknown>; const { chart: _chart, context: _context, dasha: _dasha, transits: _transits, publicFacts: _publicFacts, profileId: _profileId, userId: _userId, chartVersionId: _chartVersionId, ...safeBody } = input; return safeBody; }
 type AstroV2ReadingDependencies = { oldRoute: typeof generateReadingV2; ragOrchestrator: typeof ragReadingOrchestrator; flags: typeof getAstroRagFlags; };
+type AstroV2ReadingDependenciesWithChart = AstroV2ReadingDependencies & {
+  supabaseClient?: unknown;
+  loadCurrentChartContext?: false | ((args: {
+    userId: string | null;
+    profileId?: string | null;
+    chartVersionId?: string | null;
+    supabaseClient?: unknown;
+  }) => Promise<unknown | null>);
+};
 type AstroV2ReadingResponse = { answer: string; followUpQuestion?: string | null; followUpAnswer?: string | null; sections?: Record<string, string>; meta?: Record<string, unknown>; } | { error: string; code?: string; meta?: Record<string, unknown>; };
 function getRequestContext(body: AstroV2ReadingRequestBody) { const metadata = parseMetadata(body.metadata); const userId = readString(body.userId); const sessionId = readString(body.sessionId) ?? readString(metadata?.sessionId); return { metadata, userId: userId ?? sessionId ?? "astro-v2-page-anonymous", sessionId, chartVersionId: readString((body as Record<string, unknown>).chartVersionId), profileId: readString((body as Record<string, unknown>).profileId) ?? readString(metadata?.profileId) }; }
 function shouldUseRagReadingRoute(flags: ReturnType<typeof getAstroRagFlags>, question: string): boolean { if (!flags.ragEnabled) return false; if (!question.trim()) return false; return true; }
@@ -140,21 +154,97 @@ function inferQuestionMode(question: string): "companion" | "exact_fact" {
   return "companion";
 }
 
+function isMissingNextRequestScopeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("cookies") && message.includes("outside a request scope");
+}
+
+async function tryCreateRequestScopedSupabaseClient() {
+  try {
+    return await createClient();
+  } catch (error) {
+    if (isMissingNextRequestScopeError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function resolveCurrentChartContextForReading(args: {
+  userId: string | null;
+  profileId?: string | null;
+  chartVersionId?: string | null;
+  supabaseClient?: unknown;
+  loadCurrentChartContext?: false | ((args: {
+    userId: string | null;
+    profileId?: string | null;
+    chartVersionId?: string | null;
+    supabaseClient?: unknown;
+  }) => Promise<unknown | null>);
+}): Promise<unknown | null> {
+  if (!args.userId || args.loadCurrentChartContext === false) {
+    return null;
+  }
+  if (typeof args.loadCurrentChartContext === "function") {
+    return args.loadCurrentChartContext({
+      userId: args.userId,
+      profileId: args.profileId,
+      chartVersionId: args.chartVersionId,
+      supabaseClient: args.supabaseClient,
+    });
+  }
+  const requestScopedClient = args.supabaseClient ?? (await tryCreateRequestScopedSupabaseClient());
+  if (!requestScopedClient) {
+    return null;
+  }
+  const loaded = await loadCurrentAstroChartForUser({
+    service: createServiceClient(),
+    userId: args.userId,
+    options: { mode: "strict_user_runtime" },
+  });
+  if (!loaded.ok) {
+    return null;
+  }
+  return {
+    publicFacts: buildPublicChartFacts({
+      profileId: String(loaded.profile.id),
+      chartVersionId: String(loaded.chartVersion.id),
+      chartJson: loaded.chartVersion.chart_json,
+      predictionSummary: loaded.predictionSummary,
+    }) as unknown as Record<string, unknown>,
+  };
+}
+
 // Client-supplied chart context is only allowed in explicit dev/test mode.
 // Default is false — in production, exact facts always come from the server.
 const allowClientChartContext =
   process.env.ASTRO_ALLOW_CLIENT_CHART_CONTEXT === "true" &&
   process.env.NODE_ENV !== "production";
 
-export async function handleAstroV2ReadingRequest(request: Request, deps: Partial<AstroV2ReadingDependencies> = {}): Promise<Response> {
+export async function handleAstroV2ReadingRequest(request: Request, deps: Partial<AstroV2ReadingDependenciesWithChart> = {}): Promise<Response> {
   let body: AstroV2ReadingRequestBody;
   try { body = (await request.json()) as AstroV2ReadingRequestBody; } catch { return NextResponse.json({ error: "Invalid JSON request body." }, { status: 400 }); }
-  const question = readString(body.question) ?? readString(body.message);
+  const safeBody = stripClientChartContext(body);
+  const question = readString(safeBody.question) ?? readString(safeBody.message);
   if (!question) return NextResponse.json({ error: "Question is required." }, { status: 400 });
   const oneShotFlags = parseOneShotFlags(body);
   const context = getRequestContext(body);
   const birthDetails = parseBirthDetails(body.birthDetails);
   const metadata = context.metadata;
+  const supabase = deps.supabaseClient ?? (await tryCreateRequestScopedSupabaseClient());
+  const user = supabase ? await (supabase as { auth: { getUser: () => Promise<{ data: { user: { id: string } | null } }> } }).auth.getUser().then((result) => result.data.user) : null;
+  const currentChartContext = await resolveCurrentChartContextForReading({
+    userId: user?.id ?? context.userId ?? null,
+    profileId: context.profileId ?? null,
+    chartVersionId: context.chartVersionId ?? null,
+    supabaseClient: supabase ?? undefined,
+    loadCurrentChartContext: deps.loadCurrentChartContext,
+  });
+  const publicFacts = isRecord(currentChartContext) && isRecord((currentChartContext as Record<string, unknown>).publicFacts)
+    ? (currentChartContext as Record<string, Record<string, unknown>>).publicFacts
+    : undefined;
+  const exactFact = publicFacts ? answerExactFactFromPublicFacts(question, publicFacts as never) : { matched: false } as { matched: boolean; answer?: string };
+  if (exactFact.matched) return NextResponse.json({ answer: exactFact.answer });
   const consultationFlags = resolveConsultationFeatureFlags(process.env as never);
 
   // In production, ignore client-supplied chart evidence and context —
@@ -216,19 +306,17 @@ export async function handleAstroV2ReadingRequest(request: Request, deps: Partia
   });
   const ragBranchEnabled = routeDecision.kind === "rag" && shouldUseRagReadingRoute(flags, question);
   // In production, deterministicChartFacts from client are ignored — server chart is authoritative.
-  const deterministicChartFacts = allowClientChartContext && isRecord(body.deterministicChartFacts)
-    ? body.deterministicChartFacts as Record<string, unknown>
-    : undefined;
-  const chartContextText = groundedChartContext ?? (allowClientChartContext && typeof body.chartContext === "string" ? body.chartContext : undefined);
+  const deterministicChartFacts = publicFacts as unknown as Record<string, unknown>;
+  const chartContextText = groundedChartContext ?? undefined;
   const groundedInstruction = (oneShotFlags.oneShot || chartContextText)
     ? "Use the supplied deterministic chart facts as the only source for exact natal facts. Do not invent chart facts. If a requested chart fact is missing, say it is unavailable. Give interpretation using chart basis, and avoid unsupported timing certainty."
     : undefined;
-  const ragInput = { question, userId: context.userId, profileId: context.profileId ?? undefined, chartVersionId: context.chartVersionId ?? undefined, env: process.env, explicitUserDates: Array.isArray((body as Record<string, unknown>).explicitUserDates) ? ((body as Record<string, unknown>).explicitUserDates as NonNullable<RagReadingOrchestratorInput["explicitUserDates"]>) : undefined, memorySummary: (oneShotFlags.disableMemory || oneShotFlags.oneShot) ? undefined : readString(metadata?.memorySummary), chartContext: chartContextText, deterministicChartFacts, groundingInstruction: groundedInstruction } as Partial<RagReadingOrchestratorInput> & { chartContext?: string; deterministicChartFacts?: Record<string, unknown>; groundingInstruction?: string };
+  const ragInput = { question, userId: context.userId, profileId: context.profileId ?? undefined, chartVersionId: context.chartVersionId ?? undefined, env: process.env, explicitUserDates: Array.isArray((safeBody as Record<string, unknown>).explicitUserDates) ? ((safeBody as Record<string, unknown>).explicitUserDates as NonNullable<RagReadingOrchestratorInput["explicitUserDates"]>) : undefined, memorySummary: (oneShotFlags.disableMemory || oneShotFlags.oneShot) ? undefined : readString(metadata?.memorySummary), chartContext: chartContextText, deterministicChartFacts, groundingInstruction: groundedInstruction } as Partial<RagReadingOrchestratorInput> & { chartContext?: string; deterministicChartFacts?: Record<string, unknown>; groundingInstruction?: string };
   try {
     if (ragBranchEnabled) {
       try { const ragResult = await (deps.ragOrchestrator ?? ragReadingOrchestrator)(ragInput); if (!shouldFallbackToOldV2FromRagResult(ragResult)) return NextResponse.json(normalizeRagRouteResponse(ragResult, { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata }, oneShotFlags)); console.error("Astro V2 reading route falling back to old path after rag result"); } catch (error) { console.error("Astro V2 reading route rag branch failed, falling back to old path", error); }
     }
-    const result = await (deps.oldRoute ?? generateReadingV2)({ userId: context.userId, question, mode: readMode(body.mode), birthDetails: birthDetails as | { dateOfBirth?: string; timeOfBirth?: string; placeOfBirth?: string; latitude?: number; longitude?: number; timezone?: string; } | undefined, chart: isRecord(body.chart) ? body.chart : undefined, context: isRecord(body.context) ? body.context : undefined, dasha: isRecord(body.dasha) ? body.dasha : undefined, transits: isRecord(body.transits) ? body.transits : undefined, metadata: { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata, requireChartGrounding: Boolean(chartContextText) }, }, { trace, exposeTrace });
+      const result = await (deps.oldRoute ?? generateReadingV2)({ userId: context.userId, question, mode: readMode(body.mode), birthDetails: birthDetails as | { dateOfBirth?: string; timeOfBirth?: string; placeOfBirth?: string; latitude?: number; longitude?: number; timezone?: string; } | undefined, chart: undefined, context: undefined, dasha: undefined, transits: undefined, metadata: { source: "astro-v2-page", directV2Route: true, sessionId: context.sessionId, ...metadata, requireChartGrounding: Boolean(chartContextText) }, }, { trace, exposeTrace });
     const responseMeta: Record<string, unknown> = { ...result.meta, source: "astro-v2-page", directV2Route: true };
     if (exposeTrace) responseMeta.e2eTrace = sanitizeTraceForResponse(trace);
     trace.response.debugTraceExposed = exposeTrace;

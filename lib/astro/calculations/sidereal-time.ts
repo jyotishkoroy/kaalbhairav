@@ -4,7 +4,7 @@ commercially use, train models on, scrape, or create derivative works from this
 repository or any part of it without prior written permission from Jyotishko Roy.
 */
 
-import { normalizeLongitudeDeg } from './coordinates'
+import { normalizeLongitudeDeg } from './coordinates.ts'
 
 export type SiderealTimeResult = {
   hours: number

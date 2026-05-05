@@ -17,8 +17,8 @@ describe("astro_profile_update_invalidates_old_current_chart", () => {
       path.resolve(process.cwd(), "app/api/astro/v1/profile/route.ts"),
       "utf-8",
     );
-    expect(source).toContain("current_chart_version_id: null");
-    expect(source).toContain("input_hash: null");
+    expect(source).toContain("current_chart_version_id: calculationFieldsChanged ? null : undefined");
+    expect(source).toContain("input_hash: calculationFieldsChanged ? null : undefined");
   });
 
   it("calculate route calls promote_current_chart_version RPC for atomic promotion", async () => {

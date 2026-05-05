@@ -65,6 +65,54 @@ vi.mock('../../lib/astro/engine/remote', () => ({
   calculateMasterAstroOutputRemote: remoteCall,
 }))
 
+vi.mock('../../lib/astro/current-chart-version', () => ({
+  loadCurrentAstroChartForUser: vi.fn(async () => ({
+    ok: true,
+    profile: { id: 'profile-1', user_id: 'user-test', current_chart_version_id: 'remote-cv-1', status: 'active' },
+    chartVersion: {
+      id: 'remote-cv-1',
+      profile_id: 'profile-1',
+      user_id: 'user-test',
+      status: 'completed',
+      is_current: true,
+      schema_version: 'chart_json_v2',
+      chart_version: 1,
+      chart_json: {
+        schemaVersion: 'chart_json_v2',
+        metadata: {
+          profileId: 'profile-1',
+          chartVersionId: 'remote-cv-1',
+          chartVersion: 1,
+          inputHash: 'input-hash',
+          settingsHash: 'settings-hash',
+          engineVersion: 'engine',
+          ephemerisVersion: 'ephemeris',
+          ayanamsha: 'lahiri',
+          houseSystem: 'whole_sign',
+          runtimeClockIso: '2026-05-05T00:00:00.000Z',
+        },
+        sections: {
+          timeFacts: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          planetaryPositions: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          lagna: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          houses: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          panchang: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          d1Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          d9Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          shodashvarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          shodashvargaBhav: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          vimshottari: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          kp: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          dosha: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          ashtakavarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          transits: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+          advanced: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        },
+      },
+    },
+  })),
+}))
+
 vi.mock('../../lib/astro/encryption', () => ({
   decryptJson: vi.fn(() => ({
     display_name: 'Fixture',
@@ -109,20 +157,20 @@ vi.mock('../../lib/supabase/server', () => ({
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn(async () => ({
-                data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1', status: 'active' },
                 error: null,
               })),
               single: vi.fn(async () => ({
-                data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1', status: 'active' },
                 error: null,
               })),
               eq: vi.fn(() => ({
                 maybeSingle: vi.fn(async () => ({
-                  data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                  data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1', status: 'active' },
                   error: null,
                 })),
                 single: vi.fn(async () => ({
-                  data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1' },
+                  data: { id: 'profile-1', user_id: 'user-test', encrypted_birth_data: '{}', pii_encryption_key_version: '1', status: 'active' },
                   error: null,
                 })),
               })),
@@ -158,6 +206,32 @@ vi.mock('../../lib/supabase/server', () => ({
         }
       }
 
+      if (table === 'chart_calculations') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(async () => ({ data: { id: 'calc-row-1' }, error: null })),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(async () => ({ data: null, error: null })),
+          })),
+        }
+      }
+
       if (table === 'chart_json_versions') {
         return {
           select: vi.fn(() => ({
@@ -180,32 +254,9 @@ vi.mock('../../lib/supabase/server', () => ({
               })),
             }
           }),
-        }
-      }
-
-      if (table === 'chart_calculations') {
-        return {
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn(async () => ({ data: { id: 'calc-row-1' }, error: null })),
-            })),
-          })),
           update: vi.fn(() => ({
-            eq: vi.fn(async () => ({ data: null, error: null })),
-          })),
-          select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    order: vi.fn(() => ({
-                      limit: vi.fn(() => ({
-                        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-                      })),
-                    })),
-                  })),
-                })),
-              })),
+              eq: vi.fn(async () => ({ data: null, error: null })),
             })),
           })),
         }

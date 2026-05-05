@@ -11,18 +11,12 @@ import { analyzeQuestionQuality } from "@/lib/astro/app/question-quality";
 import { answerCanonicalAstroQuestion } from "@/lib/astro/ask/answer-canonical-astro-question";
 import { loadCurrentAstroChartForUser } from "@/lib/astro/current-chart-version";
 import { buildPublicChartFacts, validatePublicChartFacts, sanitizeVisibleAstroAnswer } from "@/lib/astro/public-chart-facts";
-import { extractChartFactsFromVersion } from "@/lib/astro/rag/chart-fact-extractor";
-import { answerExactFactIfPossible } from "@/lib/astro/rag/exact-fact-router";
 import { isE2ERateLimitDisabled, logE2ERateLimitDisabled } from "@/lib/security/e2e-rate-limit";
 import { assertSameOriginRequest, checkRateLimit, getClientIp } from "@/lib/security/request-guards";
 import { answerExactFactFromPublicFacts } from "@/lib/astro/exact-chart-facts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function looksLikeExactAstroQuestion(question: string): boolean {
-  return /\b(lagna|ascendant|moon sign|sun sign|nakshatra|pada|mahadasha|antardasha|which house|what house|house is my|what is my moon|what is my sun|what is my nakshatra|what is my current dasha)\b/i.test(question);
-}
 
 function getChartJsonFromCurrentChartResult(result: unknown): Record<string, unknown> | null {
   if (!result || typeof result !== "object") return null;
@@ -32,6 +26,23 @@ function getChartJsonFromCurrentChartResult(result: unknown): Record<string, unk
   return chartVersion.chart_json && typeof chartVersion.chart_json === "object"
     ? (chartVersion.chart_json as Record<string, unknown>)
     : null;
+}
+
+function stripClientChartContext(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+  const input = body as Record<string, unknown>;
+  const {
+    chart: _chart,
+    context: _context,
+    dasha: _dasha,
+    transits: _transits,
+    publicFacts: _publicFacts,
+    profileId: _profileId,
+    userId: _userId,
+    chartVersionId: _chartVersionId,
+    ...safeBody
+  } = input;
+  return safeBody;
 }
 
 export async function POST(req: NextRequest) {
@@ -52,9 +63,10 @@ export async function POST(req: NextRequest) {
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
-  const raw = body as Record<string, unknown>;
+  const raw = stripClientChartContext(body);
   const questionRaw = typeof raw.question === "string" ? raw.question : "";
   const requestId = typeof raw.requestId === "string" ? raw.requestId.slice(0, 120) : undefined;
+  if (!questionRaw.trim()) return NextResponse.json({ error: "Question is required." }, { status: 400 });
   if (questionRaw.length > 2000) return NextResponse.json({ answer: "aadesh: Your question is too long. Please ask one focused question." });
   const guard = guardOneShotAstroQuestion(questionRaw);
   if (!guard.allowed) return NextResponse.json({ answer: guard.answer }, { status: 200 });
@@ -97,20 +109,6 @@ export async function POST(req: NextRequest) {
   const exactFactPublic = answerExactFactFromPublicFacts(question, publicFacts);
   if (exactFactPublic.matched) {
     return NextResponse.json({ answer: exactFactPublic.answer });
-  }
-
-  const chartFacts = extractChartFactsFromVersion(chartJson, {
-    userId: user.id,
-    profileId: String(loaded.profile.id),
-    chartVersionId: String(loaded.chartVersion.id),
-  });
-  if (looksLikeExactAstroQuestion(question)) {
-    const exactFactAnswer = answerExactFactIfPossible(question, chartFacts);
-    if (exactFactAnswer?.answer) {
-      return NextResponse.json({
-        answer: exactFactAnswer.answer,
-      });
-    }
   }
 
   if (process.env.ASTRO_DEBUG_CHART_CONTEXT === "true") {
