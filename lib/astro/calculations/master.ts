@@ -33,6 +33,9 @@ import { calculateDoshas } from './doshas.ts'
 import { calculateStrength } from './strength.ts'
 import { calculateLifeAreas } from './life-areas.ts'
 import { calculateTransits } from './transits.ts'
+import { buildTransitsUnavailableSection } from './transits.ts'
+import { buildAshtakavargaSection } from './ashtakavarga.ts'
+import { makeAdvancedUnavailableSection } from './advanced-policy.ts'
 import { calculateConfidence } from './confidence.ts'
 import { collectWarnings } from './warnings.ts'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
@@ -347,6 +350,11 @@ export async function calculateMasterAstroOutput(args: {
         },
       },
     })
+    ;(sections as Record<string, unknown>).ashtakavarga = buildAshtakavargaSection({ bavRows: null })
+    ;(sections as Record<string, unknown>).transits = buildTransitsUnavailableSection({
+      runtimeClockIso: runtimeClock.currentUtc,
+    })
+    ;(sections as Record<string, unknown>).advanced = makeAdvancedUnavailableSection()
   }
 
   const output = {

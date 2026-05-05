@@ -1,8 +1,8 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { calculateAllPlanets } from './planets.ts'
 import { calculateSign } from './sign.ts'
@@ -18,6 +18,8 @@ import type { TithiResult } from './tithi.ts'
 import type { LagnaResult } from './lagna.ts'
 import type { DailyTransits } from '../engine/types.ts'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
+import type { AstroSectionContract } from './contracts.ts'
+import { makeUnavailableValue } from './unavailable.ts'
 
 // ─── Master-spec Daily Transit Result ─────────────────────────────────────
 
@@ -36,6 +38,27 @@ export type DailyTransitResult = {
     lagna_relation_reliability: 'high' | 'medium' | 'low' | 'not_available'
   }>
   warnings: string[]
+}
+
+export type TransitAsOfInput = {
+  asOfDateIso?: string | null
+  runtimeClockIso?: string | null
+}
+
+export function resolveTransitAsOfDateIso(input: TransitAsOfInput): string {
+  const value = input.asOfDateIso ?? input.runtimeClockIso
+
+  if (!value || typeof value !== 'string') {
+    throw new Error('Transit calculations require asOfDateIso or runtimeClockIso.')
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Transit as-of date must be a valid ISO date.')
+  }
+
+  return date.toISOString()
 }
 
 export function calculateTransits(
@@ -97,4 +120,34 @@ export async function calculateDailyTransits(input: TransitInput): Promise<Daily
     return { status: 'stub', calculated_at: now, transits: [], warnings: ['Engine is in stub mode.'] }
   }
   return { status: 'not_available', calculated_at: now, transits: [], warnings: ['Use calculateTransits() for real transit data.'] }
+}
+
+export function buildTransitsUnavailableSection(args?: TransitAsOfInput): AstroSectionContract {
+  let asOfDateIso: string | null = null
+
+  try {
+    asOfDateIso = args ? resolveTransitAsOfDateIso(args) : null
+  } catch {
+    asOfDateIso = null
+  }
+
+  return {
+    status: 'unavailable',
+    source: 'none',
+    reason: 'ephemeris_unavailable',
+    fields: {
+      asOfDateIso,
+      transits: makeUnavailableValue({
+        requiredModule: 'transits',
+        fieldKey: 'transits',
+        reason: 'ephemeris_unavailable',
+      }),
+      predictionTiming: makeUnavailableValue({
+        requiredModule: 'transit_prediction_timing',
+        fieldKey: 'transits.predictionTiming',
+        reason: 'fixture_validation_missing',
+      }),
+    },
+    warnings: ['Transit facts require deterministic as-of date and ephemeris-backed calculation.'],
+  }
 }
