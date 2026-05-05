@@ -1,9 +1,10 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
+import type { EphemerisBody } from './ephemeris-provider.ts'
 import { calcPlanet, SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, SE_MEAN_NODE, SE_TRUE_NODE } from '../engine/swiss.ts'
 import { normalize360 } from './math.ts'
 import { calculateSign } from './sign.ts'
@@ -31,6 +32,20 @@ const PLANET_IDS: Record<string, number> = {
   Sun: SE_SUN, Moon: SE_MOON, Mercury: SE_MERCURY, Venus: SE_VENUS,
   Mars: SE_MARS, Jupiter: SE_JUPITER, Saturn: SE_SATURN,
 }
+
+export const V2_PLANETARY_BODIES: readonly EphemerisBody[] = [
+  'Sun',
+  'Moon',
+  'Mars',
+  'Mercury',
+  'Jupiter',
+  'Venus',
+  'Saturn',
+  'Uranus',
+  'Neptune',
+  'Pluto',
+  'Rahu',
+]
 
 export function calculatePlanetPosition(
   planetName: string, jd_ut: number, ayanamsa: number, nodeType: 'mean_node' | 'true_node' = 'mean_node',

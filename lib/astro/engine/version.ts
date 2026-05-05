@@ -1,8 +1,8 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { getSweVersion } from './swiss.ts'
 
@@ -10,6 +10,8 @@ export const ENGINE_VERSION_STUB = 'v2.0.0-stub'
 export const ENGINE_VERSION_REAL = 'v2.0.0-real-sweph'
 export const EPHEMERIS_VERSION_STUB = 'stub'
 export const SCHEMA_VERSION = '2.0.0'
+export const ASTRO_ENGINE_VERSION = 'tarayai-astro-engine-v1'
+export const ASTRO_EPHEMERIS_VERSION_UNKNOWN = 'unknown'
 
 export const ENGINE_VERSION = ENGINE_VERSION_STUB
 export const EPHEMERIS_VERSION = EPHEMERIS_VERSION_STUB

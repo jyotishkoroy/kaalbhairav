@@ -1,14 +1,17 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master.ts'
 import type { AstroRuntimeClock } from '../calculations/runtime-clock.ts'
 import type { AstrologySettings, BirthProfileInput } from '../types.ts'
 import type { NormalizedBirthInput } from '../normalize.ts'
 import { getAstroEngineServiceApiKey, getAstroEngineServiceUrl } from './backend.ts'
+
+// Remote ephemeris provider wiring is intentionally omitted because the current
+// remote engine does not expose a deterministic tropical-position endpoint.
 
 export type RemoteAstroRuntime = {
   user_id: string

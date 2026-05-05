@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 export type AstroFeatureFlags = {
   readingV2Enabled: boolean
@@ -57,3 +57,16 @@ export function isAstroMemoryRelevanceGateEnabled(): boolean {
 export function isAstroFinalAnswerQualityGateEnabled(): boolean {
   return getAstroFeatureFlags().finalAnswerQualityGateEnabled
 }
+
+export const ASTRO_CALC_INTEGRATION_ENABLED = process.env.ASTRO_CALC_INTEGRATION_ENABLED === 'true'
+
+export const ASTRO_CALC_INTEGRATION_STRICT_MODE =
+  process.env.ASTRO_CALC_INTEGRATION_STRICT_MODE !== 'false'
+
+export const ASTRO_CALC_FIXTURE_VALIDATION_ENABLED =
+  process.env.ASTRO_CALC_FIXTURE_VALIDATION_ENABLED === 'true'
+
+export const ASTRO_ALLOW_UNVERIFIED_ADVANCED_CALCS =
+  process.env.ASTRO_ALLOW_UNVERIFIED_ADVANCED_CALCS === 'true'
+
+// These flags never permit LLM-generated exact facts.

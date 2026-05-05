@@ -1,13 +1,26 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import path from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
 import { createRequire } from 'module'
+import type {
+  EphemerisBody,
+  EphemerisProvider,
+  TropicalBodyPosition,
+} from '../calculations/ephemeris-provider.ts'
+import {
+  normalizeDegrees360,
+  normalizeRahuKetuMeanNode,
+} from '../calculations/ephemeris-provider.ts'
+import {
+  ASTRO_ENGINE_VERSION,
+  ASTRO_EPHEMERIS_VERSION_UNKNOWN,
+} from './version.ts'
 
 // ─── Swiss Ephemeris numeric constants ────────────────────────────────────
 // Hardcoded because sweph npm package does not export them as JS properties.
@@ -312,4 +325,91 @@ export function getEphemerisRange(): { supported_start_jd: number; supported_end
   // sepl_18.se1 + semo_18.se1 cover 1800–2400 CE.
   // JD 1800-01-01 ≈ 2378497.5, JD 2400-01-01 ≈ 2597641.5
   return { supported_start_jd: 2378497, supported_end_jd: 2597641 }
+}
+
+const EPHEMERIS_BODY_IDS: Record<Exclude<EphemerisBody, 'Ketu'>, number> = {
+  Sun: SE_SUN,
+  Moon: SE_MOON,
+  Mars: SE_MARS,
+  Mercury: SE_MERCURY,
+  Jupiter: SE_JUPITER,
+  Venus: SE_VENUS,
+  Saturn: SE_SATURN,
+  Rahu: SE_MEAN_NODE,
+  Uranus: 7,
+  Neptune: 8,
+  Pluto: 9,
+}
+
+function extractTropicalBodyPosition(body: EphemerisBody, result: SwephCalcResult): TropicalBodyPosition {
+  if (!result || typeof result !== 'object' || !Array.isArray(result.data)) {
+    throw new Error(`Swiss ephemeris returned an unexpected result shape for ${body}.`)
+  }
+
+  const longitude = result.data[0]
+  const latitude = result.data[1]
+  const speedLongitude = result.data[3]
+
+  if (!Number.isFinite(longitude)) {
+    throw new Error(`Swiss ephemeris returned a non-finite longitude for ${body}.`)
+  }
+
+  return {
+    body,
+    tropicalLongitudeDeg: normalizeDegrees360(longitude),
+    tropicalLatitudeDeg: Number.isFinite(latitude) ? latitude : undefined,
+    speedLongitudeDegPerDay: Number.isFinite(speedLongitude) ? speedLongitude : undefined,
+    retrograde: Number.isFinite(speedLongitude) ? speedLongitude < 0 : false,
+  }
+}
+
+export function createSwissEphemerisProvider(): EphemerisProvider {
+  return {
+    engineId: 'swiss-ephemeris',
+    engineVersion: ASTRO_ENGINE_VERSION,
+    ephemerisVersion: ASTRO_EPHEMERIS_VERSION_UNKNOWN,
+    async calculateTropicalPositions(jdUtExact: number, bodies: EphemerisBody[]): Promise<TropicalBodyPosition[]> {
+      if (!Number.isFinite(jdUtExact)) {
+        throw new Error('jdUtExact must be a finite number.')
+      }
+
+      if (!isSwissEphemerisAvailable()) {
+        throw new Error('Swiss ephemeris provider is unavailable in this checkout.')
+      }
+
+      const positions: TropicalBodyPosition[] = []
+      for (const body of bodies) {
+        if (body === 'Ketu') continue
+
+        const bodyId = EPHEMERIS_BODY_IDS[body as Exclude<EphemerisBody, 'Ketu'>]
+        if (bodyId === undefined) {
+          throw new Error(`Unsupported Swiss ephemeris body: ${body}`)
+        }
+
+        const result = calcPlanet(jdUtExact, bodyId)
+        if (result.error && result.error.length > 0 && !result.error.includes('Moshier')) {
+          throw new Error(`Swiss ephemeris error for ${body}: ${result.error}`)
+        }
+
+        positions.push(extractTropicalBodyPosition(body, result))
+      }
+
+      const normalized = normalizeRahuKetuMeanNode(positions)
+      const returnedBodies = new Set(normalized.map((position) => position.body))
+      for (const body of bodies) {
+        if (body === 'Ketu') {
+          if (!returnedBodies.has('Ketu') && !returnedBodies.has('Rahu')) {
+            throw new Error('Swiss ephemeris provider did not return Ketu or Rahu for derived node handling.')
+          }
+          continue
+        }
+
+        if (!returnedBodies.has(body)) {
+          throw new Error(`Swiss ephemeris provider missing requested body: ${body}`)
+        }
+      }
+
+      return normalized
+    },
+  }
 }

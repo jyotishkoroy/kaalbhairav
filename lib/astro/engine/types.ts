@@ -1,12 +1,19 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import type { SignPlacement } from '../calculations/sign.ts'
 import type { NakshatraPlacement } from '../calculations/nakshatra.ts'
 import type { TithiResult } from '../calculations/tithi.ts'
+export type {
+  AscendantMcResult,
+  EphemerisBody,
+  EphemerisProvider,
+  SunriseSunsetResult,
+  TropicalBodyPosition,
+} from '../calculations/ephemeris-provider.ts'
 
 // ── Shared primitives ──────────────────────────────────────────────────────
 
