@@ -38,28 +38,37 @@ type RequiredChartVersionMetadata = {
   houseSystem: string
 }
 
+function readTrimmedMetadataValue(
+  metadata: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = metadata[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+  return null
+}
+
 function requireChartVersionMetadata(chartJson: CanonicalChartJsonV2): RequiredChartVersionMetadata {
   const metadata = chartJson.metadata ?? {}
 
   const engineVersion =
-    typeof metadata.engineVersion === 'string' && metadata.engineVersion.trim()
-      ? metadata.engineVersion.trim()
-      : ASTRO_DETERMINISTIC_ENGINE_VERSION
+    readTrimmedMetadataValue(metadata as Record<string, unknown>, ['engineVersion', 'engine_version']) ??
+    ASTRO_DETERMINISTIC_ENGINE_VERSION
 
   const ephemerisVersion =
-    typeof metadata.ephemerisVersion === 'string' && metadata.ephemerisVersion.trim()
-      ? metadata.ephemerisVersion.trim()
-      : ASTRO_DETERMINISTIC_EPHEMERIS_VERSION
+    readTrimmedMetadataValue(metadata as Record<string, unknown>, ['ephemerisVersion', 'ephemeris_version']) ??
+    ASTRO_DETERMINISTIC_EPHEMERIS_VERSION
 
   const ayanamsha =
-    typeof metadata.ayanamsha === 'string' && metadata.ayanamsha.trim()
-      ? metadata.ayanamsha.trim()
-      : 'lahiri'
+    readTrimmedMetadataValue(metadata as Record<string, unknown>, ['ayanamsha', 'ayanamsha_main']) ??
+    'lahiri'
 
   const houseSystem =
-    typeof metadata.houseSystem === 'string' && metadata.houseSystem.trim()
-      ? metadata.houseSystem.trim()
-      : 'whole_sign'
+    readTrimmedMetadataValue(metadata as Record<string, unknown>, ['houseSystem', 'house_system']) ??
+    'whole_sign'
 
   const missing = [
     ['engineVersion', engineVersion],
@@ -193,7 +202,7 @@ export async function persistCanonicalChartJsonV2(
     p_prediction_summary: args.predictionSummary ?? null,
     p_input_hash: args.inputHash,
     p_settings_hash: args.settingsHash,
-    p_engine_version: args.engineVersion,
+    p_engine_version: requiredMetadata.engineVersion,
     p_ephemeris_version: requiredMetadata.ephemerisVersion,
     p_ayanamsha: requiredMetadata.ayanamsha,
     p_house_system: requiredMetadata.houseSystem,

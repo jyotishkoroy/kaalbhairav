@@ -267,6 +267,7 @@ grant execute on function public.persist_and_promote_current_chart_version(
   text,
   text,
   text,
+  text,
   jsonb
 ) to service_role;
 
@@ -282,7 +283,10 @@ revoke all on function public.persist_and_promote_current_chart_version(
   text,
   text,
   text,
+  text,
   jsonb
 ) from public;
+
+notify pgrst, 'reload schema';
 
 commit;
