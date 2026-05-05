@@ -4,7 +4,7 @@ commercially use, train models on, scrape, or create derivative works from this
 repository or any part of it without prior written permission from Jyotishko Roy.
 */
 
-import { RASHI_MAP, NAVAMSA_START } from './constants.ts'
+import { RASHI_MAP } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNavamsaBoundary } from './boundary.ts'
 import { calculateVargaSign } from './shodashvarga.ts'
@@ -38,8 +38,7 @@ function calcNavamsaSignIndex(sidereal: number): { navamsa_sign_index: number; n
   const d1_sign_index = Math.floor(normalized / 30)
   const degrees_in_sign = normalized - d1_sign_index * 30
   const navamsa_index = Math.floor(degrees_in_sign / (30 / 9))
-  const start = NAVAMSA_START[d1_sign_index as keyof typeof NAVAMSA_START] ?? 0
-  const navamsa_sign_index = (start + navamsa_index) % 12
+  const navamsa_sign_index = calculateVargaSign(normalized, 'D9').signNumber - 1
   return { navamsa_sign_index, navamsa_index }
 }
 

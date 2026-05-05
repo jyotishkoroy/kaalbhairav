@@ -51,7 +51,12 @@ export type ShodashvargaByBody = Partial<
 >
 
 export type CalculateAllShodashvargaArgs = {
-  byBody: Partial<Record<PlanetNameV2, PlanetaryPositionV2>>
+  byBody: Record<string, {
+    siderealLongitudeDeg?: number
+    absoluteLongitude?: number
+    sidereal_longitude?: number
+    longitude?: number
+  }>
   ascendantLongitudeDeg?: number | null
 }
 
@@ -69,7 +74,7 @@ function assertVargaType(value: unknown): VargaType {
 
 function assertFiniteLongitude(value: number): number {
   if (!Number.isFinite(value)) {
-    throw new Error('Longitude must be a finite number.')
+    throw new Error('Invalid longitude for varga calculation')
   }
 
   return normalizeDegrees360(value)
@@ -282,17 +287,30 @@ export function calculateVargaSign(
   return signResult(vargaType, vargaSign)
 }
 
+export function calculateAllShodashvargaForLongitude(longitudeDeg: number): Record<VargaType, number> {
+  const result = {} as Record<VargaType, number>
+  for (const vargaType of VARGA_TYPES) {
+    result[vargaType] = calculateVargaSign(longitudeDeg, vargaType).signNumber
+  }
+  return result
+}
+
 function getBodyInputs(args: CalculateAllShodashvargaArgs): ShodashvargaBodyInput[] {
   const bodyInputs: ShodashvargaBodyInput[] = []
 
   for (const [body, position] of Object.entries(args.byBody)) {
-    if (!position || !Number.isFinite(position.absoluteLongitude)) {
+    if (!position) {
+      continue
+    }
+
+    const longitude = position.siderealLongitudeDeg ?? position.absoluteLongitude ?? position.sidereal_longitude ?? position.longitude
+    if (typeof longitude !== 'number' || !Number.isFinite(longitude)) {
       continue
     }
 
     bodyInputs.push({
       body: body as PlanetNameV2,
-      absoluteLongitude: position.absoluteLongitude,
+      absoluteLongitude: longitude,
     })
   }
 

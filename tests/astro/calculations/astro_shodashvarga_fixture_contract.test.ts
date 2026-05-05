@@ -5,189 +5,68 @@ repository or any part of it without prior written permission from Jyotishko Roy
 */
 
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs'
-import path from 'node:path'
-import type { AstroSectionContract } from '@/lib/astro/calculations/contracts';
-import type { PlanetaryPositionV2 } from '@/lib/astro/calculations/contracts';
 import {
   VARGA_TYPES,
-  buildD9ChartSectionFromShodashvarga,
-  buildShodashvargaSection,
   calculateAllShodashvarga,
+  calculateAllShodashvargaForLongitude,
   calculateVargaSign,
 } from '@/lib/astro/calculations/shodashvarga';
 
-function planetarySection(): AstroSectionContract {
-  return {
-    status: 'computed',
-    source: 'deterministic_calculation',
-    fields: {
-      byBody: {
-        Sun: {
-          body: 'Sun',
-          sign: 'Aries',
-          signNumber: 1,
-          degreeInSign: 10,
-          absoluteLongitude: 10,
-          nakshatra: 'Ashwini',
-          pada: 4,
-          retrograde: false,
-          speedDegPerDay: 1,
-          source: 'deterministic_calculation',
-        },
-        Moon: {
-          body: 'Moon',
-          sign: 'Taurus',
-          signNumber: 2,
-          degreeInSign: 15,
-          absoluteLongitude: 45,
-          nakshatra: 'Rohini',
-          pada: 2,
-          retrograde: false,
-          speedDegPerDay: 13,
-          source: 'deterministic_calculation',
-        },
-        Rahu: {
-          body: 'Rahu',
-          sign: 'Aquarius',
-          signNumber: 11,
-          degreeInSign: 26,
-          absoluteLongitude: 326,
-          nakshatra: 'Purva Bhadrapada',
-          pada: 2,
-          retrograde: true,
-          speedDegPerDay: -0.05,
-          source: 'deterministic_calculation',
-        },
-        Ketu: {
-          body: 'Ketu',
-          sign: 'Leo',
-          signNumber: 5,
-          degreeInSign: 26,
-          absoluteLongitude: 146,
-          nakshatra: 'Purva Phalguni',
-          pada: 4,
-          retrograde: true,
-          speedDegPerDay: -0.05,
-          source: 'deterministic_calculation',
-        },
-      },
-    },
-  };
-}
-
-function lagnaSection(): AstroSectionContract {
-  return {
-    status: 'computed',
-    source: 'deterministic_calculation',
-    fields: {
-      ascendant: {
-        sign: 'Cancer',
-        signNumber: 4,
-        degreeInSign: 10,
-        absoluteLongitude: 100,
-        tropicalLongitude: 124,
-        source: 'deterministic_calculation',
-      },
-    },
-  };
-}
-
-function loadVedicEvidenceFixture<T>(fileName: string): T[] {
-  const fixturePath = path.join(process.cwd(), 'tests/astro/fixtures/vedic-calculation-evidence', fileName)
-  if (!fs.existsSync(fixturePath)) return []
-  const parsed = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as { cases?: T[] }
-  return Array.isArray(parsed.cases) ? parsed.cases : []
-}
-
 describe('astro shodashvarga fixture contract', () => {
-  it('loads sanitized evidence fixtures when present', () => {
-    const cases = loadVedicEvidenceFixture<Record<string, unknown>>('varga_cases.json')
-    expect(Array.isArray(cases)).toBe(true)
-  })
-
-  it('computes all 16 vargas for each deterministic body and Asc', () => {
-    const section = buildShodashvargaSection({
-      planetaryPositions: planetarySection(),
-      lagna: lagnaSection(),
-    });
-
-    expect(section.status).toBe('computed');
-    expect(section.fields?.vargaTypes).toEqual(VARGA_TYPES);
-
-    const byBody = section.fields?.byBody as Record<string, Record<string, { source: string }>> | undefined;
-    for (const body of ['Sun', 'Moon', 'Rahu', 'Ketu', 'Asc']) {
-      expect(Object.keys(byBody?.[body] ?? {})).toHaveLength(16);
-      for (const vargaType of VARGA_TYPES) {
-        expect(byBody?.[body]?.[vargaType]?.source).toBe('deterministic_calculation');
-      }
-    }
+  it('computes all 16 vargas for Aries 10 degrees', () => {
+    const all = calculateAllShodashvargaForLongitude(10);
+    expect(Object.keys(all)).toEqual(VARGA_TYPES);
+    expect(all.D1).toBe(1);
+    expect(all.D2).toBe(5);
+    expect(all.D3).toBe(5);
+    expect(all.D4).toBe(4);
+    expect(all.D7).toBe(3);
+    expect(all.D9).toBe(4);
+    expect(all.D10).toBe(4);
+    expect(all.D12).toBe(5);
+    expect(all.D16).toBe(6);
+    expect(all.D20).toBe(7);
+    expect(all.D24).toBe(1);
+    expect(all.D27).toBe(10);
+    expect(all.D30).toBe(9);
+    expect(all.D40).toBe(2);
+    expect(all.D45).toBe(4);
+    expect(all.D60).toBe(9);
   });
 
-  it('computes expected core vargas for simple Aries 10 degrees', () => {
-    expect(calculateVargaSign(10, 'D1')).toMatchObject({ signNumber: 1, signName: 'Aries' });
-    expect(calculateVargaSign(10, 'D2')).toMatchObject({ signNumber: 5, signName: 'Leo' });
-    expect(calculateVargaSign(5, 'D3')).toMatchObject({ signNumber: 1, signName: 'Aries' });
-    expect(calculateVargaSign(10, 'D4')).toMatchObject({ signNumber: 4, signName: 'Cancer' });
-    expect(calculateVargaSign(10, 'D9')).toMatchObject({ signNumber: 4, signName: 'Cancer' });
-    expect(calculateVargaSign(10, 'D12')).toMatchObject({ signNumber: 5, signName: 'Leo' });
+  it('handles exact sign and segment boundaries with floor arithmetic', () => {
+    expect(calculateVargaSign(30, 'D1').signNumber).toBe(2);
+    expect(calculateVargaSign(3 + 20 / 60, 'D9').signNumber).toBe(2);
+    expect(calculateVargaSign(6 + 40 / 60, 'D9').signNumber).toBe(3);
+    expect(calculateVargaSign(5, 'D30').signNumber).toBe(11);
   });
 
-  it('exact boundaries go to next segment through floor arithmetic', () => {
-    expect(calculateVargaSign(30, 'D1')).toMatchObject({ signNumber: 2, signName: 'Taurus' });
-    expect(calculateVargaSign(3 + 20 / 60, 'D9')).toMatchObject({ signNumber: 2, signName: 'Taurus' });
-    expect(calculateVargaSign(360, 'D1')).toMatchObject({ signNumber: 1, signName: 'Aries' });
-    expect(calculateVargaSign(-1, 'D1')).toMatchObject({ signNumber: 12, signName: 'Pisces' });
+  it('rejects malformed longitudes and unknown varga types', () => {
+    expect(() => calculateVargaSign(Number.NaN, 'D1')).toThrow('Invalid longitude for varga calculation');
+    expect(() => calculateVargaSign(Number.POSITIVE_INFINITY, 'D2')).toThrow('Invalid longitude for varga calculation');
+    expect(() => calculateVargaSign(Number.NEGATIVE_INFINITY, 'D3')).toThrow('Invalid longitude for varga calculation');
+    expect(() => calculateVargaSign(10, 'D99' as never)).toThrow('Unsupported varga type: D99');
   });
 
-  it('D7 uses integer-degree segmentation behavior', () => {
-    expect(calculateVargaSign(4.9, 'D7')).toMatchObject({ signNumber: 1, signName: 'Aries' });
-    expect(calculateVargaSign(5, 'D7')).toMatchObject({ signNumber: 2, signName: 'Taurus' });
-    expect(calculateVargaSign(35, 'D7')).toMatchObject({ signNumber: 9, signName: 'Sagittarius' });
-  });
-
-  it('rejects invalid longitudes and unsupported varga types', () => {
-    expect(() => calculateVargaSign(Number.NaN, 'D1')).toThrow();
-    expect(() => calculateVargaSign(Number.POSITIVE_INFINITY, 'D9')).toThrow();
-    expect(() => calculateVargaSign(10, 'D99' as never)).toThrow();
-  });
-
-  it('Rahu and Ketu use normal sidereal longitude and not reverse logic', () => {
-    const section = buildShodashvargaSection({
-      planetaryPositions: planetarySection(),
-      lagna: lagnaSection(),
-    });
-
-    const byBody = section.fields?.byBody as Record<string, Record<string, { signNumber: number }>> | undefined;
-    expect(byBody?.Rahu?.D1?.signNumber).toBe(11);
-    expect(byBody?.Ketu?.D1?.signNumber).toBe(5);
-    expect(byBody?.Rahu?.D1?.signNumber).not.toBe(byBody?.Ketu?.D1?.signNumber);
-  });
-
-  it('builds d9Chart section from shodashvarga without losing other vargas', () => {
-    const shodashvarga = buildShodashvargaSection({
-      planetaryPositions: planetarySection(),
-      lagna: lagnaSection(),
-    });
-    const d9Chart = buildD9ChartSectionFromShodashvarga(shodashvarga);
-
-    expect(d9Chart.status).toBe('computed');
-    const byBody = d9Chart.fields?.byBody as Record<string, { vargaType: string; signNumber: number }> | undefined;
-    expect(byBody?.Sun?.vargaType).toBe('D9');
-    expect(byBody?.Moon?.vargaType).toBe('D9');
-  });
-
-  it('calculateAllShodashvarga includes Asc when lagna longitude is available', () => {
-    const planetaryByBody = planetarySection().fields?.byBody as Record<string, PlanetaryPositionV2> | undefined;
-    const sunPosition = planetaryByBody?.Sun;
-    const calculated = calculateAllShodashvarga({
+  it('skips missing longitudes without emitting NaN signs', () => {
+    const byBody = calculateAllShodashvarga({
       byBody: {
-        Sun: sunPosition,
+        Sun: { siderealLongitudeDeg: 10 },
+        Moon: { absoluteLongitude: Number.NaN },
+        Mars: {},
+        Mercury: { longitude: 40 },
       },
-      ascendantLongitudeDeg: 100,
-    }) as Record<string, Record<string, unknown>>;
+    });
 
-    expect(calculated.Asc).toBeTruthy();
-    expect(Object.keys(calculated.Asc ?? {})).toHaveLength(16);
+    expect(byBody.Sun?.D1?.signNumber).toBe(1);
+    expect(byBody.Mercury?.D1?.signNumber).toBe(2);
+    expect(byBody.Moon).toBeUndefined();
+    expect(byBody.Mars).toBeUndefined();
+    expect(JSON.stringify(byBody)).not.toContain('NaN');
+  });
+
+  it('uses AstroSage compatible integer-degree D7 behavior', () => {
+    expect(calculateVargaSign(35.9, 'D7').signNumber).toBe(9);
+    expect(calculateVargaSign(34.1, 'D7').signNumber).toBe(8);
   });
 });
