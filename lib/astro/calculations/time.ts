@@ -5,6 +5,12 @@
  */
 
 import { DateTime, IANAZone } from 'luxon'
+import type { BirthInputV2, NormalizedBirthInputV2 } from './contracts.ts'
+import {
+  calculateAstronomicalJulianDateFromUtc,
+  calculateGregorianJdnForLocalDate,
+} from './julian-day.ts'
+import { normalizeLatitudeDeg, normalizeLongitudeDeg } from './coordinates.ts'
 
 export type BirthTimeValidationStatus =
   | 'valid'
@@ -38,8 +44,14 @@ export type BirthTimeResult = {
   birth_time_uncertainty_seconds: number
 }
 
+export type NormalizedBirthTimeV2 = NormalizedBirthInputV2
+
 function pad2(value: number): string {
   return String(value).padStart(2, '0')
+}
+
+function formatIsoLocal(parts: { year: number; month: number; day: number; hour: number; minute: number; second: number }): string {
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}T${pad2(parts.hour)}:${pad2(parts.minute)}:${pad2(parts.second)}.000`
 }
 
 export function parseDateParts(date: string): { year: number; month: number; day: number } | null {
@@ -61,6 +73,232 @@ export function parseTimeParts(time: string): { hour: number; minute: number; se
   const second = Number(match[3] ?? '0')
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return null
   return { hour, minute, second }
+}
+
+function parseLocalDate(dateLocal: string): { year: number; month: number; day: number } {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateLocal)
+  if (!match) {
+    throw new Error('date_local must be in YYYY-MM-DD format.')
+  }
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const check = new Date(Date.UTC(year, month - 1, day))
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    throw new Error('date_local must be a valid Gregorian date.')
+  }
+
+  return { year, month, day }
+}
+
+function parseLocalTime(timeLocal: string): { hour: number; minute: number; second: number; normalized: string } {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(timeLocal)
+  if (!match) {
+    throw new Error('time_local must be in HH:mm or HH:mm:ss format.')
+  }
+
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  const second = Number(match[3] ?? '0')
+
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+    throw new Error('time_local must be a valid civil time.')
+  }
+
+  return {
+    hour,
+    minute,
+    second,
+    normalized: `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`,
+  }
+}
+
+function normalizeRuntimeClockIso(runtimeClock?: string): string {
+  const candidate = runtimeClock ?? new Date().toISOString()
+  const parsed = new Date(candidate)
+  if (!Number.isFinite(parsed.getTime())) {
+    throw new Error('runtime_clock must be a valid ISO datetime.')
+  }
+  return parsed.toISOString()
+}
+
+function addSecondsToLocalIso(dateLocal: string, normalizedTime: string, seconds: number): string {
+  const parsedDate = parseLocalDate(dateLocal)
+  const parsedTime = parseLocalTime(normalizedTime)
+  const baseMs = Date.UTC(parsedDate.year, parsedDate.month - 1, parsedDate.day, parsedTime.hour, parsedTime.minute, parsedTime.second)
+  return DateTime.fromMillis(baseMs + seconds * 1000, { zone: 'utc' }).toFormat("yyyy-MM-dd'T'HH:mm:ss.SSS")
+}
+
+function buildFixedOffsetUtcIso(
+  dateLocal: string,
+  normalizedTime: string,
+  timezoneHours: number,
+  warTimeCorrectionSeconds: number,
+): string {
+  const parsedDate = parseLocalDate(dateLocal)
+  const parsedTime = parseLocalTime(normalizedTime)
+  const baseMs = Date.UTC(parsedDate.year, parsedDate.month - 1, parsedDate.day, parsedTime.hour, parsedTime.minute, parsedTime.second)
+  const utcMs = baseMs - (timezoneHours * 3600 + warTimeCorrectionSeconds) * 1000
+  return new Date(utcMs).toISOString()
+}
+
+function detectIanaLocalTimeStatus(args: {
+  dateLocal: string
+  normalizedTime: string
+  timezone: string
+  disambiguation?: 'earlier' | 'later'
+}): { utcIso: string; timezoneHours: number } {
+  const [year, month, day] = args.dateLocal.split('-').map(Number)
+  const [hour, minute, second] = args.normalizedTime.split(':').map(Number)
+  const local = DateTime.fromObject({ year, month, day, hour, minute, second }, { zone: args.timezone })
+  if (!local.isValid) {
+    throw new Error(`Invalid IANA local time: ${local.invalidExplanation ?? 'nonexistent or invalid time.'}`)
+  }
+
+  const possibleOffsets = typeof (local as { getPossibleOffsets?: () => DateTime[] }).getPossibleOffsets === 'function'
+    ? (local as { getPossibleOffsets: () => DateTime[] }).getPossibleOffsets()
+    : [local]
+
+  const wall = `${args.dateLocal}T${args.normalizedTime}`
+  const roundTrip = local.toFormat("yyyy-MM-dd'T'HH:mm:ss")
+  if (roundTrip !== wall) {
+    throw new Error('Invalid IANA local time: nonexistent DST local time.')
+  }
+
+  if (possibleOffsets.length > 1) {
+    if (!args.disambiguation) {
+      throw new Error('Ambiguous DST local time requires disambiguation.')
+    }
+    const selected = args.disambiguation === 'later' ? possibleOffsets[possibleOffsets.length - 1] : possibleOffsets[0]
+    return { utcIso: selected.toUTC().toISO()!, timezoneHours: selected.offset / 60 }
+  }
+
+  return { utcIso: local.toUTC().toISO()!, timezoneHours: local.offset / 60 }
+}
+
+export function normalizeBirthDateTime(input: BirthInputV2): NormalizedBirthInputV2 {
+  const dateParts = parseLocalDate(input.date_local)
+  const printedJulianDay = calculateGregorianJdnForLocalDate(input.date_local)
+  const warnings: string[] = []
+  const runtimeClockIso = normalizeRuntimeClockIso(input.runtime_clock)
+
+  const latitudeDeg = input.latitude_deg == null ? null : normalizeLatitudeDeg(input.latitude_deg)
+  const longitudeDeg = input.longitude_deg == null ? null : normalizeLongitudeDeg(input.longitude_deg)
+
+  if (latitudeDeg == null) warnings.push('Latitude is missing; coordinate-dependent calculations are unavailable.')
+  if (longitudeDeg == null) warnings.push('Longitude is missing; coordinate-dependent calculations are unavailable.')
+
+  let timezoneMode: 'iana' | 'fixed_offset_hours' = 'fixed_offset_hours'
+  let timezone: string | null = null
+  let timezoneHours: number | null = null
+  let utcDateTimeIso: string | null = null
+  let localDateTimeIso: string | null = null
+  let localMeanTimeIso: string | null = null
+  let jdUtExact: number | null = null
+  let timeLocal: string | null = null
+  let standardMeridianDeg: number | null = null
+  let localTimeCorrectionSeconds: number | null = null
+
+  const warTimeCorrectionSeconds = input.war_time_correction_seconds ?? 0
+  if (!Number.isFinite(warTimeCorrectionSeconds)) {
+    throw new Error('war_time_correction_seconds must be finite.')
+  }
+
+  if (typeof input.timezone === 'number') {
+    if (!Number.isFinite(input.timezone)) {
+      throw new Error('timezone must be a finite number or valid IANA string.')
+    }
+    timezoneMode = 'fixed_offset_hours'
+    timezoneHours = input.timezone
+  } else if (typeof input.timezone === 'string') {
+    const trimmed = input.timezone.trim()
+    if (!trimmed) {
+      throw new Error('timezone must not be empty.')
+    }
+    const numeric = Number(trimmed)
+    if (Number.isFinite(numeric)) {
+      timezoneMode = 'fixed_offset_hours'
+      timezoneHours = numeric
+    } else {
+      if (!IANAZone.isValidZone(trimmed)) {
+        throw new Error('timezone must be a valid IANA timezone.')
+      }
+      timezoneMode = 'iana'
+      timezone = trimmed
+    }
+  } else {
+    throw new Error('timezone must be a finite number or valid IANA string.')
+  }
+
+  if (input.time_local != null) {
+    const parsedTime = parseLocalTime(input.time_local)
+    timeLocal = parsedTime.normalized
+    localDateTimeIso = formatIsoLocal({
+      year: dateParts.year,
+      month: dateParts.month,
+      day: dateParts.day,
+      hour: parsedTime.hour,
+      minute: parsedTime.minute,
+      second: parsedTime.second,
+    })
+
+    if (timezoneMode === 'fixed_offset_hours') {
+      if (timezoneHours == null) {
+        throw new Error('timezoneHours missing for fixed offset conversion.')
+      }
+      utcDateTimeIso = buildFixedOffsetUtcIso(input.date_local, timeLocal, timezoneHours, warTimeCorrectionSeconds)
+    } else if (timezone) {
+      const resolved = detectIanaLocalTimeStatus({
+        dateLocal: input.date_local,
+        normalizedTime: timeLocal,
+        timezone,
+        disambiguation: input.disambiguation,
+      })
+      timezoneHours = resolved.timezoneHours
+      utcDateTimeIso = new Date(Date.parse(resolved.utcIso) - warTimeCorrectionSeconds * 1000).toISOString()
+    }
+
+    if (utcDateTimeIso) {
+      jdUtExact = calculateAstronomicalJulianDateFromUtc(utcDateTimeIso)
+    }
+  } else {
+    warnings.push('Birth time is missing; exact time-dependent calculations are unavailable.')
+  }
+
+  if (timezoneHours != null && longitudeDeg != null) {
+    standardMeridianDeg = timezoneHours * 15
+    localTimeCorrectionSeconds = (longitudeDeg - standardMeridianDeg) * 240
+  }
+
+  if (timeLocal != null && localTimeCorrectionSeconds != null) {
+    localMeanTimeIso = addSecondsToLocalIso(input.date_local, timeLocal, localTimeCorrectionSeconds)
+  }
+
+  return {
+    dateLocal: input.date_local,
+    timeLocal,
+    localDateTimeIso,
+    utcDateTimeIso,
+    placeName: input.place_name,
+    latitudeDeg,
+    longitudeDeg,
+    timezoneMode,
+    timezone,
+    timezoneHours,
+    warTimeCorrectionSeconds,
+    standardMeridianDeg,
+    localTimeCorrectionSeconds,
+    localMeanTimeIso,
+    printedJulianDay,
+    jdUtExact,
+    runtimeClockIso,
+    warnings,
+  }
 }
 
 export function getLocalTimestampCandidates(args: {
