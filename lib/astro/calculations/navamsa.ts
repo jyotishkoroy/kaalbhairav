@@ -1,12 +1,13 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { RASHI_MAP, NAVAMSA_START } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNavamsaBoundary } from './boundary.ts'
+import { calculateVargaSign } from './shodashvarga.ts'
 import type { PlanetPosition } from './planets.ts'
 import type { LagnaResult } from './lagna.ts'
 import type { NavamsaD9, ZodiacSign, PlanetName, NavamsaPlanet } from '../engine/types.ts'
@@ -76,6 +77,10 @@ export function calculateNavamsaChart(
     navamsa_lagna_sign: navamsaLagna !== null ? RASHI_MAP[navamsaLagna].english_name : null,
     placements,
   }
+}
+
+export function calculateNavamsaSignV2(longitudeDeg: number) {
+  return calculateVargaSign(longitudeDeg, 'D9')
 }
 
 // ─── Legacy adapter for existing types ────────────────────────────────────

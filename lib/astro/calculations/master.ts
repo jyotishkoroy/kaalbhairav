@@ -1,8 +1,8 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master.ts'
 import type { AstrologySettings, BirthProfileInput } from '../types.ts'
@@ -22,6 +22,8 @@ import { calculateWholeSignHouses } from './houses.ts'
 import { buildHousesSectionV2 } from './houses.ts'
 import { calculateD1Chart } from './d1.ts'
 import { calculateNavamsaChart } from './navamsa.ts'
+import { buildD9ChartSectionFromShodashvarga, buildShodashvargaSection } from './shodashvarga.ts'
+import { buildShodashvargaBhavSection } from './varga-bhav.ts'
 import { calculateVimshottari, calculateVimshottariDashaV2 } from './vimshottari.ts'
 import { calculatePanchangResult, DEFAULT_PANCHANG_CONVENTION } from './panchang.ts'
 import { calculateGrahaDrishti } from './aspects.ts'
@@ -288,6 +290,42 @@ export async function calculateMasterAstroOutput(args: {
         houses: housesSection,
       }
     : undefined
+
+  if (ASTRO_CALC_INTEGRATION_ENABLED && sections && lagnaSection) {
+    const shodashvarga = buildShodashvargaSection({
+      planetaryPositions: {
+        status: 'computed',
+        source: 'deterministic_calculation',
+        fields: { byBody: planets },
+      },
+      lagna: lagnaSection,
+    })
+
+    ;(sections as Record<string, unknown>).shodashvarga = shodashvarga
+    ;(sections as Record<string, unknown>).shodashvargaBhav = buildShodashvargaBhavSection({
+      shodashvarga,
+    })
+    ;(sections as Record<string, unknown>).d9Chart = buildD9ChartSectionFromShodashvarga(shodashvarga)
+  } else if (ASTRO_CALC_INTEGRATION_ENABLED && sections) {
+    ;(sections as Record<string, unknown>).shodashvarga = {
+      status: 'unavailable',
+      source: 'none',
+      reason: 'planetary_positions_unavailable',
+      fields: {},
+    }
+    ;(sections as Record<string, unknown>).shodashvargaBhav = {
+      status: 'unavailable',
+      source: 'none',
+      reason: 'shodashvarga_unavailable',
+      fields: {},
+    }
+    ;(sections as Record<string, unknown>).d9Chart = {
+      status: 'unavailable',
+      source: 'none',
+      reason: 'shodashvarga_unavailable',
+      fields: {},
+    }
+  }
 
   const output = {
     schema_version: '29.0.0',

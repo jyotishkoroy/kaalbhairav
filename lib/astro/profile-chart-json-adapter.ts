@@ -1,8 +1,8 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import type { ChartJson, AstrologySettings, AstroExpandedSections, ConfidenceScore } from './types.ts'
 import type { MasterAstroCalculationOutput } from './schemas/master.ts'
@@ -177,6 +177,15 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
   const panchang = expanded_sections?.panchang ?? (output as MaybeObject)?.panchang
   const d1Chart = (output as MaybeObject)?.d1_chart
   const d9Chart = expanded_sections?.navamsa_d9 ?? (output as MaybeObject)?.navamsa_d9
+  const shodashvarga = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
+    ? toRecord((output as MaybeObject)?.sections).shodashvarga
+    : (output as MaybeObject)?.shodashvarga
+  const shodashvargaBhav = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
+    ? toRecord((output as MaybeObject)?.sections).shodashvargaBhav
+    : (output as MaybeObject)?.shodashvargaBhav
+  const d9ChartCompat = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
+    ? toRecord((output as MaybeObject)?.sections).d9Chart
+    : (output as MaybeObject)?.d9Chart
   const vimshottari = expanded_sections?.vimshottari_dasha ?? (output as MaybeObject)?.vimshottari_dasha
   const transits = expanded_sections?.daily_transits ?? (output as MaybeObject)?.daily_transits
   const timeFacts = (output as MaybeObject)?.runtime_clock ?? (output as MaybeObject)?.prediction_ready_context
@@ -190,7 +199,9 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
       ? sectionComputed(engine, output, panchang)
       : sectionUnavailable(engine, output, 'panchang_not_available'),
     d1Chart: isTruthyObject(d1Chart) ? sectionComputed(engine, output, d1Chart) : sectionUnavailable(engine, output, 'd1_chart_not_available'),
-    d9Chart: isTruthyObject(d9Chart) ? sectionComputed(engine, output, d9Chart) : sectionUnavailable(engine, output, 'd9_chart_not_available'),
+    d9Chart: isTruthyObject(d9ChartCompat ?? d9Chart) ? sectionComputed(engine, output, d9ChartCompat ?? d9Chart) : sectionUnavailable(engine, output, 'd9_chart_not_available'),
+    shodashvarga: isTruthyObject(shodashvarga) ? sectionComputed(engine, output, shodashvarga) : sectionUnavailable(engine, output, 'shodashvarga_not_available'),
+    shodashvargaBhav: isTruthyObject(shodashvargaBhav) ? sectionComputed(engine, output, shodashvargaBhav) : sectionUnavailable(engine, output, 'shodashvarga_bhav_not_available'),
     vimshottari: isTruthyObject(vimshottari) ? sectionComputed(engine, output, vimshottari) : sectionUnavailable(engine, output, 'vimshottari_not_available'),
     transits: isTruthyObject(transits) ? sectionComputed(engine, output, transits) : sectionUnavailable(engine, output, 'transits_not_available'),
     advanced: {
