@@ -162,7 +162,7 @@ describe('astro chart persistence rpc signature contract', () => {
   it('pins the migration signature and schema reload directive', () => {
     const migrationPath = path.join(
       process.cwd(),
-      'supabase/migrations/20260505120000_fix_chart_json_versions_ephemeris_metadata_rpc.sql',
+      'supabase/migrations/20260505123000_make_chart_json_versions_append_only_rpc.sql',
     )
     const sql = fs.readFileSync(migrationPath, 'utf8')
 
@@ -171,12 +171,17 @@ describe('astro chart persistence rpc signature contract', () => {
     expect(sql).toContain('p_house_system text')
     expect(sql).toContain("p_audit_payload jsonb")
     expect(sql).toContain("notify pgrst, 'reload schema';")
+    expect(sql).toContain('insert into public.chart_json_versions')
+    expect(sql).toContain('where profile_id = p_profile_id')
+    expect(sql).not.toContain('update public.chart_json_versions set chart_json =')
+    expect(sql).not.toContain('update public.chart_json_versions set input_hash =')
+    expect(sql).not.toContain('update public.chart_json_versions set engine_version =')
   })
 
   it('keeps the full 13-argument function signature in order', () => {
     const migrationPath = path.join(
       process.cwd(),
-      'supabase/migrations/20260505120000_fix_chart_json_versions_ephemeris_metadata_rpc.sql',
+      'supabase/migrations/20260505123000_make_chart_json_versions_append_only_rpc.sql',
     )
     const sql = fs.readFileSync(migrationPath, 'utf8')
     expect(sql).toMatch(

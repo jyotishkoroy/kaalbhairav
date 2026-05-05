@@ -301,6 +301,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (ASTRO_CALC_INTEGRATION_ENABLED) {
+    const requestedProfileId =
+      typeof (body as Record<string, unknown>).profile_id === 'string'
+        ? String((body as Record<string, unknown>).profile_id)
+        : ''
+
     const birthInput = sanitizeCalculateBodyForDeterministicInput(body as Record<string, unknown>)
     if (!birthInput.date_local) {
       return NextResponse.json({ ok: false, success: false, error: 'invalid_input', reason: 'date_local is required.' }, { status: 400 })
@@ -333,6 +338,7 @@ export async function POST(req: NextRequest) {
       const { data: profile } = await service
         .from('birth_profiles')
         .select('id, user_id, current_chart_version_id, status')
+        .eq('id', requestedProfileId)
         .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle()

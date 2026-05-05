@@ -131,6 +131,7 @@ function makeRequest(body: Record<string, unknown>) {
 
 function validBirthBody(overrides: Record<string, unknown> = {}) {
   return {
+    profile_id: 'profile-1',
     date_local: '2026-05-05',
     time_local: '07:30:00',
     place_name: 'Test Place',
@@ -243,9 +244,11 @@ beforeEach(() => {
           select: () => ({
             eq: () => ({
               eq: () => ({
-                maybeSingle: async () => ({
-                  data: { id: 'profile-1', user_id: 'u1', status: 'active', current_chart_version_id: 'cv1' },
-                  error: null,
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: { id: 'profile-1', user_id: 'u1', status: 'active', current_chart_version_id: 'cv1' },
+                    error: null,
+                  }),
                 }),
               }),
             }),
