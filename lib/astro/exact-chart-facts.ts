@@ -6,11 +6,24 @@
 
 import type { AstroChartContext } from "./chart-context.ts";
 import type { PublicChartFacts } from "./public-chart-facts.ts";
+import { getUnavailableExactField, isUnsupportedExactFieldKey } from "./unavailable-field-registry.ts";
 
 export type ExactChartFactAnswer = { matched: true; answer: string } | { matched: false };
 
 function normalizeQuestion(question: string): string {
   return question.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function inferUnsupportedExactFieldFromQuestion(question: string) {
+  const q = normalizeQuestion(question);
+  if (/\b(shadbala|shad bala|strength score)\b/.test(q)) return "shadbala.total";
+  if (/\b(kp significator|significators|significator list)\b/.test(q)) return "kp.significators";
+  if (/\b(varshaphal|varsha lagna|yearly chart lagna)\b/.test(q)) return "varshaphal.varshaLagna";
+  if (/\b(yogini|yogini dasha)\b/.test(q)) return "yogini.currentDasha";
+  if (/\b(chara dasha|jaimini chara)\b/.test(q)) return "chara.currentDasha";
+  if (/\b(lal kitab|lal kitab judgement|lal kitab says)\b/.test(q)) return "lalKitab.judgement";
+  if (/\b(sade sati|sade sati date|sade sati dates|exact sade sati|date table)\b/.test(q)) return "sadeSati.dateTable";
+  if (/\b(bindu matrix|ashtakavarga matrix|bav matrix|sarvashtakavarga matrix)\b/.test(q)) return "ashtakavarga.binduMatrix";
+  return null;
 }
 function unavailable(): ExactChartFactAnswer {
   return { matched: true, answer: "aadesh: I could not find that chart fact in your saved chart context." };
@@ -79,6 +92,11 @@ export function answerExactChartFactQuestion(input: { question: string; chartCon
 
 export function answerExactFactFromPublicFacts(question: string, facts: PublicChartFacts): ExactChartFactAnswer {
   const q = normalizeQuestion(question);
+  const unsupportedFieldKey = inferUnsupportedExactFieldFromQuestion(question);
+  if (unsupportedFieldKey && isUnsupportedExactFieldKey(unsupportedFieldKey)) {
+    const registry = getUnavailableExactField(unsupportedFieldKey);
+    if (registry) return { matched: true, answer: `aadesh: ${registry.safeMessage}` };
+  }
   const moonUnavailable = facts.unavailableFacts?.moonHouse;
   const nakshatraUnavailable = facts.unavailableFacts?.moonNakshatra ?? facts.unavailableFacts?.moonNakshatraPada;
   const currentMahadasha = facts.currentMahadasha ?? facts.mahadasha;
@@ -107,13 +125,6 @@ export function answerExactFactFromPublicFacts(question: string, facts: PublicCh
       ? answer(`aadesh: Your current Antardasha is ${currentMahadasha}-${currentAntardasha}.`)
       : unavailableExact("the deterministic Vimshottari calculation is not available for the current chart");
   }
-  if (/\bshadbala\b/.test(q)) return unsupportedExact("Shadbala");
-  if (/\bkp\b/.test(q) && /significator/.test(q)) return unsupportedExact("KP significator");
-  if (/\bvarshaphal\b/.test(q)) return unsupportedExact("Varshaphal");
-  if (/\byogini dasha\b/.test(q)) return unsupportedExact("Yogini Dasha");
-  if (/\bchara dasha\b/.test(q)) return unsupportedExact("Chara Dasha");
-  if (/\blal kitab\b/.test(q)) return unsupportedExact("Lal Kitab");
-  if (/\bsade sati\b/.test(q) && /(date|dates|when|start|end)/.test(q)) return unsupportedExact("detailed Sade Sati date");
-  if (/\bashtakavarga\b/.test(q) && /(bindu|matrix|matrixes)/.test(q)) return unsupportedExact("Ashtakavarga bindu matrix");
+  if (unsupportedFieldKey) return unsupportedExact(unsupportedFieldKey);
   return { matched: false };
 }

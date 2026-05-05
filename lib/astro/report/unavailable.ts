@@ -77,3 +77,16 @@ export function unavailableAstroValue(args: {
     message: args.message ?? defaultUnavailableMessage(args.reason, args.requiredModule, args.requiredChartPath),
   };
 }
+
+export function unavailableAstroValueFromExactField(args: {
+  requiredModule: string;
+  fieldKey: string;
+  message?: string;
+}): UnavailableAstroValue {
+  return unavailableAstroValue({
+    reason: 'module_not_implemented',
+    requiredModule: args.requiredModule,
+    requiredChartPath: args.fieldKey,
+    message: args.message,
+  });
+}

@@ -9,6 +9,7 @@ import type {
   AstroUnavailableReason,
   AstroUnavailableValue,
 } from './contracts.ts';
+import { makeUnavailableExactFieldValue } from '../unavailable-field-registry.ts';
 
 export const ASTRO_UNAVAILABLE_MODULE_IDS = {
   shadbala: 'shadbala',
@@ -39,6 +40,25 @@ export function makeUnavailableValue(args: MakeUnavailableValueArgs): AstroUnava
     requiredModule: args.requiredModule,
     fieldKey: args.fieldKey,
   };
+}
+
+export function makeUnsupportedExactUnavailableValue(args: {
+  requiredModule: string;
+  fieldKey: string;
+  reason?: AstroUnavailableReason;
+}): AstroUnavailableValue {
+  const exact = makeUnavailableExactFieldValue(args.fieldKey);
+  if (exact) {
+    return {
+      status: exact.status,
+      value: exact.value,
+      reason: exact.reason,
+      source: exact.source,
+      requiredModule: exact.requiredModule,
+      fieldKey: exact.fieldKey,
+    };
+  }
+  return makeUnavailableValue({ requiredModule: args.requiredModule, fieldKey: args.fieldKey, reason: args.reason ?? 'module_not_implemented' });
 }
 
 export type MakeUnavailableSectionArgs = {

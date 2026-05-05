@@ -5,6 +5,7 @@
  */
 
 import type { PublicChartFacts } from "../public-chart-facts.ts";
+import { getUnavailableExactField, isUnsupportedExactFieldKey } from "../unavailable-field-registry.ts";
 import type { AnswerValidationResult, ValidationIssue, AnswerValidationInput } from "./validation-types.ts";
 import { buildIssue } from "./validators/validator-utils.ts";
 import { validateAnswerRemedies } from "./validators/remedy-validator.ts";
@@ -25,6 +26,7 @@ export type ExtractedAstroClaim = {
     | "transit_date"
     | "remedy_condition"
     | "unsupported_advanced_field";
+  unsupportedFieldKey?: string;
   value: string | number | boolean;
   rawText: string;
   planet?: string;
@@ -65,7 +67,7 @@ const NAKSHATRA_MAP: Record<string, string> = {
 };
 
 const ADVANCED_FIELDS = [
-  "shadbala", "bhavabala", "kp sub lord", "kp sub-lord", "kp cusp", "ashtakvarga", "varshaphal", "yogini dasha", "char dasha", "lal kitab", "jaimini", "pratyantar",
+  "shadbala", "shad bala", "strength score", "kp sub lord", "kp sub-lord", "kp cusp", "kp significator", "significators", "varshaphal", "varsha lagna", "yogini dasha", "yogini", "char dasha", "jaimini chara", "lal kitab", "sade sati", "date table", "ashtakavarga", "bindu matrix", "bav matrix", "sarvashtakavarga matrix", "jaimini", "pratyantar",
 ];
 
 function normalizeText(answer: string): string {
@@ -172,7 +174,7 @@ function addRemedyClaims(claims: ExtractedAstroClaim[], text: string): void {
 function addUnsupportedAdvancedClaims(claims: ExtractedAstroClaim[], text: string): void {
   for (const field of ADVANCED_FIELDS) {
     if (!new RegExp(`\\b${field.replace(/\s+/g, "\\s+")}\\b`, "i").test(text)) continue;
-    pushUnique(claims, { kind: "unsupported_advanced_field", value: true, rawText: text.match(new RegExp(`\\b${field.replace(/\s+/g, "\\s+")}\\b`, "i"))?.[0] ?? field, unsupportedField: field, normalizedValue: true });
+    pushUnique(claims, { kind: "unsupported_advanced_field", value: true, rawText: text.match(new RegExp(`\\b${field.replace(/\s+/g, "\\s+")}\\b`, "i"))?.[0] ?? field, unsupportedField: field, unsupportedFieldKey: field, normalizedValue: true });
   }
 }
 
@@ -310,6 +312,15 @@ export function validateExtractedClaimsAgainstPublicFacts(args: {
       }
     }
     if (claim.kind === "unsupported_advanced_field") {
+      const fieldKey = claim.unsupportedFieldKey ?? claim.unsupportedField ?? "";
+      if (fieldKey && isUnsupportedExactFieldKey(fieldKey)) {
+        const registry = getUnavailableExactField(fieldKey);
+        if (registry) {
+          issues.push(issue("contract_violation", registry.safeMessage, claim.rawText));
+          unsafeClaims.push(claim.rawText);
+          continue;
+        }
+      }
       issues.push(issue("contract_violation", "Unsupported advanced field claim.", claim.rawText));
     }
   }

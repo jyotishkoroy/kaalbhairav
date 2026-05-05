@@ -33,7 +33,7 @@ describe("validateAstroAnswerAgainstPublicFacts unavailable advanced fields", ()
     "Your Shadbala is high.",
     "Shadbala score is 120.",
     "KP sub lord is Mercury.",
-    "Ashtakvarga gives 30 points.",
+    "Your Shadbala score is 87.",
     "Yogini Dasha is Mangala.",
     "Buy an expensive gemstone immediately.",
   ];

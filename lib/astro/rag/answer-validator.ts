@@ -140,10 +140,11 @@ export function validateRagAnswer(input?: Partial<AnswerValidationInput>): Answe
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
   const safetyCritical = issues.some((issue) => ["unsafe_claim", "medical_claim", "legal_claim", "financial_claim", "death_lifespan_claim", "gemstone_guarantee", "expensive_puja_pressure"].includes(issue.code));
   const wrongFactCritical = wrongFacts.length > 0 || issues.some((issue) => issue.code === "invented_timing" || issue.code === "wrong_chart_fact");
+  const unsupportedExactCritical = issues.some((issue) => issue.code === "contract_violation" && /unavailable/i.test(issue.message));
   const repairable = issues.some((issue) => ["missing_required_section", "missing_required_anchor", "generic_answer", "too_short", "does_not_answer_question", "accuracy_missing", "followup_missing"].includes(issue.code));
   const ok = strictFailureCount === 0 && score >= 75;
   const retryRecommended = !ok && (repairable || genericnessScore >= 0.65);
-  const fallbackRecommended = safetyCritical || wrongFactCritical || score < 55 || gradedSafetyDecisions.some((decision) => decision.action === "replace_answer");
+  const fallbackRecommended = safetyCritical || wrongFactCritical || unsupportedExactCritical || score < 55 || gradedSafetyDecisions.some((decision) => decision.action === "replace_answer");
 
   return {
     ok,
@@ -196,7 +197,11 @@ export function validateAstroAnswerAgainstPublicFacts(args: {
   unavailableFields?: Set<string>;
 }): AnswerValidationResult {
   const claims = extractAstroClaimsFromAnswer(args.answer);
-  return validateExtractedClaimsAgainstPublicFacts({ claims, publicFacts: args.publicFacts, unavailableFields: args.unavailableFields });
+  const unavailableFields = new Set(args.unavailableFields ?? []);
+  for (const [key, value] of Object.entries(args.publicFacts.unavailableFacts ?? {})) {
+    if (value?.status === "unavailable") unavailableFields.add(key);
+  }
+  return validateExtractedClaimsAgainstPublicFacts({ claims, publicFacts: args.publicFacts, unavailableFields });
 }
 
 export async function storeValidationResult(input: StoreValidationResultInput): Promise<{ ok: boolean; id?: string; error?: string }> {
