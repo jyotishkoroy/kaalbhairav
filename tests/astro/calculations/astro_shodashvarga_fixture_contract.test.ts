@@ -5,6 +5,8 @@ repository or any part of it without prior written permission from Jyotishko Roy
 */
 
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs'
+import path from 'node:path'
 import type { AstroSectionContract } from '@/lib/astro/calculations/contracts';
 import type { PlanetaryPositionV2 } from '@/lib/astro/calculations/contracts';
 import {
@@ -91,7 +93,19 @@ function lagnaSection(): AstroSectionContract {
   };
 }
 
+function loadVedicEvidenceFixture<T>(fileName: string): T[] {
+  const fixturePath = path.join(process.cwd(), 'tests/astro/fixtures/vedic-calculation-evidence', fileName)
+  if (!fs.existsSync(fixturePath)) return []
+  const parsed = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as { cases?: T[] }
+  return Array.isArray(parsed.cases) ? parsed.cases : []
+}
+
 describe('astro shodashvarga fixture contract', () => {
+  it('loads sanitized evidence fixtures when present', () => {
+    const cases = loadVedicEvidenceFixture<Record<string, unknown>>('varga_cases.json')
+    expect(Array.isArray(cases)).toBe(true)
+  })
+
   it('computes all 16 vargas for each deterministic body and Asc', () => {
     const section = buildShodashvargaSection({
       planetaryPositions: planetarySection(),

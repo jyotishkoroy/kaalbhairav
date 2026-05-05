@@ -63,3 +63,12 @@ generated/
 tmp/astro-source/
 .aider*
 artifacts/auth/
+vedic_reverse_engineering_evidence.zip
+calculations2.zip
+allAppFiles.zip
+charts*.zip
+*.pdf
+raw PDFs
+astro_package.zip
+*.jsonl
+generated/astro-v2-live-bank-check/live-check-results.jsonl

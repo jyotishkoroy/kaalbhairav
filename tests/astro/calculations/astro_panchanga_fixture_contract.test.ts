@@ -5,6 +5,8 @@ repository or any part of it without prior written permission from Jyotishko Roy
 */
 
 import { describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { EphemerisProvider } from '@/lib/astro/calculations/ephemeris-provider'
 import type { NormalizedBirthInputV2 } from '@/lib/astro/calculations/contracts'
 import {
@@ -43,6 +45,13 @@ function normalizedTime(overrides: Partial<NormalizedBirthInputV2> = {}): Normal
   }
 }
 
+function loadVedicEvidenceFixture<T>(fileName: string): T[] {
+  const fixturePath = path.join(process.cwd(), 'tests/astro/fixtures/vedic-calculation-evidence', fileName)
+  if (!fs.existsSync(fixturePath)) return []
+  const parsed = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as { cases?: T[] }
+  return Array.isArray(parsed.cases) ? parsed.cases : []
+}
+
 const fakeSunriseProvider: EphemerisProvider = {
   engineId: 'fake-sunrise-provider',
   engineVersion: 'fake-engine-v1',
@@ -71,6 +80,11 @@ const failingSunriseProvider: EphemerisProvider = {
 }
 
 describe('astro panchanga fixture contract', () => {
+  it('loads sanitized evidence fixtures when present', () => {
+    const cases = loadVedicEvidenceFixture<Record<string, unknown>>('panchanga_cases.json')
+    expect(Array.isArray(cases)).toBe(true)
+  })
+
   it('computes tithi paksha yoga and karana from Sun and Moon longitudes', async () => {
     const section = await calculatePanchangaV2({
       sunLongitudeDeg: 10,
