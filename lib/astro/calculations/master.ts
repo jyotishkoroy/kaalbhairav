@@ -25,6 +25,7 @@ import { calculateNavamsaChart } from './navamsa.ts'
 import { buildD9ChartSectionFromShodashvarga, buildShodashvargaSection } from './shodashvarga.ts'
 import { buildShodashvargaBhavSection } from './varga-bhav.ts'
 import { calculateVimshottari, calculateVimshottariDashaV2 } from './vimshottari.ts'
+import { calculateKpSection } from './kp.ts'
 import { calculatePanchangResult, DEFAULT_PANCHANG_CONVENTION } from './panchang.ts'
 import { calculateGrahaDrishti } from './aspects.ts'
 import { calculateYogas } from './yogas.ts'
@@ -325,6 +326,27 @@ export async function calculateMasterAstroOutput(args: {
       reason: 'shodashvarga_unavailable',
       fields: {},
     }
+  }
+
+  if (ASTRO_CALC_INTEGRATION_ENABLED && sections) {
+    ;(sections as Record<string, unknown>).kp = await calculateKpSection({
+      jdUtExact: jdResult.jd_ut,
+      normalizedTime: panchangaV2Time,
+      ephemerisProvider: {
+        engineId: 'swiss-ephemeris',
+        engineVersion: getSweVersion(),
+        ephemerisVersion: 'unknown',
+        async calculateTropicalPositions() {
+          return [];
+        },
+      },
+      ayanamshaProvider: {
+        engineId: 'swiss-ephemeris',
+        calculateAyanamshaDeg() {
+          return ayanamsaResult.value_degrees;
+        },
+      },
+    })
   }
 
   const output = {

@@ -186,6 +186,9 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
   const d9ChartCompat = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).d9Chart
     : (output as MaybeObject)?.d9Chart
+  const kp = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
+    ? toRecord((output as MaybeObject)?.sections).kp
+    : (output as MaybeObject)?.kp
   const vimshottari = expanded_sections?.vimshottari_dasha ?? (output as MaybeObject)?.vimshottari_dasha
   const transits = expanded_sections?.daily_transits ?? (output as MaybeObject)?.daily_transits
   const timeFacts = (output as MaybeObject)?.runtime_clock ?? (output as MaybeObject)?.prediction_ready_context
@@ -203,6 +206,7 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
     shodashvarga: isTruthyObject(shodashvarga) ? sectionComputed(engine, output, shodashvarga) : sectionUnavailable(engine, output, 'shodashvarga_not_available'),
     shodashvargaBhav: isTruthyObject(shodashvargaBhav) ? sectionComputed(engine, output, shodashvargaBhav) : sectionUnavailable(engine, output, 'shodashvarga_bhav_not_available'),
     vimshottari: isTruthyObject(vimshottari) ? sectionComputed(engine, output, vimshottari) : sectionUnavailable(engine, output, 'vimshottari_not_available'),
+    kp: isTruthyObject(kp) ? sectionComputed(engine, output, kp) : sectionUnavailable(engine, output, 'kp_not_available'),
     transits: isTruthyObject(transits) ? sectionComputed(engine, output, transits) : sectionUnavailable(engine, output, 'transits_not_available'),
     advanced: {
       outerPlanets: sectionUnavailable(engine, output, 'outer_planets_not_enabled_for_all_engine_modes'),
