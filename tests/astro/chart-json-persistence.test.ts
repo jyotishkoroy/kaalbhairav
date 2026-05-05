@@ -72,9 +72,47 @@ describe('persistCanonicalChartJsonV2', () => {
       p_input_hash: 'input-hash',
       p_settings_hash: 'settings-hash',
       p_engine_version: 'engine',
+      p_ephemeris_version: 'ephemeris',
+      p_ayanamsha: 'lahiri',
+      p_house_system: 'whole_sign',
     }))
     expect(result).toEqual({ chartVersionId: 'chart-1', chartVersion: 3 })
   })
+
+  it('backfills required metadata from deterministic defaults before RPC', async () => {
+    rpc.mockResolvedValue({ data: [{ chart_version_id: 'chart-1', chart_version: 3 }], error: null })
+    const chartJson = makeChartJson({
+      engineVersion: '',
+      ephemerisVersion: '',
+      ayanamsha: '',
+      houseSystem: '',
+    })
+    await persistCanonicalChartJsonV2({
+      supabase: { rpc },
+      userId: 'user-1',
+      profileId: 'profile-1',
+      chartJson,
+      inputHash: 'input-hash',
+      settingsHash: 'settings-hash',
+      engineVersion: 'engine',
+    })
+
+    const [, payload] = rpc.mock.calls[0] ?? []
+    expect(payload).toMatchObject({
+      p_ephemeris_version: 'stub',
+      p_ayanamsha: 'lahiri',
+      p_house_system: 'whole_sign',
+      p_chart_json: {
+        metadata: {
+          engineVersion: 'v2.0.0-stub',
+          ephemerisVersion: 'stub',
+          ayanamsha: 'lahiri',
+          houseSystem: 'whole_sign',
+        },
+      },
+    })
+  })
+
 
   it('parses object-shaped RPC data', async () => {
     rpc.mockResolvedValue({ data: { chart_version_id: 'chart-2', chart_version: 7 }, error: null })

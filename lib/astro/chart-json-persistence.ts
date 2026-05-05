@@ -6,6 +6,10 @@ repository or any part of it without prior written permission from Jyotishko Roy
 
 import { buildProfileExpandedSectionsFromStoredChartJson } from '@/lib/astro/profile-chart-json-adapter'
 import { assertCanonicalChartJsonV2, type CanonicalChartJsonV2 } from '@/lib/astro/chart-json-v2'
+import {
+  ASTRO_DETERMINISTIC_ENGINE_VERSION,
+  ASTRO_DETERMINISTIC_EPHEMERIS_VERSION,
+} from '@/lib/astro/engine/version'
 
 export type PersistCanonicalChartJsonArgs = {
   supabase: {
@@ -25,6 +29,50 @@ export type PersistCanonicalChartJsonArgs = {
 export type PersistCanonicalChartJsonResult = {
   chartVersionId: string
   chartVersion: number
+}
+
+type RequiredChartVersionMetadata = {
+  engineVersion: string
+  ephemerisVersion: string
+  ayanamsha: string
+  houseSystem: string
+}
+
+function requireChartVersionMetadata(chartJson: CanonicalChartJsonV2): RequiredChartVersionMetadata {
+  const metadata = chartJson.metadata ?? {}
+
+  const engineVersion =
+    typeof metadata.engineVersion === 'string' && metadata.engineVersion.trim()
+      ? metadata.engineVersion.trim()
+      : ASTRO_DETERMINISTIC_ENGINE_VERSION
+
+  const ephemerisVersion =
+    typeof metadata.ephemerisVersion === 'string' && metadata.ephemerisVersion.trim()
+      ? metadata.ephemerisVersion.trim()
+      : ASTRO_DETERMINISTIC_EPHEMERIS_VERSION
+
+  const ayanamsha =
+    typeof metadata.ayanamsha === 'string' && metadata.ayanamsha.trim()
+      ? metadata.ayanamsha.trim()
+      : 'lahiri'
+
+  const houseSystem =
+    typeof metadata.houseSystem === 'string' && metadata.houseSystem.trim()
+      ? metadata.houseSystem.trim()
+      : 'whole_sign'
+
+  const missing = [
+    ['engineVersion', engineVersion],
+    ['ephemerisVersion', ephemerisVersion],
+    ['ayanamsha', ayanamsha],
+    ['houseSystem', houseSystem],
+  ].filter(([, value]) => !value)
+
+  if (missing.length > 0) {
+    throw new Error(`missing_chart_metadata:${missing.map(([key]) => key).join(',')}`)
+  }
+
+  return { engineVersion, ephemerisVersion, ayanamsha, houseSystem }
 }
 
 export function isAvailableDisplaySection(value: unknown): boolean {
@@ -121,6 +169,17 @@ export async function persistCanonicalChartJsonV2(
   }
 
   const chartJson = assertCanonicalChartJsonV2(args.chartJson)
+  const requiredMetadata = requireChartVersionMetadata(chartJson)
+  const chartJsonForPersistence: CanonicalChartJsonV2 = {
+    ...chartJson,
+    metadata: {
+      ...chartJson.metadata,
+      engineVersion: requiredMetadata.engineVersion,
+      ephemerisVersion: requiredMetadata.ephemerisVersion,
+      ayanamsha: requiredMetadata.ayanamsha,
+      houseSystem: requiredMetadata.houseSystem,
+    },
+  }
 
   if (chartJson.metadata.chartVersionId || chartJson.metadata.chartVersion) {
     throw new Error('chartVersionId/chartVersion must be assigned by persistence RPC, not prefilled.')
@@ -130,11 +189,14 @@ export async function persistCanonicalChartJsonV2(
     p_user_id: args.userId,
     p_profile_id: args.profileId,
     p_calculation_id: args.calculationId ?? null,
-    p_chart_json: chartJson,
+    p_chart_json: chartJsonForPersistence,
     p_prediction_summary: args.predictionSummary ?? null,
     p_input_hash: args.inputHash,
     p_settings_hash: args.settingsHash,
     p_engine_version: args.engineVersion,
+    p_ephemeris_version: requiredMetadata.ephemerisVersion,
+    p_ayanamsha: requiredMetadata.ayanamsha,
+    p_house_system: requiredMetadata.houseSystem,
     p_schema_version: 'chart_json_v2',
     p_audit_payload: args.auditPayload ?? {},
   })
