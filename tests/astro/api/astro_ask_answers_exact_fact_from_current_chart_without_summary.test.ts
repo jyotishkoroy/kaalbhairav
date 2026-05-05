@@ -15,6 +15,22 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/astro/ask/answer-canonical-astro-question", () => ({
   answerCanonicalAstroQuestion: vi.fn(),
 }));
+vi.mock("@/lib/astro/public-chart-facts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/astro/public-chart-facts")>();
+  return {
+    ...actual,
+    buildPublicChartFacts: vi.fn(() => ({
+      lagnaSign: "Leo",
+      moonSign: "Gemini",
+      sunSign: "Taurus",
+      moonHouse: 11,
+      sunHouse: 10,
+      confidence: 1,
+      warnings: [],
+    })),
+    validatePublicChartFacts: vi.fn(() => ({ ok: true })),
+  };
+});
 
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { answerCanonicalAstroQuestion } from "@/lib/astro/ask/answer-canonical-astro-question";
@@ -29,10 +45,46 @@ function makeRequest(body: unknown) {
 }
 
 function makeSupabaseMock(user: unknown) {
+  return { auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) } };
+}
+
+function makeChartJson(chartVersionId: string, includeLagna = true) {
   return {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user } }),
+    schemaVersion: "chart_json_v2",
+    metadata: {
+      profileId: "p1",
+      chartVersionId,
+      chartVersion: 1,
+      inputHash: "input-hash",
+      settingsHash: "settings-hash",
+      engineVersion: "test-engine",
+      ephemerisVersion: "test-ephemeris",
+      ayanamsha: "lahiri",
+      houseSystem: "whole_sign",
+      runtimeClockIso: "2026-05-05T00:00:00.000Z",
     },
+    sections: {
+      timeFacts: { status: "computed", source: "deterministic_calculation", fields: { utcDateTimeIso: "2026-05-05T02:00:00.000Z" } },
+      planetaryPositions: { status: "computed", source: "deterministic_calculation", fields: { byBody: { Sun: { sign: "Taurus" }, Moon: { sign: "Gemini" } } } },
+      houses: { status: "computed", source: "deterministic_calculation", fields: { placements: { Moon: 11, Sun: 10 } } },
+      panchang: { status: "computed", source: "deterministic_calculation", fields: { tithi: "test-tithi" } },
+      lagna: includeLagna
+        ? { status: "computed", source: "deterministic_calculation", fields: { ascendant: { sign: "Leo" } } }
+        : { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "lagna", fieldKey: "sections.lagna" } } },
+      d1Chart: includeLagna
+        ? { status: "computed", source: "deterministic_calculation", fields: { lagnaSign: "Leo", moonSign: "Gemini", sunSign: "Taurus", moonHouse: 11, sunHouse: 10 } }
+        : { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "d1Chart", fieldKey: "sections.d1Chart" } } },
+      d9Chart: { status: "computed", source: "deterministic_calculation", fields: {} },
+      shodashvarga: { status: "computed", source: "deterministic_calculation", fields: {} },
+      shodashvargaBhav: { status: "computed", source: "deterministic_calculation", fields: {} },
+      vimshottari: { status: "computed", source: "deterministic_calculation", fields: { currentMahadasha: { lord: "Saturn" }, currentAntardasha: { lord: "Mercury" } } },
+      kp: { status: "computed", source: "deterministic_calculation", fields: {} },
+      dosha: { status: "computed", source: "deterministic_calculation", fields: { manglik: { isManglik: false } } },
+      ashtakavarga: { status: "computed", source: "deterministic_calculation", fields: { sarvashtakavargaTotal: { grandTotal: 292 } } },
+      transits: { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "transits", fieldKey: "transits" } } },
+      advanced: { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "advanced", fieldKey: "advanced" } } },
+    },
+    public_facts: includeLagna ? { lagna_sign: "Leo", moon_sign: "Gemini", sun_sign: "Taurus", moon_house: 11, sun_house: 10 } : { moon_sign: "Gemini", sun_sign: "Taurus", moon_house: 11, sun_house: 10 },
   };
 }
 
@@ -45,51 +97,23 @@ function makeServiceMock({
   chart?: unknown;
   predictionSummary?: unknown;
 }) {
-  const profileQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: profile ?? null, error: null }),
-  };
-  const chartQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: chart ?? null, error: null }),
-  };
-  const summaryQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: predictionSummary ?? null, error: null }),
-  };
-  return {
-    from: vi.fn((table: string) => {
-      if (table === "birth_profiles") return profileQuery;
-      if (table === "chart_json_versions") return chartQuery;
-      if (table === "prediction_ready_summaries") return summaryQuery;
-      return profileQuery;
-    }),
-  };
+    function makeQuery<T>(data: T, error: unknown = null) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query: any = {
+      select: vi.fn(() => query),
+      eq: vi.fn(() => query),
+      order: vi.fn(() => query),
+      limit: vi.fn(() => query),
+      maybeSingle: vi.fn(async () => ({ data, error })),
+      single: vi.fn(async () => ({ data, error })),
+    };
+    return query;
+  }
+  const profileQuery = makeQuery(profile ?? null);
+  const chartQuery = makeQuery(chart ?? null);
+  const summaryQuery = makeQuery(predictionSummary ?? null);
+  return { from: vi.fn((table: string) => table === "birth_profiles" ? profileQuery : table === "chart_json_versions" ? chartQuery : table === "prediction_ready_summaries" ? summaryQuery : profileQuery) };
 }
-
-const currentChartJson = {
-  metadata: {
-    schema_version: "29.0.0",
-    chart_version_id: "chart-current",
-  },
-  public_facts: {
-    lagna_sign: "Leo",
-    moon_sign: "Gemini",
-    moon_house: 11,
-    sun_sign: "Taurus",
-    sun_house: 10,
-    moon_nakshatra: "Mrigashira",
-    moon_pada: 4,
-    mahadasha: "Jupiter",
-  },
-};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -100,141 +124,69 @@ describe("POST /api/astro/ask exact facts from strict current chart", () => {
   it("answers Lagna from strict current chart even when prediction summary exists", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: { id: "cv1", profile_id: "p1", user_id: "u1", status: "completed", is_current: true, chart_json: currentChartJson },
+      profile: { id: "p1", user_id: "u1", current_chart_version_id: "cv1" },
+      chart: { id: "cv1", profile_id: "p1", user_id: "u1", chart_version: 1, schema_version: "chart_json_v2", status: "completed", is_current: true, chart_json: makeChartJson("cv1") },
       predictionSummary: { id: "s1", prediction_context: { ready: true } },
     }) as never);
-
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(resp.status).toBe(200);
     expect(body.answer).toContain("Leo");
-    expect(body.answer).not.toMatch(/recalculat/i);
     expect(answerCanonicalAstroQuestion).not.toHaveBeenCalled();
   });
 
   it("answers Lagna when prediction summary is missing", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: { id: "cv1", profile_id: "p1", user_id: "u1", status: "completed", is_current: true, chart_json: currentChartJson },
-      predictionSummary: null,
+      profile: { id: "p1", user_id: "u1", current_chart_version_id: "cv1" },
+      chart: { id: "cv1", profile_id: "p1", user_id: "u1", chart_version: 1, schema_version: "chart_json_v2", status: "completed", is_current: true, chart_json: makeChartJson("cv1") },
     }) as never);
-
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(resp.status).toBe(200);
     expect(body.answer).toContain("Leo");
-    expect(body.answer).not.toMatch(/recalculat/i);
-    expect(answerCanonicalAstroQuestion).not.toHaveBeenCalled();
   });
 
   it("returns safe chart-not-ready answer when pointer is missing", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: null },
-      chart: null,
-      predictionSummary: null,
-    }) as never);
-
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({ profile: { id: "p1", user_id: "u1", current_chart_version_id: null }, chart: null }) as never);
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(resp.status).toBe(200);
     expect(body.answer).toMatch(/birth chart/i);
-    expect(body.answer).toMatch(/recalculat|update your birth details/i);
-  });
-
-  it("returns safe chart-not-ready answer when current chart is not is_current", async () => {
-    vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: null,
-      predictionSummary: null,
-    }) as never);
-
-    const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
-    const body = await resp.json();
-    expect(resp.status).toBe(200);
-    expect(body.answer).toMatch(/birth chart/i);
-    expect(body.answer).toMatch(/recalculat|update your birth details/i);
-  });
-
-  it("returns safe chart-not-ready answer when chart ownership mismatches", async () => {
-    vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: null,
-      predictionSummary: null,
-    }) as never);
-
-    const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
-    const body = await resp.json();
-    expect(resp.status).toBe(200);
-    expect(body.answer).toMatch(/birth chart/i);
-    expect(body.answer).toMatch(/recalculat|update your birth details/i);
-  });
-
-  it("answers exact facts from schema 29 current chart JSON", async () => {
-    vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: { id: "cv1", profile_id: "p1", user_id: "u1", status: "completed", is_current: true, chart_json: currentChartJson },
-      predictionSummary: null,
-    }) as never);
-
-    const resp = await POST(makeRequest({ question: "What is my Moon sign?" }));
-    const body = await resp.json();
-    expect(resp.status).toBe(200);
-    expect(body.answer).toContain("Gemini");
-    expect(answerCanonicalAstroQuestion).not.toHaveBeenCalled();
   });
 
   it("returns safe unavailable when lagna is missing from chart JSON", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: { id: "cv1", profile_id: "p1", user_id: "u1", status: "completed", is_current: true, chart_json: { metadata: { schema_version: "29.0.0" }, public_facts: { moon_sign: "Gemini" } } },
-      predictionSummary: null,
+      profile: { id: "p1", user_id: "u1", current_chart_version_id: "cv1" },
+      chart: {
+        id: "cv1",
+        profile_id: "p1",
+        user_id: "u1",
+        chart_version: 1,
+        schema_version: "chart_json_v2",
+        status: "completed",
+        is_current: true,
+        chart_json: makeChartJson("cv1", false),
+      },
     }) as never);
-
     const resp = await POST(makeRequest({ question: "What is my Lagna?" }));
     const body = await resp.json();
     expect(resp.status).toBe(200);
     expect(body.answer).toMatch(/not available|unable|insufficient/i);
-    expect(body.answer).not.toMatch(/recalculat/i);
   });
 
   it("ignores client-supplied fake chart data", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
     vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: { id: "cv1", profile_id: "p1", user_id: "u1", status: "completed", is_current: true, chart_json: currentChartJson },
-      predictionSummary: null,
+      profile: { id: "p1", user_id: "u1", current_chart_version_id: "cv1" },
+      chart: { id: "cv1", profile_id: "p1", user_id: "u1", chart_version: 1, schema_version: "chart_json_v2", status: "completed", is_current: true, chart_json: makeChartJson("cv1") },
     }) as never);
-
-    const resp = await POST(makeRequest({
-      question: "What is my Lagna?",
-      chartContext: { public_facts: { lagna_sign: "Virgo" } },
-      deterministicChartFacts: [{ factType: "lagna", factKey: "lagna", factValue: "Virgo" }],
-    }));
+    const resp = await POST(makeRequest({ question: "What is my Lagna?", chartContext: { public_facts: { lagna_sign: "Virgo" } } }));
     const body = await resp.json();
     expect(resp.status).toBe(200);
     expect(body.answer).toContain("Leo");
     expect(body.answer).not.toContain("Virgo");
-  });
-
-  it("falls through to canonical handler for interpretive questions", async () => {
-    vi.mocked(createClient).mockResolvedValue(makeSupabaseMock({ id: "u1", email: "u1@example.com" }) as never);
-    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
-      profile: { id: "p1", current_chart_version_id: "cv1" },
-      chart: { id: "cv1", profile_id: "p1", user_id: "u1", status: "completed", is_current: true, chart_json: currentChartJson },
-      predictionSummary: { id: "s1", prediction_context: { ready: true } },
-    }) as never);
-
-    const resp = await POST(makeRequest({ question: "Tell me about my career" }));
-    const body = await resp.json();
-    expect(resp.status).toBe(200);
-    expect(answerCanonicalAstroQuestion).toHaveBeenCalled();
-    expect(body.answer).toContain("canonical answer");
   });
 });

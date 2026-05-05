@@ -1,10 +1,31 @@
-/**
- * Copyright (c) 2026 Jyotishko Roy.
- * Proprietary and confidential. All rights reserved.
- * Project: tarayai — https://tarayai.com
- */
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { buildProfileExpandedSectionsFromStoredChartJson } from '@/lib/astro/profile-chart-json-adapter'
+import { assertCanonicalChartJsonV2, type CanonicalChartJsonV2 } from '@/lib/astro/chart-json-v2'
+
+export type PersistCanonicalChartJsonArgs = {
+  supabase: {
+    rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+  }
+  userId: string
+  profileId: string
+  calculationId?: string | null
+  chartJson: CanonicalChartJsonV2
+  predictionSummary?: Record<string, unknown> | null
+  inputHash: string
+  settingsHash: string
+  engineVersion: string
+  auditPayload?: Record<string, unknown>
+}
+
+export type PersistCanonicalChartJsonResult = {
+  chartVersionId: string
+  chartVersion: number
+}
 
 export function isAvailableDisplaySection(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
@@ -86,4 +107,73 @@ export function mergeAvailableJyotishSectionsIntoChartJson(
   }
 
   return merged
+}
+
+export async function persistCanonicalChartJsonV2(
+  args: PersistCanonicalChartJsonArgs,
+): Promise<PersistCanonicalChartJsonResult> {
+  if (!args.userId) {
+    throw new Error('userId is required.')
+  }
+
+  if (!args.profileId) {
+    throw new Error('profileId is required.')
+  }
+
+  const chartJson = assertCanonicalChartJsonV2(args.chartJson)
+
+  if (chartJson.metadata.chartVersionId || chartJson.metadata.chartVersion) {
+    throw new Error('chartVersionId/chartVersion must be assigned by persistence RPC, not prefilled.')
+  }
+
+  const { data, error } = await args.supabase.rpc('persist_and_promote_current_chart_version', {
+    p_user_id: args.userId,
+    p_profile_id: args.profileId,
+    p_calculation_id: args.calculationId ?? null,
+    p_chart_json: chartJson,
+    p_prediction_summary: args.predictionSummary ?? null,
+    p_input_hash: args.inputHash,
+    p_settings_hash: args.settingsHash,
+    p_engine_version: args.engineVersion,
+    p_schema_version: 'chart_json_v2',
+    p_audit_payload: args.auditPayload ?? {},
+  })
+
+  if (error) {
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : 'Failed to persist canonical chart JSON.',
+    )
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+
+  if (!row || typeof row !== 'object') {
+    throw new Error('Persistence RPC returned no result.')
+  }
+
+  const persisted = row as {
+    chart_version_id?: unknown
+    chartVersionId?: unknown
+    chart_version?: unknown
+    chartVersion?: unknown
+  }
+  const chartVersionId = persisted.chart_version_id ?? persisted.chartVersionId
+  const chartVersion = persisted.chart_version ?? persisted.chartVersion
+
+  if (typeof chartVersionId !== 'string' || chartVersionId.length === 0) {
+    throw new Error('Persistence RPC did not return chart_version_id.')
+  }
+
+  if (typeof chartVersion !== 'number' || !Number.isInteger(chartVersion) || chartVersion <= 0) {
+    throw new Error('Persistence RPC did not return a positive chart_version.')
+  }
+
+  return {
+    chartVersionId,
+    chartVersion,
+  }
 }

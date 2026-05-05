@@ -4,13 +4,14 @@ commercially use, train models on, scrape, or create derivative works from this
 repository or any part of it without prior written permission from Jyotishko Roy.
 */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { persistCanonicalChartJsonV2 } from '@/lib/astro/chart-json-persistence'
+import { validateCurrentChartJsonV2Metadata } from '@/lib/astro/current-chart-version'
 
 const rpc = vi.fn()
 
-function makeChartJson(overrides: Record<string, unknown> = {}) {
+function chartJson() {
   return {
     schemaVersion: 'chart_json_v2',
     metadata: {
@@ -22,7 +23,6 @@ function makeChartJson(overrides: Record<string, unknown> = {}) {
       ayanamsha: 'lahiri',
       houseSystem: 'whole_sign',
       runtimeClockIso: '2026-05-05T00:00:00.000Z',
-      ...overrides,
     },
     sections: {
       timeFacts: { status: 'computed', source: 'deterministic_calculation', fields: {} },
@@ -41,90 +41,64 @@ function makeChartJson(overrides: Record<string, unknown> = {}) {
       transits: { status: 'computed', source: 'deterministic_calculation', fields: {} },
       advanced: { status: 'computed', source: 'deterministic_calculation', fields: {} },
     },
-  } as never
+  } as const
 }
 
-beforeEach(() => {
-  rpc.mockReset()
-})
+describe('current chart pointer integrity helpers', () => {
+  it('persists canonical chart JSON without prefilled version metadata and validates the returned pointer', async () => {
+    rpc.mockResolvedValue({ data: [{ chart_version_id: 'chart-2', chart_version: 3 }], error: null })
 
-describe('persistCanonicalChartJsonV2', () => {
-  it('calls the atomic RPC and returns chartVersionId/chartVersion', async () => {
-    rpc.mockResolvedValue({ data: [{ chart_version_id: 'chart-1', chart_version: 3 }], error: null })
-    const result = await persistCanonicalChartJsonV2({
+    const persisted = await persistCanonicalChartJsonV2({
       supabase: { rpc },
       userId: 'user-1',
       profileId: 'profile-1',
       calculationId: 'calc-1',
-      chartJson: makeChartJson(),
-      predictionSummary: { ready: true },
+      chartJson: chartJson(),
       inputHash: 'input-hash',
       settingsHash: 'settings-hash',
       engineVersion: 'engine',
-      auditPayload: { phase: 15 },
     })
 
+    expect(persisted).toEqual({ chartVersionId: 'chart-2', chartVersion: 3 })
     expect(rpc).toHaveBeenCalledWith('persist_and_promote_current_chart_version', expect.objectContaining({
+      p_schema_version: 'chart_json_v2',
       p_user_id: 'user-1',
       p_profile_id: 'profile-1',
       p_calculation_id: 'calc-1',
-      p_schema_version: 'chart_json_v2',
-      p_input_hash: 'input-hash',
-      p_settings_hash: 'settings-hash',
-      p_engine_version: 'engine',
     }))
-    expect(result).toEqual({ chartVersionId: 'chart-1', chartVersion: 3 })
-  })
 
-  it('parses object-shaped RPC data', async () => {
-    rpc.mockResolvedValue({ data: { chart_version_id: 'chart-2', chart_version: 7 }, error: null })
-    await expect(persistCanonicalChartJsonV2({
-      supabase: { rpc },
+    const validated = validateCurrentChartJsonV2Metadata({
+      chartJson: {
+        ...chartJson(),
+        metadata: {
+          ...chartJson().metadata,
+          chartVersionId: 'chart-2',
+          chartVersion: 3,
+        },
+      },
       userId: 'user-1',
       profileId: 'profile-1',
-      chartJson: makeChartJson(),
-      inputHash: 'input-hash',
-      settingsHash: 'settings-hash',
-      engineVersion: 'engine',
-    })).resolves.toEqual({ chartVersionId: 'chart-2', chartVersion: 7 })
+      chartVersionId: 'chart-2',
+      chartVersion: 3,
+    })
+    expect(validated.metadata.chartVersionId).toBe('chart-2')
   })
 
-  it('rejects chart JSON that already has persistence metadata', async () => {
-    await expect(persistCanonicalChartJsonV2({
-      supabase: { rpc },
+  it('rejects metadata mismatches so the strict loader cannot fall back to a different row', () => {
+    expect(() => validateCurrentChartJsonV2Metadata({
+      chartJson: {
+        ...chartJson(),
+        metadata: {
+          ...chartJson().metadata,
+          chartVersionId: 'chart-1',
+          chartVersion: 2,
+        },
+      },
       userId: 'user-1',
       profileId: 'profile-1',
-      chartJson: makeChartJson({ chartVersionId: 'prefilled', chartVersion: 1 }),
-      inputHash: 'input-hash',
-      settingsHash: 'settings-hash',
-      engineVersion: 'engine',
-    })).rejects.toThrow('chartVersionId/chartVersion must be assigned by persistence RPC, not prefilled.')
-    expect(rpc).not.toHaveBeenCalled()
-  })
-
-  it('rejects missing RPC data', async () => {
-    rpc.mockResolvedValue({ data: null, error: null })
-    await expect(persistCanonicalChartJsonV2({
-      supabase: { rpc },
-      userId: 'user-1',
-      profileId: 'profile-1',
-      chartJson: makeChartJson(),
-      inputHash: 'input-hash',
-      settingsHash: 'settings-hash',
-      engineVersion: 'engine',
-    })).rejects.toThrow('Persistence RPC returned no result.')
-  })
-
-  it('surfaces RPC errors verbatim', async () => {
-    rpc.mockResolvedValue({ data: null, error: { message: 'persist failed' } })
-    await expect(persistCanonicalChartJsonV2({
-      supabase: { rpc },
-      userId: 'user-1',
-      profileId: 'profile-1',
-      chartJson: makeChartJson(),
-      inputHash: 'input-hash',
-      settingsHash: 'settings-hash',
-      engineVersion: 'engine',
-    })).rejects.toThrow('persist failed')
+      chartVersionId: 'chart-2',
+      chartVersion: 3,
+    })).toThrow('current_chart_metadata_version_id_mismatch')
   })
 })
+

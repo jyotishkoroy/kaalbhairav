@@ -10,6 +10,55 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { loadCurrentAstroChartForUser } from "@/lib/astro/current-chart-version";
 
+function makeCanonicalChartJson(chartVersionId: string, lagnaSign: string) {
+  return {
+    schemaVersion: "chart_json_v2",
+    metadata: {
+      profileId: "p1",
+      chartVersionId,
+      chartVersion: lagnaSign === "Leo" ? 1 : 2,
+      inputHash: "input-hash",
+      settingsHash: "settings-hash",
+      engineVersion: "test-engine",
+      ephemerisVersion: "test-ephemeris",
+      ayanamsha: "lahiri",
+      houseSystem: "whole_sign",
+      runtimeClockIso: "2026-05-05T00:00:00.000Z",
+    },
+    sections: {
+      timeFacts: { status: "computed", source: "deterministic_calculation", fields: { utcDateTimeIso: "2026-05-05T02:00:00.000Z" } },
+      planetaryPositions: { status: "computed", source: "deterministic_calculation", fields: { byBody: { Sun: { sign: "Taurus" }, Moon: { sign: "Gemini" } } } },
+      lagna: { status: "computed", source: "deterministic_calculation", fields: { ascendant: { sign: lagnaSign } } },
+      houses: { status: "computed", source: "deterministic_calculation", fields: { placements: { Moon: lagnaSign === "Leo" ? 11 : 10, Sun: lagnaSign === "Leo" ? 10 : 9 } } },
+      panchang: { status: "computed", source: "deterministic_calculation", fields: { tithi: "test-tithi" } },
+      d1Chart: { status: "computed", source: "deterministic_calculation", fields: { lagnaSign, moonSign: "Gemini", moonHouse: lagnaSign === "Leo" ? 11 : 10 } },
+      d9Chart: { status: "computed", source: "deterministic_calculation", fields: {} },
+      shodashvarga: { status: "computed", source: "deterministic_calculation", fields: {} },
+      shodashvargaBhav: { status: "computed", source: "deterministic_calculation", fields: {} },
+      vimshottari: { status: "computed", source: "deterministic_calculation", fields: { currentMahadasha: { lord: "Saturn" } } },
+      kp: { status: "computed", source: "deterministic_calculation", fields: {} },
+      dosha: { status: "computed", source: "deterministic_calculation", fields: { manglik: { isManglik: false } } },
+      ashtakavarga: { status: "computed", source: "deterministic_calculation", fields: { sarvashtakavargaTotal: { grandTotal: 292 } } },
+      transits: { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "transits", fieldKey: "transits" } } },
+      advanced: { status: "unavailable", source: "none", reason: "insufficient_birth_data", fields: { value: { status: "unavailable", value: null, reason: "insufficient_birth_data", source: "none", requiredModule: "advanced", fieldKey: "advanced" } } },
+    },
+    public_facts: { lagna_sign: lagnaSign, moon_sign: "Gemini", moon_house: lagnaSign === "Leo" ? 11 : 10, sun_sign: "Taurus", sun_house: lagnaSign === "Leo" ? 10 : 9 },
+  };
+}
+
+function makeQuery<T>(data: T, error: unknown = null) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const query: any = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    order: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    maybeSingle: vi.fn(async () => ({ data, error })),
+    single: vi.fn(async () => ({ data, error })),
+  };
+  return query;
+}
+
 beforeEach(() => vi.clearAllMocks());
 
 describe("astro_ask_uses_pointer_not_latest_wrong_chart", () => {
@@ -18,37 +67,23 @@ describe("astro_ask_uses_pointer_not_latest_wrong_chart", () => {
       id: "cv-leo",
       profile_id: "p1",
       user_id: "u1",
-      chart_json: { public_facts: { lagna_sign: "Leo", moon_sign: "Gemini", moon_house: 11 } },
+      chart_version: 1,
+      schema_version: "chart_json_v2",
+      chart_json: makeCanonicalChartJson("cv-leo", "Leo"),
       status: "completed",
       is_current: true,
-      chart_version: 1,
     };
-    // The service mock returns the Leo chart when queried by exact ID with all strict conditions.
-    const chartQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: leoChart, error: null }),
-    };
-    const predSummaryQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    };
-    const profileQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: "p1", user_id: "u1", status: "active", current_chart_version_id: "cv-leo" },
-        error: null,
-      }),
-    };
+    const chartQuery = makeQuery(leoChart);
+    const profileQuery = makeQuery({
+      id: "p1",
+      user_id: "u1",
+      status: "active",
+      current_chart_version_id: "cv-leo",
+    });
     const service = {
       from: vi.fn((table: string) => {
         if (table === "birth_profiles") return profileQuery;
         if (table === "chart_json_versions") return chartQuery;
-        if (table === "prediction_ready_summaries") return predSummaryQuery;
         return profileQuery;
       }),
     } as never;
@@ -64,25 +99,7 @@ describe("astro_ask_uses_pointer_not_latest_wrong_chart", () => {
   });
 
   it("refuses without fallback when pointer is null even if newer Virgo row exists", async () => {
-    // Profile has null pointer but there is a Virgo chart row with is_current=true
-    const virgoChart = {
-      id: "cv-virgo",
-      profile_id: "p1",
-      user_id: "u1",
-      chart_json: { public_facts: { lagna_sign: "Virgo" } },
-      status: "completed",
-      is_current: true,
-    };
-    void virgoChart; // exists in DB but should not be loaded in strict mode
-
-    const profileQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: "p1", user_id: "u1", status: "active", current_chart_version_id: null },
-        error: null,
-      }),
-    };
+    const profileQuery = makeQuery({ id: "p1", user_id: "u1", status: "active", current_chart_version_id: null });
     const service = {
       from: vi.fn((table: string) => {
         if (table === "birth_profiles") return profileQuery;
@@ -94,7 +111,6 @@ describe("astro_ask_uses_pointer_not_latest_wrong_chart", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toBe("chart_not_ready");
-      // Critically: Virgo chart was never loaded
     }
   });
 
@@ -103,52 +119,25 @@ describe("astro_ask_uses_pointer_not_latest_wrong_chart", () => {
       id: "cv-virgo",
       profile_id: "p1",
       user_id: "u1",
-      chart_json: { public_facts: { lagna_sign: "Virgo" } },
+      chart_version: 2,
+      schema_version: "chart_json_v2",
+      chart_json: makeCanonicalChartJson("cv-virgo", "Virgo"),
       status: "completed",
       is_current: true,
-      chart_version: 2,
     };
-
-    let queryCount = 0;
-    const chartQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockImplementation(() => {
-        queryCount++;
-        return Promise.resolve({ data: virgoChart, error: null });
-      }),
-    };
-    const predSummaryQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    };
-    const profileQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: "p1", user_id: "u1", status: "active", current_chart_version_id: null },
-        error: null,
-      }),
-    };
+    const chartQuery = makeQuery(virgoChart);
+    const profileQuery = makeQuery({ id: "p1", user_id: "u1", status: "active", current_chart_version_id: null });
     const service = {
       from: vi.fn((table: string) => {
         if (table === "birth_profiles") return profileQuery;
         if (table === "chart_json_versions") return chartQuery;
-        if (table === "prediction_ready_summaries") return predSummaryQuery;
         return profileQuery;
       }),
     } as never;
 
-    // Strict mode refuses
     const strictResult = await loadCurrentAstroChartForUser({ service, userId: "u1", options: { mode: "strict_user_runtime" } });
     expect(strictResult.ok).toBe(false);
 
-    // Repair mode allows fallback
     const repairResult = await loadCurrentAstroChartForUser({ service, userId: "u1", options: { mode: "diagnostic_repair" } });
     expect(repairResult.ok).toBe(true);
   });

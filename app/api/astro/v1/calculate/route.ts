@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
@@ -34,6 +34,9 @@ import {
   hasIgnoredClientContext,
   sanitizeCalculateBodyForDeterministicInput,
 } from '@/lib/astro/calculate-route-v2'
+import { persistCanonicalChartJsonV2 } from '@/lib/astro/chart-json-persistence'
+import { loadCurrentAstroChartForUser } from '@/lib/astro/current-chart-version'
+import { assertCanonicalChartJsonV2 } from '@/lib/astro/chart-json-v2'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -79,30 +82,18 @@ async function persistCalculatedOutput(args: {
     prediction_summary_present: Boolean(args.predictionSummary),
   }
 
-  const { data, error } = await args.service.rpc('persist_and_promote_current_chart_version', {
-    p_user_id: args.userId,
-    p_profile_id: args.profileId,
-    p_calculation_id: args.calcId,
-    p_chart_json: args.chartJson,
-    p_prediction_summary: args.predictionSummary,
-    p_input_hash: args.inputHash,
-    p_settings_hash: args.settingsHash,
-    p_engine_version: args.runtimeEngineVersion,
-    p_schema_version: args.schemaVersion,
-    p_audit_payload: auditPayload,
+  return persistCanonicalChartJsonV2({
+    supabase: args.service as never,
+    userId: args.userId,
+    profileId: args.profileId,
+    calculationId: args.calcId,
+    chartJson: args.chartJson as never,
+    predictionSummary: args.predictionSummary,
+    inputHash: args.inputHash,
+    settingsHash: args.settingsHash,
+    engineVersion: args.runtimeEngineVersion,
+    auditPayload,
   })
-
-  const persisted = Array.isArray(data) ? data[0] : data
-  if (error || !persisted?.chart_version_id || typeof persisted.chart_version !== 'number') {
-    throw new Error(
-      `persist_and_promote_current_chart_version_failed: ${error?.message ?? 'missing chart_version_id'}`,
-    )
-  }
-
-  return {
-    chartVersionId: persisted.chart_version_id,
-    chartVersion: persisted.chart_version,
-  }
 }
 
 function logCalculationFailure(stage: string, code: string, context: {
@@ -320,7 +311,116 @@ export async function POST(req: NextRequest) {
         birthInput,
         ignoredClientContext: hasIgnoredClientContext(body as Record<string, unknown>),
       })
-      return NextResponse.json(payload)
+
+      const chartJsonV2 = assertCanonicalChartJsonV2(
+        (payload.chart_json_v2 ?? payload.chartJsonV2) as Record<string, unknown>,
+      )
+      const chartJsonToPersist = {
+        ...chartJsonV2,
+        metadata: {
+          ...chartJsonV2.metadata,
+        },
+      }
+      delete chartJsonToPersist.metadata.chartVersionId
+      delete chartJsonToPersist.metadata.chartVersion
+
+      const service = createServiceClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        return NextResponse.json({ ok: false, success: false, error: 'unauthenticated' }, { status: 401 })
+      }
+
+      const { data: profile } = await service
+        .from('birth_profiles')
+        .select('id, user_id, current_chart_version_id, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (!profile || !profile.id) {
+        return NextResponse.json({ ok: false, success: false, error: 'profile_not_found' }, { status: 404 })
+      }
+
+      const { data: calc } = await service
+        .from('chart_calculations')
+        .insert({
+          user_id: user.id,
+          profile_id: profile.id,
+          status: 'running',
+          input_hash: payload?.meta && typeof payload.meta === 'object' ? (payload.meta as Record<string, unknown>).inputHash ?? null : null,
+          settings_hash: payload?.meta && typeof payload.meta === 'object' ? (payload.meta as Record<string, unknown>).settingsHash ?? null : null,
+          engine_version: payload?.meta && typeof payload.meta === 'object' ? (payload.meta as Record<string, unknown>).engineVersion ?? null : null,
+          ephemeris_version: getRuntimeEphemerisVersion(),
+          schema_version: SCHEMA_VERSION,
+          force_recalc: false,
+          started_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (!calc || !(calc as Record<string, unknown>).id) {
+        return NextResponse.json({ ok: false, success: false, error: 'calc_insert_failed' }, { status: 500 })
+      }
+
+      const persistedChart = await persistCalculatedOutput({
+        service,
+        userId: user.id,
+        profileId: String(profile.id),
+        calcId: String((calc as Record<string, unknown>).id),
+        inputHash: typeof (payload?.meta as Record<string, unknown> | undefined)?.inputHash === 'string'
+          ? String((payload.meta as Record<string, unknown>).inputHash)
+          : '',
+        settingsHash: typeof (payload?.meta as Record<string, unknown> | undefined)?.settingsHash === 'string'
+          ? String((payload.meta as Record<string, unknown>).settingsHash)
+          : '',
+        chartJson: chartJsonToPersist as never,
+        predictionSummary: null,
+        runtimeEngineVersion: typeof (payload?.meta as Record<string, unknown> | undefined)?.engineVersion === 'string'
+          ? String((payload.meta as Record<string, unknown>).engineVersion)
+          : getRuntimeEngineVersion(),
+        runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
+        schemaVersion: SCHEMA_VERSION,
+      })
+
+      const currentChart = await loadCurrentAstroChartForUser({
+        service,
+        userId: user.id,
+        options: { mode: 'strict_user_runtime' },
+      })
+
+      if (!currentChart.ok) {
+        return NextResponse.json(
+          {
+            ok: false,
+            success: false,
+            error: currentChart.error,
+            message: currentChart.message,
+            status: currentChart.status,
+          },
+          { status: currentChart.status },
+        )
+      }
+
+      const currentChartJson = assertCanonicalChartJsonV2(currentChart.chartVersion.chart_json)
+      if (currentChart.chartVersion.id !== persistedChart.chartVersionId) {
+        return NextResponse.json(
+          { ok: false, success: false, error: 'strict_current_chart_reload_mismatch' },
+          { status: 500 },
+        )
+      }
+
+      return NextResponse.json({
+        ...payload,
+        chartVersionId: persistedChart.chartVersionId,
+        chartVersion: persistedChart.chartVersion,
+        chart_json_v2: currentChartJson,
+        chartJsonV2: currentChartJson,
+        meta: {
+          ...(payload.meta as Record<string, unknown> | undefined),
+          persisted: true,
+          currentChartPromoted: true,
+        },
+      })
     } catch (error) {
       if (ASTRO_CALC_INTEGRATION_STRICT_MODE) {
         return NextResponse.json(
@@ -680,7 +780,6 @@ export async function POST(req: NextRequest) {
       )
   }
 
-    const chartVersionId = randomUUID()
     const nextChartVersion = await getNextChartVersion({
       service,
       profileId,
@@ -690,7 +789,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       profileId,
       calculationId: calc.id,
-      chartVersionId,
+      chartVersionId: randomUUID(),
       chartVersion: nextChartVersion,
       inputHash,
       settingsHash,
@@ -707,6 +806,15 @@ export async function POST(req: NextRequest) {
       ephemerisVersion: getRuntimeEphemerisVersion(),
       schemaVersion: SCHEMA_VERSION,
     })
+    const chartJsonV2 = assertCanonicalChartJsonV2(chartJson.chart_json_v2 ?? chartJson.chartJsonV2)
+    const chartJsonToPersist = {
+      ...chartJsonV2,
+      metadata: {
+        ...chartJsonV2.metadata,
+      },
+    }
+    delete chartJsonToPersist.metadata.chartVersionId
+    delete chartJsonToPersist.metadata.chartVersion
     const mergedChartJson = mergeAvailableJyotishSectionsIntoChartJson(
       chartJson as Record<string, unknown>,
       output as unknown as Record<string, unknown>,
@@ -725,7 +833,7 @@ export async function POST(req: NextRequest) {
         calcId: calc.id,
         inputHash,
         settingsHash,
-        chartJson: mergedChartJson,
+        chartJson: chartJsonToPersist as never,
         predictionSummary: (mergedChartJson.prediction_ready_summaries as Record<string, unknown>) ?? null,
         runtimeEngineVersion: getRuntimeEngineVersion(),
         runtimeEphemerisVersion: getRuntimeEphemerisVersion(),
@@ -798,6 +906,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: code }, { status: 500 })
     }
 
+    const currentChart = await loadCurrentAstroChartForUser({
+      service,
+      userId: user.id,
+      options: { mode: 'strict_user_runtime' },
+    })
+
+    if (!currentChart.ok) {
+      return NextResponse.json(
+        {
+          error: currentChart.error,
+          message: currentChart.message,
+          status: currentChart.status,
+        },
+        { status: currentChart.status },
+      )
+    }
+
+    const currentChartJson = assertCanonicalChartJsonV2(currentChart.chartVersion.chart_json)
+    if (currentChart.chartVersion.id !== persistedChart.chartVersionId) {
+      return NextResponse.json(
+        { error: 'strict_current_chart_reload_mismatch' },
+        { status: 500 },
+      )
+    }
+
     if (process.env.NODE_ENV !== 'production') {
       const rawAstronomicalData = mergedChartJson.astronomical_data && typeof mergedChartJson.astronomical_data === 'object'
         ? mergedChartJson.astronomical_data as Record<string, unknown>
@@ -836,7 +969,14 @@ export async function POST(req: NextRequest) {
       calculation_id: calc.id,
       chart_version_id: persistedChart.chartVersionId,
       chart_version: persistedChart.chartVersion,
+      chart_json_v2: currentChartJson,
+      chartJsonV2: currentChartJson,
       reused_cache: false,
+      meta: {
+        ...(mergedApiResponse.meta as Record<string, unknown> | undefined),
+        persisted: true,
+        currentChartPromoted: true,
+      },
     }
 
     if (process.env.NODE_ENV !== 'production') {

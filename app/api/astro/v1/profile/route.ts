@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -12,6 +12,8 @@ import { hashSettings, DEFAULT_SETTINGS } from '@/lib/astro/settings'
 import { astroV1ApiEnabled } from '@/lib/astro/feature-flags'
 import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
 import { normalizeBirthTimeForCalculation } from '@/lib/astro/calculations/time'
+import { decryptJson } from '@/lib/astro/encryption'
+import { didCalculationAffectingProfileFieldsChange } from '@/lib/astro/api/profile-current-chart-invalidation'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -47,6 +49,27 @@ function birthTimeValidationMessage(status: string): string {
       return 'Birth time is required for exact Lagna, houses, and dasha calculations.'
     default:
       return 'The provided birth time could not be used for calculation.'
+  }
+}
+
+function buildCalculationAffectingProfilePatch(input: Record<string, unknown>) {
+  return {
+    birthDate: readString(input.birth_date) ?? readString(input.dateOfBirth) ?? readString(input.birthDate) ?? readString(input.date_of_birth),
+    birthTime: readString(input.birth_time) ?? readString(input.timeOfBirth) ?? readString(input.birthTime) ?? readString(input.time_of_birth),
+    birthPlace: readString(input.birth_place_name) ?? readString(input.birthPlace) ?? readString(input.placeName),
+    placeName: readString(input.place_name) ?? readString(input.placeName) ?? readString(input.birth_place_name),
+    timezone: readString(input.timezone),
+    timezoneHours: readString(input.timezone_hours) ?? readString(input.timezoneHours),
+    latitude: input.latitude,
+    latitude_deg: input.latitude_deg,
+    latitudeDeg: input.latitudeDeg,
+    longitude: input.longitude,
+    longitude_deg: input.longitude_deg,
+    longitudeDeg: input.longitudeDeg,
+    ayanamsha: readString(input.ayanamsha),
+    ayanamsha_main: readString(input.ayanamsha_main),
+    house_system: readString(input.house_system),
+    houseSystem: readString(input.houseSystem),
   }
 }
 
@@ -142,7 +165,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existingProfile } = await service
     .from('birth_profiles')
-    .select('id, last_birth_details_updated_at, birth_details_change_available_at')
+    .select('id, encrypted_birth_data, last_birth_details_updated_at, birth_details_change_available_at')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .maybeSingle()
@@ -166,8 +189,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Birth data is changing — clear the current chart pointer so stale chart cannot be used.
-    // The user must recalculate after updating birth details.
+    const existingBirthData = (() => {
+      try {
+        return decryptJson(existingProfile.encrypted_birth_data)
+      } catch {
+        return null
+      }
+    })()
+    const calculationFieldsChanged = didCalculationAffectingProfileFieldsChange({
+      existingProfile: existingBirthData && typeof existingBirthData === 'object' ? existingBirthData as Record<string, unknown> : null,
+      nextProfilePatch: buildCalculationAffectingProfilePatch(input as Record<string, unknown>),
+    })
+
     const { error: updateError } = await service
       .from('birth_profiles')
       .update({
@@ -183,11 +216,8 @@ export async function POST(req: NextRequest) {
         birth_details_change_available_at: changeAvailableAt.toISOString(),
         terms_accepted_at: input.terms_accepted_version ? now.toISOString() : undefined,
         terms_accepted_version: input.terms_accepted_version ?? undefined,
-        // Invalidate the current chart pointer so the stale chart cannot be used.
-        // All calculation-affecting fields are re-encrypted together; we cannot diff
-        // individual fields, so we always clear the pointer on any profile update.
-        current_chart_version_id: null,
-        input_hash: null,
+        current_chart_version_id: calculationFieldsChanged ? null : undefined,
+        input_hash: calculationFieldsChanged ? null : undefined,
       })
       .eq('id', existingProfile.id)
       .eq('user_id', user.id)
@@ -195,6 +225,15 @@ export async function POST(req: NextRequest) {
     if (updateError) {
       console.error('[profile_update_failed]', updateError?.code, updateError?.message?.slice(0, 100))
       return NextResponse.json({ error: 'profile_save_failed' }, { status: 500 })
+    }
+
+    if (calculationFieldsChanged) {
+      await service
+        .from('chart_json_versions')
+        .update({ is_current: false })
+        .eq('profile_id', existingProfile.id)
+        .eq('user_id', user.id)
+        .eq('is_current', true)
     }
 
     const { data: existingSettings } = await service

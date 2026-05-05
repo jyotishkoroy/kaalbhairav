@@ -1,10 +1,11 @@
 /*
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
- */
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
 
 import { createServiceClient } from "@/lib/supabase/server";
+import { assertCanonicalChartJsonV2, type CanonicalChartJsonV2 } from "@/lib/astro/chart-json-v2";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -12,6 +13,44 @@ export type CurrentChartLoadMode = "strict_user_runtime" | "diagnostic_repair";
 
 export interface LoadCurrentAstroChartOptions {
   mode?: CurrentChartLoadMode;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getMetadata(chartJson: unknown): Record<string, unknown> | null {
+  if (!isRecord(chartJson)) {
+    return null;
+  }
+
+  const metadata = chartJson.metadata;
+  return isRecord(metadata) ? metadata : null;
+}
+
+export function validateCurrentChartJsonV2Metadata(args: {
+  chartJson: unknown;
+  userId: string;
+  profileId: string;
+  chartVersionId: string;
+  chartVersion: number;
+}): CanonicalChartJsonV2 {
+  const chartJson = assertCanonicalChartJsonV2(args.chartJson);
+  const metadata = chartJson.metadata;
+
+  if (metadata.profileId !== args.profileId) {
+    throw new Error('current_chart_metadata_profile_mismatch');
+  }
+
+  if (metadata.chartVersionId !== args.chartVersionId) {
+    throw new Error('current_chart_metadata_version_id_mismatch');
+  }
+
+  if (metadata.chartVersion !== args.chartVersion) {
+    throw new Error('current_chart_metadata_version_mismatch');
+  }
+
+  return chartJson;
 }
 
 export async function loadCurrentAstroChartForUser(input: {
@@ -53,12 +92,10 @@ export async function loadCurrentAstroChartForUser(input: {
 
     const { data: chartRow } = await service
       .from("chart_json_versions")
-      .select("id, profile_id, user_id, chart_json, chart_version, created_at, is_current, status, input_hash")
+      .select("id, profile_id, user_id, chart_json, chart_version, created_at, is_current, status, schema_version, input_hash")
       .eq("id", profile.current_chart_version_id as string)
       .eq("user_id", userId)
       .eq("profile_id", profile.id as string)
-      .eq("status", "completed")
-      .eq("is_current", true)
       .maybeSingle();
 
     if (!chartRow) {
@@ -72,6 +109,52 @@ export async function loadCurrentAstroChartForUser(input: {
     }
 
     const chartVersion = chartRow as Record<string, unknown>;
+    if (chartVersion.status !== "completed") {
+      return {
+        ok: false,
+        status: 404,
+        error: "chart_not_ready",
+        message: "aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering.",
+        code: "current_chart_pointer_invalid",
+      } as never;
+    }
+
+    const schemaVersion = typeof chartVersion.schema_version === "string"
+      ? chartVersion.schema_version
+      : typeof getMetadata(chartVersion.chart_json)?.schemaVersion === "string"
+        ? String(getMetadata(chartVersion.chart_json)?.schemaVersion)
+        : null;
+
+    if (schemaVersion !== "chart_json_v2") {
+      return {
+        ok: false,
+        status: 404,
+        error: "chart_not_ready",
+        message: "aadesh: Your birth chart context is not ready yet. Please update your birth details once so Tarayai can calculate your chart before answering.",
+        code: "current_chart_unsupported_schema",
+      } as never;
+    }
+
+    const typedChartVersionId = String(chartVersion.id);
+    const typedChartVersion = typeof chartVersion.chart_version === "number" ? chartVersion.chart_version : NaN;
+    try {
+      validateCurrentChartJsonV2Metadata({
+        chartJson: chartVersion.chart_json,
+        userId,
+        profileId: String(profile.id),
+        chartVersionId: typedChartVersionId,
+        chartVersion: typedChartVersion,
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        status: 404,
+        error: "chart_not_ready",
+        message: error instanceof Error ? error.message : "current chart metadata mismatch",
+        code: "current_chart_metadata_invalid",
+      } as never;
+    }
+
     const predictionSummary = await loadPredictionSummary(service, profile.id as string, chartVersion.id as string);
     return { ok: true, profile, chartVersion, predictionSummary };
   }

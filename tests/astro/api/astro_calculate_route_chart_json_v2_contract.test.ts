@@ -8,6 +8,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const calculateRouteV2ResponsePayloadMock = vi.hoisted(() => vi.fn())
+const persistCanonicalChartJsonV2Mock = vi.hoisted(() => vi.fn())
+const loadCurrentAstroChartForUserMock = vi.hoisted(() => vi.fn())
 const sanitizeCalculateBodyForDeterministicInputMock = vi.hoisted(() => vi.fn((body) => body))
 const hasIgnoredClientContextMock = vi.hoisted(() => vi.fn((body) => Boolean(body?.chart || body?.context || body?.dasha || body?.transits || body?.publicFacts || body?.profileId || body?.userId || body?.chartVersionId)))
 
@@ -31,8 +33,78 @@ vi.mock('@/lib/astro/engine/version', () => ({
   getRuntimeEphemerisVersion: vi.fn(() => 'ephemeris'),
   SCHEMA_VERSION: '1',
 }))
-vi.mock('@/lib/astro/chart-json-persistence', () => ({ mergeAvailableJyotishSectionsIntoChartJson: vi.fn((value) => value) }))
-vi.mock('@/lib/astro/profile-chart-json-adapter', () => ({ buildProfileChartJsonFromMasterOutput: vi.fn(() => ({ metadata: { chart_version_id: 'cv1' } })) }))
+vi.mock('@/lib/astro/chart-json-persistence', () => ({
+  mergeAvailableJyotishSectionsIntoChartJson: vi.fn((value) => value),
+  persistCanonicalChartJsonV2: persistCanonicalChartJsonV2Mock,
+}))
+vi.mock('@/lib/astro/current-chart-version', () => ({
+  loadCurrentAstroChartForUser: loadCurrentAstroChartForUserMock,
+}))
+vi.mock('@/lib/astro/profile-chart-json-adapter', () => ({
+  buildProfileChartJsonFromMasterOutput: vi.fn(() => ({
+    metadata: { chart_version_id: 'cv1', schema_version: 'chart_json_v2' },
+    chart_json_v2: {
+      schemaVersion: 'chart_json_v2',
+      metadata: {
+        profileId: 'profile-1',
+        inputHash: 'input_hash',
+        settingsHash: 'settings_hash',
+        engineVersion: 'engine',
+        ephemerisVersion: 'ephemeris',
+        ayanamsha: 'lahiri',
+        houseSystem: 'whole_sign',
+        runtimeClockIso: '2026-05-05T00:00:00.000Z',
+      },
+      sections: {
+        timeFacts: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        planetaryPositions: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        lagna: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        houses: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        panchang: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        d1Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        d9Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        shodashvarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        shodashvargaBhav: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        vimshottari: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        kp: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        dosha: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        ashtakavarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        transits: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        advanced: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+      },
+    },
+    chartJsonV2: {
+      schemaVersion: 'chart_json_v2',
+      metadata: {
+        profileId: 'profile-1',
+        inputHash: 'input_hash',
+        settingsHash: 'settings_hash',
+        engineVersion: 'engine',
+        ephemerisVersion: 'ephemeris',
+        ayanamsha: 'lahiri',
+        houseSystem: 'whole_sign',
+        runtimeClockIso: '2026-05-05T00:00:00.000Z',
+      },
+      sections: {
+        timeFacts: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        planetaryPositions: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        lagna: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        houses: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        panchang: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        d1Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        d9Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        shodashvarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        shodashvargaBhav: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        vimshottari: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        kp: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        dosha: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        ashtakavarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        transits: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        advanced: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+      },
+    },
+  })),
+}))
 vi.mock('@/lib/astro/normalize', () => ({ normalizeBirthInput: vi.fn(() => ({ input_hash_material_version: '2.0.0', birth_date_iso: '2026-05-05', birth_time_iso: '07:30:00', birth_time_known: true, birth_time_precision: 'exact', birth_time_uncertainty_seconds: 0, timezone: 'Asia/Kolkata', timezone_status: 'valid', latitude_full: 13.0833, longitude_full: 80.2707, latitude_rounded: 13.0833, longitude_rounded: 80.2707, coordinate_confidence: 0.95, warnings: [] })) }))
 vi.mock('@/lib/astro/profile-birth-data', () => ({ normalizeStoredBirthData: vi.fn((value) => value) }))
 vi.mock('@/lib/astro/encryption', () => ({ decryptJson: vi.fn(() => ({ birth_date: '2026-05-05', birth_time: '07:30:00', birth_time_known: true, birth_time_precision: 'exact', birth_place_name: 'Test Place', latitude: 13.0833, longitude: 80.2707, timezone: 'Asia/Kolkata', data_consent_version: 'astro-v1' })) }))
@@ -165,16 +237,103 @@ beforeEach(() => {
   process.env.ASTRO_CALC_INTEGRATION_STRICT_MODE = 'true'
   vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })) } } as never)
   vi.mocked(createServiceClient).mockReturnValue({
-    from: vi.fn(() => ({
-      select: () => ({
-        eq: () => ({
+    from: vi.fn((table: string) => {
+      if (table === 'birth_profiles') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { id: 'profile-1', user_id: 'u1', status: 'active', current_chart_version_id: 'cv1' },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+
+      if (table === 'chart_calculations') {
+        return {
+          insert: () => ({
+            select: () => ({
+              single: async () => ({ data: { id: 'calc-1' }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: async () => ({ data: null, error: null }),
+          }),
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                eq: () => ({
+                  order: () => ({
+                    limit: () => ({
+                      maybeSingle: async () => ({ data: null, error: null }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+
+      if (table === 'chart_json_versions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                limit: () => ({
+                  maybeSingle: async () => ({ data: null, error: null }),
+                }),
+              }),
+            }),
+          }),
+          insert: () => ({
+            select: () => ({
+              single: async () => ({ data: { id: 'cv1' }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              eq: async () => ({ data: null, error: null }),
+            }),
+          }),
+        }
+      }
+
+      if (table === 'prediction_ready_summaries') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({ data: null, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+
+      return {
+        select: () => ({
           eq: () => ({
             maybeSingle: async () => ({ data: null, error: null }),
           }),
         }),
-      }),
-    })),
+      }
+    }),
   } as never)
+  persistCanonicalChartJsonV2Mock.mockResolvedValue({ chartVersionId: 'cv1', chartVersion: 1 })
+  loadCurrentAstroChartForUserMock.mockResolvedValue({
+    ok: true,
+    profile: { id: 'profile-1' },
+    chartVersion: { id: 'cv1', chart_json: canonicalPayload().chart_json_v2 },
+  })
 })
 
 afterEach(() => {
@@ -254,7 +413,7 @@ describe('POST /api/astro/v1/calculate phase 14 contract', () => {
     expect(JSON.stringify(json)).not.toContain('Taurus')
   })
 
-  it('Phase 14 does not persist or promote current chart', async () => {
+  it('persists and promotes current chart before returning success', async () => {
     calculateRouteV2ResponsePayloadMock.mockResolvedValue(canonicalPayload())
     const { POST } = await import('@/app/api/astro/v1/calculate/route')
     const response = await POST(makeRequest(validBirthBody()))
@@ -262,16 +421,55 @@ describe('POST /api/astro/v1/calculate phase 14 contract', () => {
 
     expect(response.status).toBe(200)
     expect(calculateRouteV2ResponsePayloadMock).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(createServiceClient)).not.toHaveBeenCalled()
+    expect(persistCanonicalChartJsonV2Mock).toHaveBeenCalledTimes(1)
+    expect(loadCurrentAstroChartForUserMock).toHaveBeenCalledTimes(1)
     expect(vi.mocked(createClient)).toHaveBeenCalledTimes(1)
+    expect(json.meta.persisted).toBe(true)
+    expect(json.meta.currentChartPromoted).toBe(true)
   })
 
   it('feature flag disabled preserves legacy route path', async () => {
     process.env.ASTRO_CALC_INTEGRATION_ENABLED = 'false'
     vi.mocked(calculateMasterAstroOutput).mockResolvedValue({
       calculation_status: 'calculated',
-      schema_version: '1',
+      schema_version: '29.0.0',
       runtime_clock: { current_utc: '2026-05-05T00:00:00.000Z' },
+      panchang: {
+        status: 'available',
+        rows: [
+          { label: 'Tithi', value: 'Pratipad' },
+          { label: 'Yoga', value: 'Ganda' },
+          { label: 'Karan', value: 'Kintudhhana' },
+        ],
+      },
+      vimshottari_dasha: {
+        status: 'available',
+        items: [{ mahadasha: 'Jupiter', from: '2018-08-22', to: '2034-08-22' }],
+      },
+      navamsa_d9: {
+        status: 'available',
+        rows: [
+          { body: 'Sun', sign_number: 6 },
+          { body: 'Moon', sign_number: 8 },
+        ],
+      },
+      ashtakvarga: {
+        status: 'available',
+        rows: [{ sign: 8, Total: 37 }],
+      },
+      current_timing: {
+        status: 'real',
+        current_mahadasha: {
+          lord: 'Jupiter',
+          start_date: '2018-08-22T00:00:00.000Z',
+          end_date: '2034-08-22T00:00:00.000Z',
+        },
+      },
+      expanded_sections: {
+        panchang: { status: 'partial', rows: [] },
+        navamsa_d9: { status: 'partial', rows: [] },
+        current_timing: { status: 'not_available' },
+      },
     } as never)
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn((table: string) => {

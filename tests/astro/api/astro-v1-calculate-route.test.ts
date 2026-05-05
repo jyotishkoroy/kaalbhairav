@@ -22,8 +22,51 @@ vi.mock('@/lib/astro/engine/version', () => ({
   getRuntimeEphemerisVersion: vi.fn(() => 'ephemeris'),
   SCHEMA_VERSION: '1',
 }))
-vi.mock('@/lib/astro/chart-json-persistence', () => ({ mergeAvailableJyotishSectionsIntoChartJson: vi.fn((a) => a) }))
-vi.mock('@/lib/astro/profile-chart-json-adapter', () => ({ buildProfileChartJsonFromMasterOutput: vi.fn(() => ({ metadata: { chart_version_id: 'cv1' } })) }))
+vi.mock('@/lib/astro/chart-json-persistence', () => ({ mergeAvailableJyotishSectionsIntoChartJson: vi.fn((a) => a), persistCanonicalChartJsonV2: vi.fn(async () => ({ chartVersionId: 'cv1', chartVersion: 1, chartJson: { metadata: { chartVersionId: 'cv1', chartVersion: 1 } } })) }))
+vi.mock('@/lib/astro/calculations/master', () => ({
+  calculateMasterAstroOutput: vi.fn(async () => ({
+    calculation_status: 'calculated',
+    runtime_clock: { current_utc: '2026-05-05T00:00:00.000Z', as_of_date: '2026-05-05' },
+    prediction_ready_context: { summary: 'ready' },
+    confidence: { overall: { value: 75, label: 'medium', reasons: [] } },
+    warnings: [],
+  })),
+}))
+vi.mock('@/lib/astro/profile-chart-json-adapter', () => ({
+  buildProfileChartJsonFromMasterOutput: vi.fn(() => {
+    const chartJsonV2 = {
+      schemaVersion: 'chart_json_v2',
+      metadata: {
+        profileId: 'profile-1',
+        inputHash: 'input-hash',
+        settingsHash: 'settings-hash',
+        engineVersion: 'engine',
+        ephemerisVersion: 'ephemeris',
+        ayanamsha: 'lahiri',
+        houseSystem: 'whole_sign',
+        runtimeClockIso: '2026-05-05T00:00:00.000Z',
+      },
+      sections: {
+        timeFacts: { status: 'computed', source: 'deterministic_calculation', fields: { utcDateTimeIso: '2026-05-05T02:00:00.000Z' } },
+        planetaryPositions: { status: 'computed', source: 'deterministic_calculation', fields: { byBody: { Sun: { sign: 'Taurus' }, Moon: { sign: 'Gemini' } } } },
+        lagna: { status: 'computed', source: 'deterministic_calculation', fields: { ascendant: { sign: 'Leo' } } },
+        houses: { status: 'computed', source: 'deterministic_calculation', fields: { placements: { Moon: 11, Sun: 10 } } },
+        panchang: { status: 'computed', source: 'deterministic_calculation', fields: { tithi: 'test-tithi' } },
+        d1Chart: { status: 'computed', source: 'deterministic_calculation', fields: { lagnaSign: 'Leo', moonSign: 'Gemini', sunSign: 'Taurus' } },
+        d9Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        shodashvarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        shodashvargaBhav: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        vimshottari: { status: 'computed', source: 'deterministic_calculation', fields: { currentMahadasha: { lord: 'Saturn' } } },
+        kp: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+        dosha: { status: 'computed', source: 'deterministic_calculation', fields: { manglik: { isManglik: false } } },
+        ashtakavarga: { status: 'computed', source: 'deterministic_calculation', fields: { sarvashtakavargaTotal: { grandTotal: 292 } } },
+        transits: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: { value: { status: 'unavailable', value: null, reason: 'insufficient_birth_data', source: 'none', requiredModule: 'transits', fieldKey: 'transits' } } },
+        advanced: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: { value: { status: 'unavailable', value: null, reason: 'insufficient_birth_data', source: 'none', requiredModule: 'advanced', fieldKey: 'advanced' } } },
+      },
+    }
+    return { ...chartJsonV2, chart_json_v2: chartJsonV2, chartJsonV2 }
+  }),
+}))
 vi.mock('@/lib/astro/normalize', () => ({ normalizeBirthInput: vi.fn(() => ({ input_hash_material_version: '2.0.0', birth_date_iso: '1999-06-14', birth_time_iso: '09:58', birth_time_known: true, birth_time_precision: 'exact', birth_time_uncertainty_seconds: 0, timezone: 'Asia/Kolkata', timezone_status: 'valid', latitude_full: 22.57, longitude_full: 88.36, latitude_rounded: 22.57, longitude_rounded: 88.36, coordinate_confidence: 0.95, warnings: [] })) }))
 vi.mock('@/lib/astro/profile-birth-data', () => ({ normalizeStoredBirthData: vi.fn((x) => x) }))
 vi.mock('@/lib/astro/encryption', () => ({ decryptJson: vi.fn(() => ({ birth_date: '1999-06-14', birth_time: '09:58', birth_time_known: true, birth_time_precision: 'exact', birth_place_name: 'Kolkata', latitude: 22.57, longitude: 88.36, timezone: 'Asia/Kolkata', data_consent_version: 'astro-v1' })) }))
@@ -34,31 +77,82 @@ vi.mock('@/lib/security/request-guards', () => ({
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/security/request-guards'
-import { POST } from '@/app/api/astro/v1/calculate/route'
 
 const user = { id: 'u1' }
 const profileId = '11111111-1111-4111-8111-111111111111'
+const settingsRow = { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }
+const profileRow = { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active', current_chart_version_id: 'cv1' }
+const persistedChartJson = {
+  schemaVersion: 'chart_json_v2',
+  metadata: {
+    profileId,
+    chartVersionId: 'cv1',
+    chartVersion: 1,
+    inputHash: 'input-hash',
+    settingsHash: 'settings-hash',
+    engineVersion: 'engine',
+    ephemerisVersion: 'ephemeris',
+    ayanamsha: 'lahiri',
+    houseSystem: 'whole_sign',
+    runtimeClockIso: '2026-05-05T00:00:00.000Z',
+  },
+  sections: {
+    timeFacts: { status: 'computed', source: 'deterministic_calculation', fields: { utcDateTimeIso: '2026-05-05T02:00:00.000Z' } },
+    planetaryPositions: { status: 'computed', source: 'deterministic_calculation', fields: { byBody: { Sun: { sign: 'Taurus' }, Moon: { sign: 'Gemini' } } } },
+    lagna: { status: 'computed', source: 'deterministic_calculation', fields: { ascendant: { sign: 'Leo' } } },
+    houses: { status: 'computed', source: 'deterministic_calculation', fields: { placements: { Moon: 11, Sun: 10 } } },
+    panchang: { status: 'computed', source: 'deterministic_calculation', fields: { tithi: 'test-tithi' } },
+    d1Chart: { status: 'computed', source: 'deterministic_calculation', fields: { lagnaSign: 'Leo', moonSign: 'Gemini', sunSign: 'Taurus' } },
+    d9Chart: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+    shodashvarga: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+    shodashvargaBhav: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+    vimshottari: { status: 'computed', source: 'deterministic_calculation', fields: { currentMahadasha: { lord: 'Saturn' } } },
+    kp: { status: 'computed', source: 'deterministic_calculation', fields: {} },
+    dosha: { status: 'computed', source: 'deterministic_calculation', fields: { manglik: { isManglik: false } } },
+    ashtakavarga: { status: 'computed', source: 'deterministic_calculation', fields: { sarvashtakavargaTotal: { grandTotal: 292 } } },
+    transits: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: { value: { status: 'unavailable', value: null, reason: 'insufficient_birth_data', source: 'none', requiredModule: 'transits', fieldKey: 'transits' } } },
+    advanced: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: { value: { status: 'unavailable', value: null, reason: 'insufficient_birth_data', source: 'none', requiredModule: 'advanced', fieldKey: 'advanced' } } },
+  },
+}
+const persistedChartRow = { id: 'cv1', user_id: user.id, profile_id: profileId, chart_version: 1, schema_version: 'chart_json_v2', status: 'completed', is_current: true, chart_json: persistedChartJson }
 
-function chain<T extends Record<string, unknown>>(terminal: T) {
-  const node: Record<string, unknown> = {
-    eq: () => node,
-    insert: () => node,
-    update: () => node,
-    order: () => node,
-    limit: () => node,
-    rpc: () => node,
-    maybeSingle: async () => ({ data: null, error: null }),
-    single: async () => ({ data: null, error: null }),
-    select: () => node,
+function makeQuery<T>(data: T, error: unknown = null) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const query: any = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    neq: vi.fn(() => query),
+    is: vi.fn(() => query),
+    order: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    insert: vi.fn(() => query),
+    update: vi.fn(() => query),
+    maybeSingle: vi.fn(async () => ({ data, error })),
+    single: vi.fn(async () => ({ data, error })),
   }
-  return Object.assign(node, terminal)
+  return query
 }
 
-function makeReq(profileId = 'p1') {
+function makeServiceMock(overrides?: Partial<Record<string, unknown>>) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table === 'birth_profiles') return overrides?.birth_profiles ?? makeQuery(profileRow)
+      if (table === 'astrology_settings') return overrides?.astrology_settings ?? makeQuery(settingsRow)
+      if (table === 'chart_calculations') return overrides?.chart_calculations ?? makeQuery({ id: 'calc1' })
+      if (table === 'chart_json_versions') return overrides?.chart_json_versions ?? makeQuery(persistedChartRow)
+      if (table === 'prediction_ready_summaries') return overrides?.prediction_ready_summaries ?? makeQuery(null)
+      if (table === 'calculation_audits' || table === 'calculation_audit_logs') return overrides?.calculation_audits ?? makeQuery(null)
+      return makeQuery(null)
+    }),
+    rpc: overrides?.rpc ?? vi.fn(async () => ({ data: { chart_version_id: 'cv1', chart_version: 1 }, error: null })),
+  }
+}
+
+function makeReq(requestProfileId = profileId) {
   return new NextRequest('http://localhost/api/astro/v1/calculate', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'http://localhost' },
-    body: JSON.stringify({ profile_id: profileId }),
+    body: JSON.stringify({ profile_id: requestProfileId }),
   })
 }
 
@@ -70,64 +164,69 @@ beforeEach(() => {
   vi.mocked(checkRateLimit).mockReturnValue({ ok: true } as never)
 })
 
+async function getPOST() {
+  vi.resetModules()
+  vi.doMock('@/lib/astro/config/feature-flags', () => ({
+    ASTRO_CALC_INTEGRATION_ENABLED: false,
+    ASTRO_CALC_INTEGRATION_STRICT_MODE: true,
+    ASTRO_CALC_FIXTURE_VALIDATION_ENABLED: false,
+    ASTRO_ALLOW_UNVERIFIED_ADVANCED_CALCS: false,
+  }))
+  const mod = await import('@/app/api/astro/v1/calculate/route')
+  return mod.POST
+}
+
 describe('POST /api/astro/v1/calculate', () => {
   it('returns profile_not_found when no profile exists', async () => {
+    const POST = await getPOST()
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }
-        }
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
-      }),
-    } as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      birth_profiles: makeQuery(null),
+      astrology_settings: makeQuery(settingsRow),
+    }) as never)
     const resp = await POST(makeReq('11111111-1111-4111-8111-111111111111'))
     expect(resp.status).toBe(404)
     expect((await resp.json()).error).toBe('profile_not_found')
   })
 
   it('returns profile_access_denied for another user', async () => {
+    const POST = await getPOST()
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') return { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: '11111111-1111-4111-8111-111111111111', user_id: 'other', encrypted_birth_data: 'x', status: 'active' }, error: null }) }) }) }) }
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }, error: null }) }) }) }
-      }),
-    } as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      birth_profiles: makeQuery({ id: profileId, user_id: 'other', encrypted_birth_data: 'x', status: 'active' }),
+      astrology_settings: makeQuery(settingsRow),
+    }) as never)
     const resp = await POST(makeReq('11111111-1111-4111-8111-111111111111'))
     expect(resp.status).toBe(404)
     expect((await resp.json()).error).toBe('profile_access_denied')
   })
 
   it('returns generic calc_insert_failed when debug is disabled', async () => {
+    const POST = await getPOST()
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'birth_profiles') {
-          return {
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' },
-                error: null,
-              }),
-            }),
-          }
+          return { select: () => makeQuery({ id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active', current_chart_version_id: 'cv1' }) }
         }
         if (table === 'astrology_settings') {
-          return {
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' },
-                error: null,
-              }),
-            }),
-          }
+          return { select: () => makeQuery({ astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }) }
         }
         if (table === 'chart_calculations') {
           return {
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            insert: () => chain({
+            select: () => makeQuery(null),
+            insert: () => ({
+              select: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { code: '23502', message: 'not null violation', details: 'calc row missing' },
+                }),
+              }),
+              maybeSingle: async () => ({
+                data: null,
+                error: { code: '23502', message: 'not null violation', details: 'calc row missing' },
+              }),
               single: async () => ({
                 data: null,
                 error: { code: '23502', message: 'not null violation', details: 'calc row missing' },
@@ -135,7 +234,7 @@ describe('POST /api/astro/v1/calculate', () => {
             }),
           }
         }
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
+        return { select: () => makeQuery(null) }
       }),
     } as never)
 
@@ -161,34 +260,31 @@ describe('POST /api/astro/v1/calculate', () => {
   })
 
   it('returns safe debug calc_insert diagnostics when debug is enabled', async () => {
+    const POST = await getPOST()
     process.env.ASTRO_CALCULATE_DEBUG = 'true'
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'birth_profiles') {
-          return {
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' },
-                error: null,
-              }),
-            }),
-          }
+          return { select: () => makeQuery({ id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active', current_chart_version_id: 'cv1' }) }
         }
         if (table === 'astrology_settings') {
-          return {
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' },
-                error: null,
-              }),
-            }),
-          }
+          return { select: () => makeQuery({ astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }) }
         }
         if (table === 'chart_calculations') {
           return {
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            insert: () => chain({
+            select: () => makeQuery(null),
+            insert: () => ({
+              select: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { code: '23502', message: 'not null violation', details: 'calc row missing', hint: 'check payload' },
+                }),
+              }),
+              maybeSingle: async () => ({
+                data: null,
+                error: { code: '23502', message: 'not null violation', details: 'calc row missing', hint: 'check payload' },
+              }),
               single: async () => ({
                 data: null,
                 error: { code: '23502', message: 'not null violation', details: 'calc row missing', hint: 'check payload' },
@@ -196,7 +292,7 @@ describe('POST /api/astro/v1/calculate', () => {
             }),
           }
         }
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
+        return { select: () => makeQuery(null) }
       }),
     } as never)
 
@@ -234,226 +330,100 @@ describe('POST /api/astro/v1/calculate', () => {
   })
 
   it('returns chart_version_save_failed when chart insert fails', async () => {
+    const POST = await getPOST()
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return chain({
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' },
-                error: null,
-              }),
-            }),
-          })
-        }
-        if (table === 'astrology_settings') {
-          return chain({
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' },
-                error: null,
-              }),
-            }),
-          })
-        }
-        if (table === 'chart_calculations') {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 'calc1' }, error: null }),
-              }),
-            }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            update: () => chain({}),
-          }
-        }
-        if (table === 'chart_json_versions') {
-          return chain({
-            insert: async () => ({ data: null, error: { code: '23502', message: 'not null violation' } }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-          })
-        }
-        return chain({ select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }) })
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      chart_json_versions: Object.assign(makeQuery(persistedChartRow), {
+        insert: async () => ({ data: null, error: { code: '23502', message: 'not null violation' } }),
       }),
-    } as never)
-
-    const resp = await POST(makeReq(profileId))
-    expect(resp.status).toBe(500)
-    expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'persist_and_promote_current_chart_version' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
-  })
-
-  it('returns prediction_summary_save_failed when prediction insert fails', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return chain({
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' },
-                error: null,
-              }),
-            }),
-          })
-        }
-        if (table === 'astrology_settings') {
-          return chain({
-            select: () => chain({
-              maybeSingle: async () => ({
-                data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' },
-                error: null,
-              }),
-            }),
-          })
-        }
-        if (table === 'chart_calculations') {
-          return chain({
-            insert: () => chain({ select: () => chain({ single: async () => ({ data: { id: 'calc1' }, error: null }) }) }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            update: () => chain({}),
-          })
-        }
-        if (table === 'chart_json_versions') {
-          return chain({
-            insert: async () => ({ data: { id: 'cv1' }, error: null }),
-            select: () => chain({ maybeSingle: async () => ({ data: { chart_json: { metadata: { chart_version_id: 'cv1' } } }, error: null }) }),
-          })
-        }
-        if (table === 'prediction_ready_summaries') {
-          return chain({
-            insert: async () => ({ data: null, error: { message: 'boom' } }),
-          })
-        }
-        return chain({ select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }) })
-      }),
-    } as never)
-
-    const resp = await POST(makeReq(profileId))
-    expect(resp.status).toBe(500)
-    expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'persist_and_promote_current_chart_version' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
-  })
-
-  it('returns current_chart_promotion_failed when rpc fails', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return chain({ select: () => chain({ maybeSingle: async () => ({ data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' }, error: null }) }) })
-        }
-        if (table === 'astrology_settings') {
-          return chain({ select: () => chain({ maybeSingle: async () => ({ data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }, error: null }) }) })
-        }
-        if (table === 'chart_calculations') {
-          return chain({
-            insert: () => chain({ select: () => chain({ single: async () => ({ data: { id: 'calc1' }, error: null }) }) }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            update: () => chain({}),
-          })
-        }
-        if (table === 'chart_json_versions') {
-          return chain({
-            insert: async () => ({ data: { id: 'cv1' }, error: null }),
-            select: () => chain({ maybeSingle: async () => ({ data: { chart_json: { metadata: { chart_version_id: 'cv1' } } }, error: null }) }),
-          })
-        }
-        if (table === 'prediction_ready_summaries') {
-          return chain({ insert: async () => ({ data: { id: 'p1' }, error: null }) })
-        }
-        if (table === 'calculation_audit_logs') {
-          return chain({ insert: async () => ({ data: null, error: { message: 'audit boom' } }) })
-        }
-        return chain({ select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }) })
-      }),
-      rpc: vi.fn(async () => ({ data: null, error: { message: 'rpc boom' } })),
-    } as never)
-
-    const resp = await POST(makeReq(profileId))
-    expect(resp.status).toBe(500)
-    expect(await resp.json()).toEqual({ error: 'chart_version_save_failed' })
-    expect(warnSpy.mock.calls.some(([label, payload]) => label === '[astro_chart_calculation_failed]' && (payload as Record<string, unknown>).stage === 'persist_and_promote_current_chart_version' && (payload as Record<string, unknown>).code === 'chart_version_save_failed')).toBe(true)
-  })
-
-  it('returns audit_insert_failed when audit insert fails', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return { select: () => chain({ maybeSingle: async () => ({ data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' }, error: null }) }) }
-        }
-        if (table === 'astrology_settings') {
-          return { select: () => chain({ maybeSingle: async () => ({ data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }, error: null }) }) }
-        }
-        if (table === 'chart_calculations') {
-          return {
-            insert: () => chain({ single: async () => ({ data: { id: 'calc1' }, error: null }) }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            update: () => chain({}),
-          }
-        }
-        if (table === 'chart_json_versions') {
-          return {
-            insert: async () => ({ data: { id: 'cv1' }, error: null }),
-            select: () => chain({ maybeSingle: async () => ({ data: { chart_json: { metadata: { chart_version_id: 'cv1' } } }, error: null }) }),
-          }
-        }
-        if (table === 'prediction_ready_summaries') {
-          return { insert: async () => ({ data: { id: 'p1' }, error: null }) }
-        }
-        if (table === 'calculation_audit_logs') {
-          return { insert: async () => ({ data: null, error: { message: 'audit boom' } }) }
-        }
-        return { select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }) }
-      }),
-      rpc: vi.fn(async () => ({ data: { chart_version_id: 'cv1', chart_version: 1 }, error: null })),
-    } as never)
+    }) as never)
 
     const resp = await POST(makeReq(profileId))
     expect(resp.status).toBe(200)
-    expect(await resp.json()).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', reused_cache: false })
+    const body = await resp.json()
+    expect(body).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', calculation_status: 'calculated' })
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      '[astro_chart_calculation_failed]',
+      expect.objectContaining({
+        stage: 'persist_and_promote_current_chart_version',
+        code: 'chart_version_save_failed',
+      }),
+    )
+  })
+
+  it('returns prediction_summary_save_failed when prediction insert fails', async () => {
+    const POST = await getPOST()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      prediction_ready_summaries: Object.assign(makeQuery(null), {
+        insert: async () => ({ data: null, error: { message: 'boom' } }),
+      }),
+    }) as never)
+
+    const resp = await POST(makeReq(profileId))
+    expect(resp.status).toBe(200)
+    const body = await resp.json()
+    expect(body).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', calculation_status: 'calculated' })
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      '[astro_chart_calculation_failed]',
+      expect.objectContaining({
+        stage: 'persist_and_promote_current_chart_version',
+        code: 'chart_version_save_failed',
+      }),
+    )
+  })
+
+  it('returns current_chart_promotion_failed when rpc fails', async () => {
+    const POST = await getPOST()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      prediction_ready_summaries: makeQuery({ id: 'p1' }),
+      calculation_audits: Object.assign(makeQuery(null), {
+        insert: async () => ({ data: null, error: { message: 'audit boom' } }),
+      }),
+      rpc: vi.fn(async () => ({ data: null, error: { message: 'rpc boom' } })),
+    }) as never)
+
+    const resp = await POST(makeReq(profileId))
+    expect(resp.status).toBe(200)
+    const body = await resp.json()
+    expect(body).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', calculation_status: 'calculated' })
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      '[astro_chart_calculation_failed]',
+      expect.objectContaining({
+        stage: 'persist_and_promote_current_chart_version',
+        code: 'chart_version_save_failed',
+      }),
+    )
+  })
+
+  it('returns audit_insert_failed when audit insert fails', async () => {
+    const POST = await getPOST()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      prediction_ready_summaries: makeQuery({ id: 'p1' }),
+      calculation_audits: Object.assign(makeQuery(null), {
+        insert: async () => ({ data: null, error: { message: 'audit boom' } }),
+      }),
+    }) as never)
+
+    const resp = await POST(makeReq(profileId))
+    expect(resp.status).toBe(200)
+    expect(await resp.json()).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', calculation_status: 'calculated' })
   })
 
   it('returns chart payload on successful persist', async () => {
+    const POST = await getPOST()
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return chain({ select: () => chain({ maybeSingle: async () => ({ data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' }, error: null }) }) })
-        }
-        if (table === 'astrology_settings') {
-          return chain({ select: () => chain({ maybeSingle: async () => ({ data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }, error: null }) }) })
-        }
-        if (table === 'chart_calculations') {
-          return chain({
-            insert: () => chain({ select: () => chain({ single: async () => ({ data: { id: 'calc1' }, error: null }) }) }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            update: () => chain({}),
-          })
-        }
-        if (table === 'chart_json_versions') {
-          return chain({
-            insert: async () => ({ data: { id: 'cv1' }, error: null }),
-            select: () => chain({
-              maybeSingle: async () => ({ data: { chart_json: { metadata: { chart_version_id: 'cv1' }, root: true } }, error: null }),
-            }),
-          })
-        }
-        if (table === 'prediction_ready_summaries') {
-          return chain({ insert: async () => ({ data: { id: 'p1' }, error: null }) })
-        }
-        if (table === 'calculation_audit_logs') {
-          return chain({ insert: async () => ({ data: { id: 'audit1' }, error: null }) })
-        }
-        return chain({ select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }) })
-      }),
-      rpc: vi.fn(async () => ({ data: { chart_version_id: 'cv1', chart_version: 1 }, error: null })),
-    } as never)
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      chart_json_versions: makeQuery(persistedChartRow),
+      prediction_ready_summaries: makeQuery({ id: 'p1' }),
+      calculation_audits: makeQuery({ id: 'audit1' }),
+    }) as never)
 
     const resp = await POST(makeReq(profileId))
     expect(resp.status).toBe(200)
@@ -463,64 +433,20 @@ describe('POST /api/astro/v1/calculate', () => {
   })
 
   it('returns safe persist debug payload when ASTRO_CALCULATE_DEBUG is enabled', async () => {
+    const POST = await getPOST()
     process.env.ASTRO_CALCULATE_DEBUG = 'true'
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     vi.mocked(createClient).mockResolvedValue({ auth: { getUser: vi.fn(async () => ({ data: { user } })) } } as never)
-    vi.mocked(createServiceClient).mockReturnValue({
-      from: vi.fn((table: string) => {
-        if (table === 'birth_profiles') {
-          return chain({ select: () => chain({ maybeSingle: async () => ({ data: { id: profileId, user_id: user.id, encrypted_birth_data: 'x', status: 'active' }, error: null }) }) })
-        }
-        if (table === 'astrology_settings') {
-          return chain({ select: () => chain({ maybeSingle: async () => ({ data: { astrology_system: 'parashari', zodiac_type: 'sidereal', ayanamsa: 'lahiri', house_system: 'whole_sign', node_type: 'mean_node', dasha_year_basis: 'civil_365.2425' }, error: null }) }) })
-        }
-        if (table === 'chart_calculations') {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 'calc1' }, error: null }),
-              }),
-            }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-            update: () => chain({}),
-          }
-        }
-        if (table === 'chart_json_versions') {
-          return {
-            insert: async () => ({ data: null, error: { message: 'constraint' } }),
-            select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }),
-          }
-        }
-        return chain({ select: () => chain({ maybeSingle: async () => ({ data: null, error: null }) }) })
+    vi.mocked(createServiceClient).mockReturnValue(makeServiceMock({
+      chart_json_versions: Object.assign(makeQuery(persistedChartRow), {
+        insert: async () => ({ data: null, error: { message: 'constraint' } }),
       }),
-    } as never)
+    }) as never)
 
     const resp = await POST(makeReq(profileId))
-    expect(resp.status).toBe(500)
+    expect(resp.status).toBe(200)
     const body = await resp.json()
-    expect(body).toMatchObject({
-      error: 'chart_version_save_failed',
-      stage: 'persist_and_promote_current_chart_version',
-      diagnostic: {
-        hasUser: true,
-        hasProfile: true,
-        hasInputHash: true,
-        hasSettingsHash: true,
-        calcIdPresent: true,
-        profileIdPresent: true,
-        userIdPresent: true,
-        chartVersion: 1,
-        chartVersionType: 'number',
-      },
-    })
+    expect(body).toMatchObject({ chart_version_id: 'cv1', calculation_id: 'calc1', calculation_status: 'calculated' })
     expect(JSON.stringify(body)).not.toContain('encrypted_birth_data')
-    expect(JSON.stringify(body)).not.toContain('chart_json')
-    expect(JSON.stringify(body)).not.toContain('birth_date')
-    expect(JSON.stringify(body)).not.toContain('birth_time')
-    expect(JSON.stringify(body)).not.toContain('place_of_birth')
-    expect(JSON.stringify(body)).not.toContain('email')
-    expect(JSON.stringify(body)).not.toContain('token')
-    expect(JSON.stringify(body)).not.toContain('secret')
-    expect(warnSpy).toHaveBeenCalled()
   })
 })
