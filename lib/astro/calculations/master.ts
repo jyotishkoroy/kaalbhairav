@@ -19,6 +19,7 @@ import { calculateSign } from './sign.ts'
 import { calculateNakshatra } from './nakshatra.ts'
 import { calculateLagna } from './lagna.ts'
 import { calculateWholeSignHouses } from './houses.ts'
+import { buildHousesSectionV2 } from './houses.ts'
 import { calculateD1Chart } from './d1.ts'
 import { calculateNavamsaChart } from './navamsa.ts'
 import { calculateVimshottari, calculateVimshottariDashaV2 } from './vimshottari.ts'
@@ -100,6 +101,35 @@ function getMoonAbsoluteLongitude(section: import('./contracts.ts').AstroSection
   return typeof moon?.absoluteLongitude === 'number' && Number.isFinite(moon.absoluteLongitude)
     ? moon.absoluteLongitude
     : null
+}
+
+function getAyanamshaDeg(section: import('./contracts.ts').AstroSectionContract): number | null {
+  const ayanamshaDeg = section.fields?.ayanamshaDeg
+  return typeof ayanamshaDeg === 'number' && Number.isFinite(ayanamshaDeg) ? ayanamshaDeg : null
+}
+
+function normalizeHouseSystem(value: AstrologySettings['house_system']): 'whole_sign' | 'sripati' | 'kp_placidus' {
+  if (value === 'sripati') return 'sripati'
+  if (value === 'placidus' || value === 'bhava_chalit') return 'sripati'
+  if (value === 'kp') return 'kp_placidus'
+  return 'whole_sign'
+}
+
+function buildLagnaSectionContract(lagna: import('./lagna.ts').LagnaResult): import('./contracts.ts').AstroSectionContract {
+  return {
+    status: 'computed',
+    source: 'deterministic_calculation',
+    fields: {
+      ascendant: {
+        sign: lagna.sign,
+        signNumber: lagna.sign_index + 1,
+        degreeInSign: lagna.degrees_in_sign,
+        absoluteLongitude: lagna.sidereal_longitude,
+        tropicalLongitude: lagna.tropical_longitude,
+        source: 'deterministic_calculation',
+      },
+    },
+  }
 }
 
 export async function calculateMasterAstroOutput(args: {
@@ -213,6 +243,40 @@ export async function calculateMasterAstroOutput(args: {
       })
     : undefined
 
+  const lagnaSection = lagna ? buildLagnaSectionContract(lagna) : null
+
+  const housesSection = ASTRO_CALC_INTEGRATION_ENABLED && lagnaSection && planets
+    ? await buildHousesSectionV2({
+        lagna: lagnaSection,
+        planetaryPositions: {
+          status: 'computed',
+          source: 'deterministic_calculation',
+          engine: 'swiss_ephemeris',
+          fields: { byBody: planets, ayanamshaDeg: ayanamsaResult.value_degrees },
+        },
+        houseSystem: normalizeHouseSystem(settings.house_system),
+        ephemerisProvider: {
+          engineId: 'swiss-ephemeris',
+          engineVersion: getSweVersion(),
+          ephemerisVersion: 'unknown',
+          async calculateTropicalPositions() {
+            return [];
+          },
+          async calculateAscendantMc() {
+            return undefined as never;
+          },
+        },
+        jdUtExact: jdResult.jd_ut,
+        latitudeDeg: normalized.latitude_full,
+        longitudeDeg: normalized.longitude_full,
+        ayanamshaDeg: getAyanamshaDeg({
+          status: 'computed',
+          source: 'deterministic_calculation',
+          fields: { ayanamshaDeg: ayanamsaResult.value_degrees },
+        }),
+      })
+    : undefined
+
   const sections = ASTRO_CALC_INTEGRATION_ENABLED && sun && moon && panchangaV2Time
     ? {
         panchang: await calculatePanchangaV2({
@@ -221,6 +285,7 @@ export async function calculateMasterAstroOutput(args: {
           normalizedTime: panchangaV2Time,
         }),
         vimshottari: vimshottariSection,
+        houses: housesSection,
       }
     : undefined
 

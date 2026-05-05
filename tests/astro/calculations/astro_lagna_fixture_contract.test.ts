@@ -47,6 +47,7 @@ const fakeAscMcProvider: EphemerisProvider = {
     return {
       ascendantTropicalDeg: 124,
       mcTropicalDeg: 214,
+      cuspsTropicalDeg: [124, 154, 184, 214, 244, 274, 304, 334, 4, 34, 64, 94],
     };
   },
 };
@@ -169,5 +170,26 @@ describe('astro lagna fixture contract', () => {
 
     expect(section.status).toBe('error');
     expect(section.source).toBe('none');
+  });
+
+  it('ignores provider cusp metadata and preserves ascendant and MC calculations', async () => {
+    const section = await calculateAscendantV2({
+      jdUtExact: 2451545,
+      latitudeDeg: 13.08,
+      longitudeDeg: 80.27,
+      ephemerisProvider: fakeAscMcProvider,
+      ayanamshaProvider: fakeAyanamshaProvider,
+    });
+
+    expect(section.status).toBe('computed');
+    expect(section.fields?.ascendant).toMatchObject({
+      sign: 'Cancer',
+      signNumber: 4,
+    });
+    expect(section.fields?.mc).toMatchObject({
+      sign: 'Libra',
+      signNumber: 7,
+    });
+    expect(section.fields).not.toHaveProperty('cuspsTropicalDeg');
   });
 });
