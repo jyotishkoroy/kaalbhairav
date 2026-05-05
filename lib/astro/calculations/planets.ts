@@ -4,12 +4,17 @@ commercially use, train models on, scrape, or create derivative works from this
 repository or any part of it without prior written permission from Jyotishko Roy.
 */
 
-import type { EphemerisBody } from './ephemeris-provider.ts'
+import type { AstroSectionContract, PlanetNameV2, PlanetaryPositionV2 } from './contracts.ts'
+import type { AyanamshaProvider } from './ayanamsha-provider.ts'
+import { tropicalToSidereal } from './ayanamsha-provider.ts'
+import type { EphemerisBody, EphemerisProvider, TropicalBodyPosition } from './ephemeris-provider.ts'
+import { assertProviderReturnedBodies, normalizeRahuKetuMeanNode } from './ephemeris-provider.ts'
 import { calcPlanet, SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, SE_MEAN_NODE, SE_TRUE_NODE } from '../engine/swiss.ts'
 import { normalize360 } from './math.ts'
 import { calculateSign } from './sign.ts'
 import { calculateNakshatra, type NakshatraPlacement } from './nakshatra.ts'
 import { nearSignBoundary, nearNakshatraBoundary, nearPadaBoundary } from './boundary.ts'
+import { longitudeToSignDegree } from './longitude.ts'
 
 export type PlanetPosition = {
   name: string
@@ -46,6 +51,120 @@ export const V2_PLANETARY_BODIES: readonly EphemerisBody[] = [
   'Pluto',
   'Rahu',
 ]
+
+export type CalculatePlanetaryPositionsV2Args = {
+  jdUtExact: number;
+  ephemerisProvider: EphemerisProvider;
+  ayanamshaProvider: AyanamshaProvider;
+  ayanamshaType: 'lahiri';
+};
+
+export type PlanetaryPositionsV2Fields = {
+  ayanamshaDeg: number;
+  ayanamshaType: 'lahiri';
+  byBody: Partial<Record<PlanetNameV2, PlanetaryPositionV2>>;
+};
+
+function toPlanetNameV2(body: EphemerisBody): PlanetNameV2 {
+  return body;
+}
+
+function maybeCalculateNakshatraPada(siderealLongitudeDeg: number): {
+  nakshatra: string | null;
+  pada: 1 | 2 | 3 | 4 | null;
+} {
+  const nakshatra = calculateNakshatra(siderealLongitudeDeg);
+  if (!nakshatra || typeof nakshatra !== 'object') {
+    return { nakshatra: null, pada: null };
+  }
+
+  const name = (nakshatra as { nakshatra?: unknown; name?: unknown }).nakshatra ?? (nakshatra as { name?: unknown }).name;
+  const pada = (nakshatra as { pada?: unknown }).pada;
+
+  return {
+    nakshatra: typeof name === 'string' ? name : null,
+    pada: pada === 1 || pada === 2 || pada === 3 || pada === 4 ? pada : null,
+  };
+}
+
+export async function calculatePlanetaryPositionsV2(
+  args: CalculatePlanetaryPositionsV2Args,
+): Promise<AstroSectionContract> {
+  if (!Number.isFinite(args.jdUtExact)) {
+    return {
+      status: 'error',
+      source: 'none',
+      reason: 'jdUtExact must be a finite number.',
+      fields: {},
+    };
+  }
+
+  try {
+    const tropicalPositions = await args.ephemerisProvider.calculateTropicalPositions(
+      args.jdUtExact,
+      [...V2_PLANETARY_BODIES],
+    );
+
+    const normalizedTropicalPositions = normalizeRahuKetuMeanNode(tropicalPositions);
+
+    assertProviderReturnedBodies(
+      [...V2_PLANETARY_BODIES, 'Ketu'],
+      normalizedTropicalPositions,
+    );
+
+    const ayanamshaDeg = await args.ayanamshaProvider.calculateAyanamshaDeg(
+      args.jdUtExact,
+      args.ayanamshaType,
+    );
+
+    if (!Number.isFinite(ayanamshaDeg)) {
+      throw new Error('Ayanamsha provider returned a non-finite value.');
+    }
+
+    const byBody: Partial<Record<PlanetNameV2, PlanetaryPositionV2>> = {};
+
+    for (const position of normalizedTropicalPositions) {
+      const body = toPlanetNameV2(position.body);
+      const siderealLongitudeDeg = tropicalToSidereal(position.tropicalLongitudeDeg, ayanamshaDeg);
+      const signDegree = longitudeToSignDegree(siderealLongitudeDeg);
+      const nakshatraPada = maybeCalculateNakshatraPada(siderealLongitudeDeg);
+
+      byBody[body] = {
+        body,
+        sign: signDegree.signName,
+        signNumber: signDegree.signNumber,
+        degreeInSign: signDegree.degreeInSign,
+        absoluteLongitude: siderealLongitudeDeg,
+        nakshatra: nakshatraPada.nakshatra,
+        pada: nakshatraPada.pada,
+        retrograde:
+          position.body === 'Rahu' ||
+          position.body === 'Ketu' ||
+          (position.speedLongitudeDegPerDay ?? 0) < 0,
+        speedDegPerDay: position.speedLongitudeDegPerDay ?? null,
+        source: 'deterministic_calculation',
+      };
+    }
+
+    return {
+      status: 'computed',
+      source: 'deterministic_calculation',
+      engine: args.ephemerisProvider.engineId,
+      fields: {
+        ayanamshaDeg,
+        ayanamshaType: args.ayanamshaType,
+        byBody,
+      } satisfies PlanetaryPositionsV2Fields,
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      source: 'none',
+      reason: error instanceof Error ? error.message : 'Planetary position calculation failed.',
+      fields: {},
+    };
+  }
+}
 
 export function calculatePlanetPosition(
   planetName: string, jd_ut: number, ayanamsa: number, nodeType: 'mean_node' | 'true_node' = 'mean_node',

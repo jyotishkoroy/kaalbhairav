@@ -7,6 +7,13 @@
 import { RASHI_MAP } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearSignBoundary } from './boundary.ts'
+export {
+  ZODIAC_SIGN_NAMES,
+  longitudeToSignDegree,
+  normalizeDegrees360,
+  type SignDegree,
+  type SignNumber,
+} from './longitude.ts'
 
 export type SignPlacement = {
   sign: string
