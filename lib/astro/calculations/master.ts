@@ -7,6 +7,7 @@
 import { masterAstroOutputSchema, type MasterAstroCalculationOutput } from '../schemas/master.ts'
 import type { AstrologySettings, BirthProfileInput } from '../types.ts'
 import type { NormalizedBirthInput } from '../normalize.ts'
+import { ASTRO_CALC_INTEGRATION_ENABLED } from '../config/feature-flags.ts'
 import { getSweVersion, isMoshierFallback, isSwissEphemerisAvailable, sweJulday } from '../engine/swiss.ts'
 import { getEngineDiagnostics, getEphemerisRangeMetadata, runStartupValidation } from '../engine/diagnostics.ts'
 import { CONSTANTS_VERSION, RASHI_MAP_VERSION, NAKSHATRA_MAP_VERSION, DASHA_ORDER_VERSION, PANCHANG_SEQUENCE_VERSION } from './constants.ts'
@@ -32,6 +33,7 @@ import { calculateConfidence } from './confidence.ts'
 import { collectWarnings } from './warnings.ts'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
 import { normalizeBirthTimeForCalculation } from './time.ts'
+import { calculatePanchangaV2 } from './panchang.ts'
 
 const FORBIDDEN_PREDICTION_KEYS = new Set([
   'birth_date',
@@ -55,6 +57,36 @@ function stripForbiddenKeys<T>(value: T): T {
     result[key] = stripForbiddenKeys(nested)
   }
   return result as T
+}
+
+function toPanchangaV2Time(
+  normalized: NormalizedBirthInput,
+  birthTimeResult: { birth_local_wall_time: string; utc_offset_minutes: number; birth_utc: string | null },
+): import('./contracts.ts').NormalizedBirthInputV2 | null {
+  if (!normalized.birth_time_known || !normalized.birth_time_iso || !birthTimeResult.birth_utc) {
+    return null
+  }
+
+  return {
+    dateLocal: normalized.birth_date_iso,
+    timeLocal: normalized.birth_time_iso,
+    localDateTimeIso: birthTimeResult.birth_local_wall_time,
+    utcDateTimeIso: birthTimeResult.birth_utc,
+    placeName: null,
+    latitudeDeg: normalized.latitude_full,
+    longitudeDeg: normalized.longitude_full,
+    timezoneMode: 'fixed_offset_hours',
+    timezone: normalized.timezone,
+    timezoneHours: birthTimeResult.utc_offset_minutes / 60,
+    warTimeCorrectionSeconds: 0,
+    standardMeridianDeg: null,
+    localTimeCorrectionSeconds: null,
+    localMeanTimeIso: null,
+    printedJulianDay: null,
+    jdUtExact: null,
+    runtimeClockIso: birthTimeResult.birth_utc,
+    warnings: [],
+  }
 }
 
 export async function calculateMasterAstroOutput(args: {
@@ -155,6 +187,17 @@ export async function calculateMasterAstroOutput(args: {
     { name: 'startup_validation', passed: startupValidation.passed, details: startupValidation.checks.map((check) => ({ check_id: check.check_id, passed: check.passed })) },
   ]
 
+  const panchangaV2Time = toPanchangaV2Time(normalized, birthTimeResult)
+  const sections = ASTRO_CALC_INTEGRATION_ENABLED && sun && moon && panchangaV2Time
+    ? {
+        panchang: await calculatePanchangaV2({
+          sunLongitudeDeg: sun.sidereal_longitude,
+          moonLongitudeDeg: moon.sidereal_longitude,
+          normalizedTime: panchangaV2Time,
+        }),
+      }
+    : undefined
+
   const output = {
     schema_version: '29.0.0',
     calculation_status: confidence.rejected ? 'rejected' : (birthTimeResult.timezone_status !== 'valid' || !normalized.birth_time_known ? 'partial' : 'calculated'),
@@ -227,6 +270,7 @@ export async function calculateMasterAstroOutput(args: {
     }),
     core_natal_summary: { ascendant: lagna, sun_sign: calculateSign(sun?.sidereal_longitude ?? 0), moon_sign: calculateSign(moon?.sidereal_longitude ?? 0), moon_nakshatra: calculateNakshatra(moon?.sidereal_longitude ?? 0), birth_tithi: panchang?.tithi ?? null, dasha_at_birth: vimshottari_dasha ? { lord: vimshottari_dasha.birth_dasha_lord, elapsed_years: vimshottari_dasha.dasha_elapsed_years, remaining_years: vimshottari_dasha.dasha_remaining_years } : null, confidence, warnings },
     panchang,
+    sections,
     daily_transits,
     confidence,
     warnings,

@@ -8,7 +8,7 @@ import type {
   AstroSectionContract,
   AstroUnavailableReason,
   AstroUnavailableValue,
-} from './contracts';
+} from './contracts.ts';
 
 export const ASTRO_UNAVAILABLE_MODULE_IDS = {
   shadbala: 'shadbala',

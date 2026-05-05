@@ -1,14 +1,20 @@
+/*
+Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
+commercially use, train models on, scrape, or create derivative works from this
+repository or any part of it without prior written permission from Jyotishko Roy.
+*/
+
 /**
  * Copyright (c) 2026 Jyotishko Roy.
  * Proprietary and confidential. All rights reserved.
  * Project: tarayai — https://tarayai.com
- *
- * Copyright (c) 2026 Jyotishko Roy. All rights reserved. No permission is granted to copy, modify, distribute, sublicense, host, sell,
- * commercially use, train models on, scrape, or create derivative works from this
- * repository or any part of it without prior written permission from Jyotishko Roy.
  */
 
 import { DateTime } from 'luxon'
+import type { AstroSectionContract, AstroUnavailableValue, NormalizedBirthInputV2 } from './contracts.ts'
+import type { EphemerisProvider } from './ephemeris-provider.ts'
+import { normalizeDegrees360 } from './longitude.ts'
+import { makeUnavailableValue } from './unavailable.ts'
 import { getSunriseOrSet, SE_CALC_RISE, SE_CALC_SET } from '../engine/swiss.ts'
 import { calculateJulianDay } from './julian-day.ts'
 import { sweJulday } from '../engine/swiss.ts'
@@ -16,7 +22,7 @@ import { calculateSign } from './sign.ts'
 import { calculateNakshatra } from './nakshatra.ts'
 import { normalize360 } from './math.ts'
 import { nearYogaBoundary } from './boundary.ts'
-import { YOGA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
+import { YOGA_NAMES as LEGACY_YOGA_NAMES, karanaNameByHalfTithiIndex, BOUNDARY_THRESHOLD_DEGREES } from './constants.ts'
 import { calculateTithi, type TithiResult } from './tithi.ts'
 import { calculateAyanamsa } from './ayanamsa.ts'
 import { calculateAllPlanets } from './planets.ts'
@@ -24,6 +30,345 @@ import { assertEphemerisRange } from '../engine/diagnostics.ts'
 import type { NakshatraPlacement } from './nakshatra.ts'
 import type { SignPlacement } from './sign.ts'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
+
+export const TITHI_NAMES = [
+  'Pratipada',
+  'Dwitiya',
+  'Tritiya',
+  'Chaturthi',
+  'Panchami',
+  'Shashthi',
+  'Saptami',
+  'Ashtami',
+  'Navami',
+  'Dashami',
+  'Ekadashi',
+  'Dwadashi',
+  'Trayodashi',
+  'Chaturdashi',
+  'Purnima',
+  'Pratipada',
+  'Dwitiya',
+  'Tritiya',
+  'Chaturthi',
+  'Panchami',
+  'Shashthi',
+  'Saptami',
+  'Ashtami',
+  'Navami',
+  'Dashami',
+  'Ekadashi',
+  'Dwadashi',
+  'Trayodashi',
+  'Chaturdashi',
+  'Amavasya',
+] as const
+
+export const YOGA_NAMES = [
+  'Vishkambha',
+  'Priti',
+  'Ayushman',
+  'Saubhagya',
+  'Shobhana',
+  'Atiganda',
+  'Sukarma',
+  'Dhriti',
+  'Shoola',
+  'Ganda',
+  'Vriddhi',
+  'Dhruva',
+  'Vyaghata',
+  'Harshana',
+  'Vajra',
+  'Siddhi',
+  'Vyatipata',
+  'Variyana',
+  'Parigha',
+  'Shiva',
+  'Siddha',
+  'Sadhya',
+  'Shubha',
+  'Shukla',
+  'Brahma',
+  'Indra',
+  'Vaidhriti',
+] as const
+
+export const MOVABLE_KARANA_NAMES = [
+  'Bava',
+  'Balava',
+  'Kaulava',
+  'Taitila',
+  'Gara',
+  'Vanija',
+  'Vishti',
+] as const
+
+export const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const
+
+export type PanchangaV2Args = {
+  sunLongitudeDeg: number
+  moonLongitudeDeg: number
+  normalizedTime: NormalizedBirthInputV2
+  sunriseSunsetProvider?: EphemerisProvider
+}
+
+export type PanchangaV2Fields = {
+  tithi: {
+    number: number
+    name: string
+    paksha: 'Shukla' | 'Krishna'
+    elongationDeg: number
+  }
+  yoga: {
+    number: number
+    name: string
+    sumLongitudeDeg: number
+  }
+  karana: {
+    number: number
+    name: string
+    halfTithiIndex: number
+  }
+  civilWeekday: string
+  hinduWeekday: string | AstroUnavailableValue
+  sunrise?: {
+    status: 'computed'
+    sunriseLocalIso: string
+    sunsetLocalIso: string
+  } | AstroUnavailableValue
+}
+
+function assertFiniteLongitude(value: number, label: string): number {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number.`)
+  }
+  return normalizeDegrees360(value)
+}
+
+export function calculateTithiNumber(moonLongitudeDeg: number, sunLongitudeDeg: number): number {
+  const delta = normalizeDegrees360(
+    assertFiniteLongitude(moonLongitudeDeg, 'Moon longitude') -
+      assertFiniteLongitude(sunLongitudeDeg, 'Sun longitude'),
+  )
+  return Math.floor(delta / 12) + 1
+}
+
+export function calculatePaksha(tithiNumber: number): 'Shukla' | 'Krishna' {
+  if (!Number.isInteger(tithiNumber) || tithiNumber < 1 || tithiNumber > 30) {
+    throw new Error('Tithi number must be an integer from 1 to 30.')
+  }
+
+  return tithiNumber <= 15 ? 'Shukla' : 'Krishna'
+}
+
+export function calculateYogaNumber(sunLongitudeDeg: number, moonLongitudeDeg: number): number {
+  const sum = normalizeDegrees360(
+    assertFiniteLongitude(sunLongitudeDeg, 'Sun longitude') +
+      assertFiniteLongitude(moonLongitudeDeg, 'Moon longitude'),
+  )
+  const yogaSpanDeg = 13 + 20 / 60
+  return Math.floor(sum / yogaSpanDeg) + 1
+}
+
+export function calculateKaranaNumber(moonLongitudeDeg: number, sunLongitudeDeg: number): number {
+  const delta = normalizeDegrees360(
+    assertFiniteLongitude(moonLongitudeDeg, 'Moon longitude') -
+      assertFiniteLongitude(sunLongitudeDeg, 'Sun longitude'),
+  )
+  return Math.floor(delta / 6) + 1
+}
+
+export function getKaranaName(halfTithiIndex: number): string {
+  if (!Number.isInteger(halfTithiIndex) || halfTithiIndex < 1 || halfTithiIndex > 60) {
+    throw new Error('Karana half-tithi index must be an integer from 1 to 60.')
+  }
+
+  if (halfTithiIndex === 1) {
+    return 'Kimstughna'
+  }
+
+  if (halfTithiIndex >= 2 && halfTithiIndex <= 57) {
+    return MOVABLE_KARANA_NAMES[(halfTithiIndex - 2) % MOVABLE_KARANA_NAMES.length]
+  }
+
+  if (halfTithiIndex === 58) {
+    return 'Shakuni'
+  }
+
+  if (halfTithiIndex === 59) {
+    return 'Chatushpada'
+  }
+
+  return 'Naga'
+}
+
+export function getCivilWeekday(dateLocal: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateLocal)
+  if (!match) {
+    throw new Error('dateLocal must be in YYYY-MM-DD format.')
+  }
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error('dateLocal must be a valid Gregorian date.')
+  }
+
+  return WEEKDAY_NAMES[date.getUTCDay()]
+}
+
+function getPreviousCivilWeekday(dateLocal: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateLocal)
+  if (!match) {
+    throw new Error('dateLocal must be in YYYY-MM-DD format.')
+  }
+
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  date.setUTCDate(date.getUTCDate() - 1)
+
+  return WEEKDAY_NAMES[date.getUTCDay()]
+}
+
+function localTimeIsBefore(localTimeIso: string | null, sunriseLocalIso: string): boolean {
+  if (!localTimeIso) {
+    return false
+  }
+
+  const timeMatch = /T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(localTimeIso)
+  const sunriseMatch = /T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(sunriseLocalIso)
+
+  if (!timeMatch || !sunriseMatch) {
+    return false
+  }
+
+  const toSeconds = (match: RegExpExecArray) =>
+    Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3] ?? 0)
+
+  return toSeconds(timeMatch) < toSeconds(sunriseMatch)
+}
+
+export async function calculatePanchangaV2(
+  args: PanchangaV2Args,
+): Promise<AstroSectionContract> {
+  try {
+    const sunLongitudeDeg = assertFiniteLongitude(args.sunLongitudeDeg, 'Sun longitude')
+    const moonLongitudeDeg = assertFiniteLongitude(args.moonLongitudeDeg, 'Moon longitude')
+
+    const elongationDeg = normalizeDegrees360(moonLongitudeDeg - sunLongitudeDeg)
+    const tithiNumber = Math.floor(elongationDeg / 12) + 1
+    const paksha = calculatePaksha(tithiNumber)
+
+    const sumLongitudeDeg = normalizeDegrees360(sunLongitudeDeg + moonLongitudeDeg)
+    const yogaSpanDeg = 13 + 20 / 60
+    const yogaNumber = Math.floor(sumLongitudeDeg / yogaSpanDeg) + 1
+
+    const karanaNumber = Math.floor(elongationDeg / 6) + 1
+    const civilWeekday = getCivilWeekday(args.normalizedTime.dateLocal)
+
+    let sunrise:
+      | { status: 'computed'; sunriseLocalIso: string; sunsetLocalIso: string }
+      | AstroUnavailableValue = makeUnavailableValue({
+        requiredModule: 'sunrise_sunset',
+        fieldKey: 'panchang.sunrise',
+        reason: 'module_not_implemented',
+      })
+
+    let hinduWeekday: string | AstroUnavailableValue = makeUnavailableValue({
+      requiredModule: 'sunrise_sunset',
+      fieldKey: 'panchang.hinduWeekday',
+      reason: 'module_not_implemented',
+    })
+
+    if (
+      args.sunriseSunsetProvider?.calculateSunriseSunset &&
+      args.normalizedTime.latitudeDeg !== null &&
+      args.normalizedTime.longitudeDeg !== null &&
+      args.normalizedTime.timezoneHours !== null
+    ) {
+      try {
+        const computed = await args.sunriseSunsetProvider.calculateSunriseSunset({
+          dateLocal: args.normalizedTime.dateLocal,
+          latitudeDeg: args.normalizedTime.latitudeDeg,
+          longitudeDeg: args.normalizedTime.longitudeDeg,
+          timezoneHours: args.normalizedTime.timezoneHours,
+        })
+
+        sunrise = {
+          status: 'computed',
+          sunriseLocalIso: computed.sunriseLocalIso,
+          sunsetLocalIso: computed.sunsetLocalIso,
+        }
+
+        hinduWeekday = localTimeIsBefore(
+          args.normalizedTime.localDateTimeIso,
+          computed.sunriseLocalIso,
+        )
+          ? getPreviousCivilWeekday(args.normalizedTime.dateLocal)
+          : civilWeekday
+      } catch {
+        sunrise = makeUnavailableValue({
+          requiredModule: 'sunrise_sunset',
+          fieldKey: 'panchang.sunrise',
+          reason: 'ephemeris_unavailable',
+        })
+        hinduWeekday = makeUnavailableValue({
+          requiredModule: 'sunrise_sunset',
+          fieldKey: 'panchang.hinduWeekday',
+          reason: 'ephemeris_unavailable',
+        })
+      }
+    }
+
+    return {
+      status: 'computed',
+      source: 'deterministic_calculation',
+      fields: {
+        tithi: {
+          number: tithiNumber,
+          name: TITHI_NAMES[tithiNumber - 1],
+          paksha,
+          elongationDeg,
+        },
+        yoga: {
+          number: yogaNumber,
+          name: YOGA_NAMES[yogaNumber - 1],
+          sumLongitudeDeg,
+        },
+        karana: {
+          number: karanaNumber,
+          name: getKaranaName(karanaNumber),
+          halfTithiIndex: karanaNumber,
+        },
+        civilWeekday,
+        hinduWeekday,
+        sunrise,
+      } satisfies PanchangaV2Fields,
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      source: 'none',
+      reason: error instanceof Error ? error.message : 'Panchanga calculation failed.',
+      fields: {},
+    }
+  }
+}
 
 export type PanchangConvention = 'at_birth_time' | 'at_local_sunrise'
 
@@ -199,7 +544,7 @@ export function calculatePanchangResult(params: {
   const near_yoga_boundary = nearYogaBoundary(yoga_angle)
   const yoga = {
     yoga_index,
-    yoga_name: YOGA_NAMES[yoga_index] ?? 'Unknown',
+    yoga_name: LEGACY_YOGA_NAMES[yoga_index] ?? 'Unknown',
     yoga_fraction_elapsed,
     near_yoga_boundary,
   }
