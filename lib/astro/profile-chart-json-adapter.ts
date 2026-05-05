@@ -174,13 +174,106 @@ function sectionUnavailable(engine: string, output: MasterAstroCalculationOutput
   })
 }
 
+function getRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+function getLagnaSignNumber(lagna: unknown): number | null {
+  const record = getRecord(lagna)
+  if (typeof record?.sign_index === 'number' && Number.isFinite(record.sign_index)) {
+    return record.sign_index + 1
+  }
+  const ascendant = getRecord(record?.ascendant)
+  const signNumber = ascendant?.signNumber
+  return typeof signNumber === 'number' && Number.isFinite(signNumber) ? signNumber : null
+}
+
+function buildDeterministicD1ChartSection(output: MasterAstroCalculationOutput) {
+  const d1Chart = getRecord((output as MaybeObject)?.d1_rashi_chart) ?? getRecord((output as MaybeObject)?.d1_chart)
+  const lagna = getRecord((output as MaybeObject)?.lagna)
+  const lagnaSign = typeof lagna?.sign === 'string'
+    ? lagna.sign
+    : typeof getRecord(lagna?.ascendant)?.sign === 'string'
+      ? getRecord(lagna?.ascendant)?.sign as string
+      : undefined
+  const lagnaSignNumber = getLagnaSignNumber(lagna)
+
+  const planetToSign = getRecord(d1Chart?.planet_to_sign)
+  const planetToHouse = getRecord(d1Chart?.planet_to_house)
+  const houses = Array.isArray(d1Chart?.houses) ? d1Chart.houses : []
+
+  if ((!planetToSign && !planetToHouse) || !lagnaSign || lagnaSignNumber === null) {
+    return null
+  }
+
+  const placements: Record<string, Record<string, unknown>> = {}
+  let moonSign: string | undefined
+  let moonHouse: number | undefined
+  let sunSign: string | undefined
+  let sunHouse: number | undefined
+
+  const bodyNames = new Set<string>([
+    ...Object.keys(planetToSign ?? {}),
+    ...Object.keys(planetToHouse ?? {}),
+  ])
+
+  for (const body of bodyNames) {
+    const signPlacement = getRecord(planetToSign?.[body]) ?? {}
+    const sign = typeof signPlacement.sign === 'string' ? signPlacement.sign : undefined
+    const signNumber = typeof signPlacement.signNumber === 'number' && Number.isFinite(signPlacement.signNumber)
+      ? signPlacement.signNumber
+      : typeof signPlacement.sign_index === 'number' && Number.isFinite(signPlacement.sign_index)
+        ? signPlacement.sign_index + 1
+      : null
+    const houseValue = planetToHouse?.[body]
+    const house = typeof houseValue === 'number' && Number.isFinite(houseValue)
+      ? houseValue
+      : signNumber === null
+        ? undefined
+        : ((((signNumber - lagnaSignNumber) % 12) + 12) % 12) + 1
+    if (!sign) continue
+    placements[body] = {
+      sign,
+      signNumber,
+      degreeInSign: typeof signPlacement.degreeInSign === 'number' ? signPlacement.degreeInSign : undefined,
+      absoluteLongitude: typeof signPlacement.absoluteLongitude === 'number' ? signPlacement.absoluteLongitude : undefined,
+      wholeSignHouse: house,
+      source: 'deterministic_calculation',
+    }
+    if (body === 'Moon') {
+      moonSign = sign
+      moonHouse = house
+    }
+    if (body === 'Sun') {
+      sunSign = sign
+      sunHouse = house
+    }
+  }
+
+  const lagnaHouse = houses.find((row) => {
+    const record = getRecord(row)
+    return typeof record?.house_number === 'number' && record.house_number === 1
+  })
+
+  return {
+    lagnaSign,
+    lagnaSignNumber,
+    lagnaHouse: lagnaHouse && typeof getRecord(lagnaHouse)?.house_number === 'number' ? getRecord(lagnaHouse)?.house_number : undefined,
+    moonSign,
+    moonHouse,
+    sunSign,
+    sunHouse,
+    placements,
+  }
+}
+
 function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_sections: AstroExpandedSections | null | undefined) {
   const engine = getEngineName(output)
   const planetaryPositions = (output as MaybeObject)?.planetary_positions
   const lagna = (output as MaybeObject)?.lagna
   const houses = (output as MaybeObject)?.houses
   const panchang = expanded_sections?.panchang ?? (output as MaybeObject)?.panchang
-  const d1Chart = (output as MaybeObject)?.d1_chart
+  const d1Chart = (output as MaybeObject)?.d1_chart ?? buildDeterministicD1ChartSection(output)
   const d9Chart = expanded_sections?.navamsa_d9 ?? (output as MaybeObject)?.navamsa_d9
   const shodashvarga = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).shodashvarga
