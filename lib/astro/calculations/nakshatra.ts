@@ -7,6 +7,15 @@
 import { NAKSHATRA_MAP, NAKSHATRA_SPAN, PADA_SPAN } from './constants.ts'
 import { normalize360 } from './math.ts'
 import { nearNakshatraBoundary, nearPadaBoundary } from './boundary.ts'
+import {
+  NAKSHATRA_NAMES,
+  NAKSHATRA_SPAN_DEG,
+  PADA_SPAN_DEG,
+  VIMSHOTTARI_SEQUENCE,
+  type NakshatraName,
+  type VimshottariLord,
+} from './dasha-constants.ts'
+import { normalizeDegrees360 } from './longitude.ts'
 
 export type NakshatraPlacement = {
   nakshatra: string
@@ -34,5 +43,39 @@ export function calculateNakshatra(sidereal: number): NakshatraPlacement {
     pada,
     near_nakshatra_boundary: nearNakshatraBoundary(sidereal),
     near_pada_boundary: nearPadaBoundary(sidereal),
+  }
+}
+
+export type NakshatraPadaResult = {
+  index: number
+  name: NakshatraName
+  pada: 1 | 2 | 3 | 4
+  lord: VimshottariLord
+  startLongitudeDeg: number
+  endLongitudeDeg: number
+  offsetWithinNakshatraDeg: number
+}
+
+export function calculateNakshatraPada(siderealLongitudeDeg: number): NakshatraPadaResult {
+  if (!Number.isFinite(siderealLongitudeDeg)) {
+    throw new Error('Sidereal longitude must be a finite number.')
+  }
+
+  const longitude = normalizeDegrees360(siderealLongitudeDeg)
+  const rawIndex = Math.floor(longitude / NAKSHATRA_SPAN_DEG)
+  const index = Math.min(rawIndex, 26)
+  const startLongitudeDeg = index * NAKSHATRA_SPAN_DEG
+  const offsetWithinNakshatraDeg = longitude - startLongitudeDeg
+  const rawPada = Math.floor(offsetWithinNakshatraDeg / PADA_SPAN_DEG) + 1
+  const pada = Math.min(rawPada, 4) as 1 | 2 | 3 | 4
+
+  return {
+    index,
+    name: NAKSHATRA_NAMES[index],
+    pada,
+    lord: VIMSHOTTARI_SEQUENCE[index % VIMSHOTTARI_SEQUENCE.length],
+    startLongitudeDeg,
+    endLongitudeDeg: startLongitudeDeg + NAKSHATRA_SPAN_DEG,
+    offsetWithinNakshatraDeg,
   }
 }

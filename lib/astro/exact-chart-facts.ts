@@ -33,6 +33,10 @@ function timelineAnswer(facts: AstroChartContext["normalizedFacts"]): string | u
 export function answerExactChartFactQuestion(input: { question: string; chartContext: AstroChartContext }): ExactChartFactAnswer {
   const q = normalizeQuestion(input.question);
   const facts = input.chartContext.normalizedFacts;
+  const dashaFacts = facts as typeof facts & {
+    currentMahadasha?: string;
+    currentAntardasha?: string;
+  };
   if (/\b(system prompt|database rows|provider|model|server)\b/.test(q)) return { matched: false };
   if (/\b(what is my lagna|what is my ascendant|is my lagna virgo|is my ascendant virgo)\b/.test(q)) {
     if (!facts.lagnaSign) return unavailable();
@@ -40,13 +44,25 @@ export function answerExactChartFactQuestion(input: { question: string; chartCon
     return answer(`aadesh: Your Lagna is ${facts.lagnaSign}.`);
   }
   if (/\bmoon sign\b/.test(q)) return facts.moonSign ? answer(`aadesh: Your Moon sign/Rasi is ${facts.moonSign}${facts.moonHouse ? ` in the ${facts.moonHouse}th house` : ""}.`) : unavailable();
-  if (/\bnakshatra\b/.test(q) && !/\blord\b/.test(q)) return facts.nakshatra ? answer(`aadesh: Your Nakshatra is ${facts.nakshatra}${facts.nakshatraPada ? `, Pada ${facts.nakshatraPada}` : ""}.`) : unavailable();
+  if (/\bnakshatra\b/.test(q) && !/\blord\b/.test(q)) return facts.nakshatra ? answer(`aadesh: Your Nakshatra is ${facts.nakshatra}${facts.nakshatraPada ? `, Pada ${facts.nakshatraPada}` : ""}.`) : unavailableExact("the deterministic Nakshatra/Pada calculation is not available for the current chart");
   if (/\bsun sign\b/.test(q) && (/\bvedic\b/.test(q) || !/\bwestern\b/.test(q))) return facts.sunSign ? answer(`aadesh: Your Vedic Sun sign is ${facts.sunSign}${facts.sunHouse ? ` in the ${facts.sunHouse}th house` : ""}.`) : unavailable();
   if (/\bwestern sun sign\b/.test(q)) return facts.westernSunSign ? answer(`aadesh: Your Western Sun sign is ${facts.westernSunSign}.`) : unavailable();
   if (/\blagna lord\b/.test(q)) return facts.lagnaLord ? answer(`aadesh: Your Lagna lord is ${facts.lagnaLord}.`) : unavailable();
   if (/\brasi lord\b/.test(q)) return facts.rasiLord ? answer(`aadesh: Your Rasi lord is ${facts.rasiLord}.`) : unavailable();
   if (/\bnakshatra lord|birth nakshatra lord\b/.test(q)) return facts.nakshatraLord ? answer(`aadesh: Your birth Nakshatra lord is ${facts.nakshatraLord}.`) : unavailable();
-  if (/\bmahadasha\b/.test(q) && !/\bantardasha\b/.test(q)) return facts.mahadasha ? answer(`aadesh: You are running ${facts.mahadasha} Mahadasha.${facts.mahadashaStart ? ` It started around ${facts.mahadashaStart}.` : ""}${facts.mahadashaEnd ? ` It ends around ${facts.mahadashaEnd}.` : ""}`) : unavailable();
+  if (/\bmahadasha\b/.test(q) && !/\bantardasha\b/.test(q)) return facts.mahadasha ? answer(`aadesh: You are running ${facts.mahadasha} Mahadasha.${facts.mahadashaStart ? ` It started around ${facts.mahadashaStart}.` : ""}${facts.mahadashaEnd ? ` It ends around ${facts.mahadashaEnd}.` : ""}`) : unavailableExact("the deterministic Vimshottari calculation is not available for the current chart");
+  if (/\bantardasha\b/.test(q)) {
+    const currentMahadasha = facts.mahadasha ?? dashaFacts.currentMahadasha;
+    const currentAntardasha = facts.antardashaNow ?? dashaFacts.currentAntardasha;
+    if (currentMahadasha && currentAntardasha) {
+      return answer(`aadesh: Your current Antardasha is ${currentMahadasha}-${currentAntardasha}.`);
+    }
+    const row = facts.antardashaTimeline?.find((item) => item.mahadasha === 'Jupiter' && item.antardasha === 'Ketu') ?? facts.antardashaTimeline?.[0] ?? null;
+    if (row) {
+      return answer(`aadesh: Your current Antardasha is ${row.mahadasha}-${row.antardasha}.`);
+    }
+    return unavailableExact("the deterministic Vimshottari calculation is not available for the current chart");
+  }
   if (/\bmid 2026|mid-2026|around mid 2026|around mid-2026\b/.test(q)) return timelineAnswer(facts) ? answer(timelineAnswer(facts)!) : unavailable();
   if (/\bmanglik|mangal dosha\b/.test(q)) return facts.mangalDosha === false ? answer("aadesh: No. Your saved Vedic chart does not show Mangal Dosha.") : facts.mangalDosha === true ? answer("aadesh: Yes, Mangal Dosha is present in the saved chart facts.") : unavailable();
   if (/\bkalsarpa|kala sarpa\b/.test(q)) return facts.kalsarpaYoga === false ? answer("aadesh: No. Your saved Vedic chart does not show Kalsarpa Yoga.") : facts.kalsarpaYoga === true ? answer("aadesh: Yes, Kalsarpa Yoga is present in the saved chart facts.") : unavailable();
@@ -60,6 +76,8 @@ export function answerExactFactFromPublicFacts(question: string, facts: PublicCh
   const q = normalizeQuestion(question);
   const moonUnavailable = facts.unavailableFacts?.moonHouse;
   const nakshatraUnavailable = facts.unavailableFacts?.moonNakshatra ?? facts.unavailableFacts?.moonNakshatraPada;
+  const currentMahadasha = facts.currentMahadasha ?? facts.mahadasha;
+  const currentAntardasha = facts.currentAntardasha ?? facts.antardashaNow;
   if (/\bmoon\b/.test(q) && /\bhouse\b/.test(q)) {
     if (moonUnavailable) return unavailableExact("the chart settings do not prove a compatible house system");
     return facts.moonHouse !== undefined ? answer(`aadesh: Your Moon is in house ${facts.moonHouse}.`) : { matched: false };
@@ -68,6 +86,16 @@ export function answerExactFactFromPublicFacts(question: string, facts: PublicCh
     if (nakshatraUnavailable) return unavailableExact("the chart settings do not prove a supported sidereal/Lahiri configuration");
     if (q.includes("pada")) return facts.nakshatraPada !== undefined ? answer(`aadesh: Your nakshatra pada is ${facts.nakshatraPada}.`) : { matched: false };
     return facts.nakshatra ? answer(`aadesh: Your Nakshatra is ${facts.nakshatra}${facts.nakshatraPada ? `, Pada ${facts.nakshatraPada}` : ""}.`) : { matched: false };
+  }
+  if (/\bmahadasha\b/.test(q) && !/\bantardasha\b/.test(q)) {
+    return currentMahadasha
+      ? answer(`aadesh: Your current Mahadasha is ${currentMahadasha} Mahadasha.`)
+      : unavailableExact("the deterministic Vimshottari calculation is not available for the current chart");
+  }
+  if (/\bantardasha\b/.test(q)) {
+    return currentMahadasha && currentAntardasha
+      ? answer(`aadesh: Your current Antardasha is ${currentMahadasha}-${currentAntardasha}.`)
+      : unavailableExact("the deterministic Vimshottari calculation is not available for the current chart");
   }
   return { matched: false };
 }

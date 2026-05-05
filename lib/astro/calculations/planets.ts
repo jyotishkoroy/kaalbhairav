@@ -12,7 +12,7 @@ import { assertProviderReturnedBodies, normalizeRahuKetuMeanNode } from './ephem
 import { calcPlanet, SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, SE_MEAN_NODE, SE_TRUE_NODE } from '../engine/swiss.ts'
 import { normalize360 } from './math.ts'
 import { calculateSign } from './sign.ts'
-import { calculateNakshatra, type NakshatraPlacement } from './nakshatra.ts'
+import { calculateNakshatra, calculateNakshatraPada, type NakshatraPlacement } from './nakshatra.ts'
 import { nearSignBoundary, nearNakshatraBoundary, nearPadaBoundary } from './boundary.ts'
 import { longitudeToSignDegree } from './longitude.ts'
 
@@ -73,18 +73,19 @@ function maybeCalculateNakshatraPada(siderealLongitudeDeg: number): {
   nakshatra: string | null;
   pada: 1 | 2 | 3 | 4 | null;
 } {
-  const nakshatra = calculateNakshatra(siderealLongitudeDeg);
-  if (!nakshatra || typeof nakshatra !== 'object') {
-    return { nakshatra: null, pada: null };
+  try {
+    const nakshatraPada = calculateNakshatraPada(siderealLongitudeDeg);
+
+    return {
+      nakshatra: nakshatraPada.name,
+      pada: nakshatraPada.pada,
+    };
+  } catch {
+    return {
+      nakshatra: null,
+      pada: null,
+    };
   }
-
-  const name = (nakshatra as { nakshatra?: unknown; name?: unknown }).nakshatra ?? (nakshatra as { name?: unknown }).name;
-  const pada = (nakshatra as { pada?: unknown }).pada;
-
-  return {
-    nakshatra: typeof name === 'string' ? name : null,
-    pada: pada === 1 || pada === 2 || pada === 3 || pada === 4 ? pada : null,
-  };
 }
 
 export async function calculatePlanetaryPositionsV2(

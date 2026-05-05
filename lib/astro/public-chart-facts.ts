@@ -39,6 +39,8 @@ export type PublicChartFacts = {
   lagnaLord?: string;
   moonSign?: string;
   moonHouse?: number;
+  moonNakshatra?: string | null;
+  moonPada?: number | null;
   rasiLord?: string;
   sunSign?: string;
   sunHouse?: number;
@@ -48,9 +50,11 @@ export type PublicChartFacts = {
   nakshatraLord?: string;
 
   mahadasha?: string;
+  currentMahadasha?: string | null;
   mahadashaStart?: string;
   mahadashaEnd?: string;
   antardashaNow?: string;
+  currentAntardasha?: string | null;
   antardashaStart?: string;
   antardashaEnd?: string;
   antardashaTimeline?: Array<{ mahadasha: string; antardasha: string; startDate?: string; endDate?: string }>;
@@ -180,6 +184,37 @@ function readDashaValue(root: unknown): string | undefined {
   );
 }
 
+function getV2MoonFacts(chartJson: unknown): {
+  nakshatra: string | null;
+  pada: number | null;
+} {
+  const moon = atPath(chartJson, ['sections', 'planetaryPositions', 'fields', 'byBody', 'Moon']);
+  if (!isRecord(moon)) {
+    return { nakshatra: null, pada: null };
+  }
+
+  const nakshatra = typeof moon.nakshatra === 'string' ? moon.nakshatra : null;
+  const pada = typeof moon.pada === 'number' && Number.isFinite(moon.pada) ? moon.pada : null;
+  return { nakshatra, pada };
+}
+
+function getV2DashaFacts(chartJson: unknown): {
+  currentMahadasha: string | null;
+  currentAntardasha: string | null;
+} {
+  const fields = atPath(chartJson, ['sections', 'vimshottari', 'fields']);
+  if (!isRecord(fields)) {
+    return { currentMahadasha: null, currentAntardasha: null };
+  }
+
+  const currentMahadasha = isRecord(fields.currentMahadasha) ? str(fields.currentMahadasha, ['lord']) : str(fields, ['currentMahadasha']);
+  const currentAntardasha = isRecord(fields.currentAntardasha) ? str(fields.currentAntardasha, ['lord']) : str(fields, ['currentAntardasha']);
+  return {
+    currentMahadasha: currentMahadasha ?? null,
+    currentAntardasha: currentAntardasha ?? null,
+  };
+}
+
 export function extractDeterministicDashaFacts(input: {
   chartJson?: unknown;
   predictionSummary?: unknown;
@@ -296,6 +331,8 @@ export function buildPublicChartFacts(input: {
   const panchangLocalDate = str(chartJson, ["panchang", "local_date"], ["panchang", "panchang_local_date"], ["expanded_sections", "panchang", "local_date"], ["astronomical_data", "panchang", "local_date"]);
   const panchangTimezone = str(chartJson, ["panchang", "timezone"], ["expanded_sections", "panchang", "timezone"], ["astronomical_data", "panchang", "timezone"]);
   const panchangWeekday = str(chartJson, ["panchang", "weekday"], ["panchang", "fields", "weekday"], ["expanded_sections", "panchang", "fields", "weekday"], ["astronomical_data", "panchang", "fields", "weekday"]);
+  const v2MoonFacts = getV2MoonFacts(chartJson);
+  const v2DashaFacts = getV2DashaFacts(chartJson);
 
   // Extract lagna from multiple paths
   const lagnaSign = canonSign(
@@ -366,13 +403,13 @@ export function buildPublicChartFacts(input: {
     if (lagnaSign && sunSign && sunHouse === undefined) sunHouse = computeWholeSignHouse(lagnaSign, sunSign);
   }
 
-  const nakshatraRaw = str(chartJson,
+  const nakshatraRaw = v2MoonFacts.nakshatra ?? str(chartJson,
     ["public_facts","moon_nakshatra"], ["publicFacts","moonNakshatra"],
     ["nakshatra"], ["moonNakshatra"], ["moon_nakshatra"],
     ["d1","planets","Moon","nakshatra"], ["planets","Moon","nakshatra"]
   ) ?? str(predictionSummary, ["nakshatra"], ["moonNakshatra"], ["public_facts","moon_nakshatra"], ["publicFacts","moonNakshatra"]);
 
-  const nakshatraPadaRaw = num(chartJson,
+  const nakshatraPadaRaw = v2MoonFacts.pada ?? num(chartJson,
     ["public_facts","moon_pada"], ["publicFacts","moonPada"], ["public_facts","moon_nakshatra_pada"], ["publicFacts","moonNakshatraPada"],
     ["nakshatraPada"], ["nakshatra_pada"],
     ["d1","planets","Moon","pada"], ["planets","Moon","pada"], ["planets","Moon","nakshatra_pada"], ["moon","nakshatra_pada"]
@@ -410,7 +447,7 @@ export function buildPublicChartFacts(input: {
   const nakshatraPada = hasSettingsMetadata && !siderealSupported ? undefined : nakshatraPadaRaw;
 
   const dashaFacts = extractDeterministicDashaFacts({ chartJson, predictionSummary, reportFacts });
-  const mahadasha = dashaFacts.mahadasha;
+  const mahadasha = v2DashaFacts.currentMahadasha ?? dashaFacts.mahadasha;
 
   const mahadashaStart = str(chartJson,
     ["public_facts","mahadasha_start"], ["publicFacts","mahadashaStart"], ["public_facts","current_mahadasha_start"], ["publicFacts","currentMahadashaStart"], ["mahadashaStart"], ["mahadasha_start"]
@@ -418,7 +455,7 @@ export function buildPublicChartFacts(input: {
   const mahadashaEnd = str(chartJson,
     ["public_facts","mahadasha_end"], ["publicFacts","mahadashaEnd"], ["public_facts","current_mahadasha_end"], ["publicFacts","currentMahadashaEnd"], ["mahadashaEnd"], ["mahadasha_end"]
   ) ?? str(predictionSummary, ["public_facts","mahadasha_end"], ["publicFacts","mahadashaEnd"], ["mahadashaEnd"], ["mahadasha_end"]);
-  const antardashaNow = dashaFacts.antardashaNow;
+  const antardashaNow = v2DashaFacts.currentAntardasha ?? dashaFacts.antardashaNow;
   const antardashaStart = dashaFacts.antardashaStart;
   const antardashaEnd = dashaFacts.antardashaEnd;
   const antardashaTimeline = dashaFacts.antardashaTimeline ?? [];
@@ -461,6 +498,8 @@ export function buildPublicChartFacts(input: {
     lagnaLord,
     moonSign,
     moonHouse,
+    moonNakshatra: nakshatra ?? null,
+    moonPada: nakshatraPada ?? null,
     rasiLord,
     sunSign,
     sunHouse,
@@ -469,9 +508,11 @@ export function buildPublicChartFacts(input: {
     nakshatraPada,
     nakshatraLord,
     mahadasha,
+    currentMahadasha: v2DashaFacts.currentMahadasha,
     mahadashaStart,
     mahadashaEnd,
     antardashaNow,
+    currentAntardasha: v2DashaFacts.currentAntardasha,
     antardashaStart,
     antardashaEnd,
     antardashaTimeline: antardashaTimeline.length ? antardashaTimeline : undefined,

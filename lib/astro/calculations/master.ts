@@ -21,7 +21,7 @@ import { calculateLagna } from './lagna.ts'
 import { calculateWholeSignHouses } from './houses.ts'
 import { calculateD1Chart } from './d1.ts'
 import { calculateNavamsaChart } from './navamsa.ts'
-import { calculateVimshottari } from './vimshottari.ts'
+import { calculateVimshottari, calculateVimshottariDashaV2 } from './vimshottari.ts'
 import { calculatePanchangResult, DEFAULT_PANCHANG_CONVENTION } from './panchang.ts'
 import { calculateGrahaDrishti } from './aspects.ts'
 import { calculateYogas } from './yogas.ts'
@@ -62,6 +62,7 @@ function stripForbiddenKeys<T>(value: T): T {
 function toPanchangaV2Time(
   normalized: NormalizedBirthInput,
   birthTimeResult: { birth_local_wall_time: string; utc_offset_minutes: number; birth_utc: string | null },
+  runtimeClockIso: string,
 ): import('./contracts.ts').NormalizedBirthInputV2 | null {
   if (!normalized.birth_time_known || !normalized.birth_time_iso || !birthTimeResult.birth_utc) {
     return null
@@ -84,9 +85,21 @@ function toPanchangaV2Time(
     localMeanTimeIso: null,
     printedJulianDay: null,
     jdUtExact: null,
-    runtimeClockIso: birthTimeResult.birth_utc,
+    runtimeClockIso,
     warnings: [],
   }
+}
+
+function getMoonAbsoluteLongitude(section: import('./contracts.ts').AstroSectionContract): number | null {
+  const byBody = section.fields?.byBody
+  if (!byBody || typeof byBody !== 'object' || Array.isArray(byBody)) {
+    return null
+  }
+
+  const moon = (byBody as Record<string, { absoluteLongitude?: unknown }>).Moon
+  return typeof moon?.absoluteLongitude === 'number' && Number.isFinite(moon.absoluteLongitude)
+    ? moon.absoluteLongitude
+    : null
 }
 
 export async function calculateMasterAstroOutput(args: {
@@ -187,7 +200,19 @@ export async function calculateMasterAstroOutput(args: {
     { name: 'startup_validation', passed: startupValidation.passed, details: startupValidation.checks.map((check) => ({ check_id: check.check_id, passed: check.passed })) },
   ]
 
-  const panchangaV2Time = toPanchangaV2Time(normalized, birthTimeResult)
+  const panchangaV2Time = toPanchangaV2Time(normalized, birthTimeResult, runtimeClock.currentUtc)
+  const vimshottariSection = ASTRO_CALC_INTEGRATION_ENABLED && moon && panchangaV2Time
+    ? calculateVimshottariDashaV2({
+        moonLongitudeDeg: getMoonAbsoluteLongitude({
+          status: 'computed',
+          source: 'deterministic_calculation',
+          fields: { byBody: planets },
+        }) ?? moon.sidereal_longitude,
+        birthUtcIso: panchangaV2Time.utcDateTimeIso,
+        runtimeClockIso: panchangaV2Time.runtimeClockIso,
+      })
+    : undefined
+
   const sections = ASTRO_CALC_INTEGRATION_ENABLED && sun && moon && panchangaV2Time
     ? {
         panchang: await calculatePanchangaV2({
@@ -195,6 +220,7 @@ export async function calculateMasterAstroOutput(args: {
           moonLongitudeDeg: moon.sidereal_longitude,
           normalizedTime: panchangaV2Time,
         }),
+        vimshottari: vimshottariSection,
       }
     : undefined
 

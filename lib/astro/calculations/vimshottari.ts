@@ -8,6 +8,17 @@ import { DASHA_SEQUENCE, DASHA_YEARS, NAKSHATRA_MAP, NAKSHATRA_SPAN, DASHA_YEAR_
 import { normalize360 } from './math.ts'
 import { nearNakshatraBoundary } from './boundary.ts'
 import { getRuntimeClockMs, normalizeRuntimeClock, type AstroRuntimeClock } from './runtime-clock.ts'
+import type { AstroSectionContract } from './contracts.ts'
+import { makeUnavailableValue } from './unavailable.ts'
+import { normalizeDegrees360 } from './longitude.ts'
+import { calculateNakshatraPada } from './nakshatra.ts'
+import {
+  VIMSHOTTARI_SEQUENCE,
+  VIMSHOTTARI_YEAR_DAYS,
+  VIMSHOTTARI_YEARS as V2_VIMSHOTTARI_YEARS,
+  NAKSHATRA_SPAN_DEG,
+  type VimshottariLord,
+} from './dasha-constants.ts'
 
 export type DashaPeriod = {
   level: 'mahadasha' | 'antardasha' | 'pratyantardasha'
@@ -40,12 +51,92 @@ export type VimshottariDashaResult = {
   current_utc?: string
 }
 
+export type VimshottariPeriod = {
+  lord: VimshottariLord
+  startIso: string
+  endIso: string
+  durationYears: number
+}
+
+export type VimshottariDashaV2Args = {
+  moonLongitudeDeg: number | null
+  birthUtcIso: string | null
+  runtimeClockIso: string
+  maxAntardashaYears?: number
+}
+
+export type VimshottariDashaV2Fields = {
+  birthNakshatra: string
+  birthNakshatraPada: 1 | 2 | 3 | 4
+  birthNakshatraLord: VimshottariLord
+  dashaBalanceYears: number
+  dashaBalanceDays: number
+  mahadashaTimeline: VimshottariPeriod[]
+  currentMahadasha: VimshottariPeriod | null
+  currentAntardasha: VimshottariPeriod | null
+}
+
 function addDays(iso: string, days: number): string {
   return new Date(new Date(iso).getTime() + days * 86400000).toISOString()
 }
 
 function findCurrent<T extends { start_utc: string; end_utc: string }>(periods: T[], nowMs: number): T | null {
   return periods.find(p => new Date(p.start_utc).getTime() <= nowMs && nowMs < new Date(p.end_utc).getTime()) ?? null
+}
+
+function assertValidIso(value: string, label: string): Date {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${label} must be a valid ISO datetime.`)
+  }
+  return date
+}
+
+function addDaysDate(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 86400000)
+}
+
+function toIso(date: Date): string {
+  return date.toISOString()
+}
+
+function getLordIndex(lord: VimshottariLord): number {
+  return VIMSHOTTARI_SEQUENCE.indexOf(lord)
+}
+
+function getLordAt(startLord: VimshottariLord, offset: number): VimshottariLord {
+  const startIndex = getLordIndex(startLord)
+  const index = ((startIndex + offset) % VIMSHOTTARI_SEQUENCE.length + VIMSHOTTARI_SEQUENCE.length) % VIMSHOTTARI_SEQUENCE.length
+  return VIMSHOTTARI_SEQUENCE[index]
+}
+
+function findCurrentPeriod(periods: VimshottariPeriod[], runtimeDate: Date): VimshottariPeriod | null {
+  const time = runtimeDate.getTime()
+  return periods.find((period) => {
+    const start = new Date(period.startIso).getTime()
+    const end = new Date(period.endIso).getTime()
+    return time >= start && time < end
+  }) ?? null
+}
+
+function buildAntardashaTimeline(
+  mahadasha: VimshottariPeriod,
+  startLord: VimshottariLord,
+): VimshottariPeriod[] {
+  let cursor = new Date(mahadasha.startIso)
+  return VIMSHOTTARI_SEQUENCE.map((_, offset) => {
+    const lord = getLordAt(startLord, offset)
+    const durationYears = (mahadasha.durationYears * V2_VIMSHOTTARI_YEARS[lord]) / 120
+    const end = addDaysDate(cursor, durationYears * VIMSHOTTARI_YEAR_DAYS)
+    const period = {
+      lord,
+      startIso: toIso(cursor),
+      endIso: toIso(end),
+      durationYears,
+    }
+    cursor = end
+    return period
+  })
 }
 
 export function calculateVimshottari(moonSidereal: number, birthUtcISO: string, runtimeClockInput?: Partial<AstroRuntimeClock>): VimshottariDashaResult {
@@ -161,5 +252,103 @@ export function calculateVimshottari(moonSidereal: number, birthUtcISO: string, 
     boundary_warnings,
     as_of_date: runtimeClock.asOfDate,
     current_utc: runtimeClock.currentUtc,
+  }
+}
+
+export function calculateVimshottariDashaV2(args: VimshottariDashaV2Args): AstroSectionContract {
+  if (args.moonLongitudeDeg === null || !Number.isFinite(args.moonLongitudeDeg)) {
+    return {
+      status: 'unavailable',
+      source: 'none',
+      reason: 'insufficient_birth_data',
+      fields: {
+        vimshottari: makeUnavailableValue({
+          requiredModule: 'vimshottari',
+          fieldKey: 'vimshottari.currentMahadasha',
+          reason: 'insufficient_birth_data',
+        }),
+      },
+      warnings: ['Moon longitude is required for Vimshottari Dasha calculation.'],
+    }
+  }
+
+  if (!args.birthUtcIso) {
+    return {
+      status: 'unavailable',
+      source: 'none',
+      reason: 'insufficient_birth_data',
+      fields: {
+        vimshottari: makeUnavailableValue({
+          requiredModule: 'vimshottari',
+          fieldKey: 'vimshottari.currentMahadasha',
+          reason: 'insufficient_birth_data',
+        }),
+      },
+      warnings: ['Birth UTC time is required for Vimshottari Dasha calculation.'],
+    }
+  }
+
+  try {
+    const birthDate = assertValidIso(args.birthUtcIso, 'birthUtcIso')
+    const runtimeDate = assertValidIso(args.runtimeClockIso, 'runtimeClockIso')
+    const moonLongitude = normalizeDegrees360(args.moonLongitudeDeg)
+    const nakshatra = calculateNakshatraPada(moonLongitude)
+    const birthLord = nakshatra.lord
+    const remainingDeg = nakshatra.endLongitudeDeg - moonLongitude
+    const remainingFraction = remainingDeg / NAKSHATRA_SPAN_DEG
+    const birthLordYears = V2_VIMSHOTTARI_YEARS[birthLord]
+    const dashaBalanceYears = remainingFraction * birthLordYears
+    const dashaBalanceDays = dashaBalanceYears * VIMSHOTTARI_YEAR_DAYS
+
+    const mahadashaTimeline: VimshottariPeriod[] = []
+    let cursor = birthDate
+    const firstEnd = addDaysDate(cursor, dashaBalanceDays)
+    mahadashaTimeline.push({
+      lord: birthLord,
+      startIso: toIso(cursor),
+      endIso: toIso(firstEnd),
+      durationYears: dashaBalanceYears,
+    })
+    cursor = firstEnd
+
+    for (let offset = 1; offset <= 9; offset += 1) {
+      const lord = getLordAt(birthLord, offset)
+      const durationYears = V2_VIMSHOTTARI_YEARS[lord]
+      const end = addDaysDate(cursor, durationYears * VIMSHOTTARI_YEAR_DAYS)
+      mahadashaTimeline.push({
+        lord,
+        startIso: toIso(cursor),
+        endIso: toIso(end),
+        durationYears,
+      })
+      cursor = end
+    }
+
+    const currentMahadasha = findCurrentPeriod(mahadashaTimeline, runtimeDate)
+    const currentAntardasha = currentMahadasha ? findCurrentPeriod(buildAntardashaTimeline(currentMahadasha, currentMahadasha.lord), runtimeDate) : null
+
+    const fields: VimshottariDashaV2Fields = {
+      birthNakshatra: nakshatra.name,
+      birthNakshatraPada: nakshatra.pada,
+      birthNakshatraLord: birthLord,
+      dashaBalanceYears,
+      dashaBalanceDays,
+      mahadashaTimeline,
+      currentMahadasha,
+      currentAntardasha,
+    }
+
+    return {
+      status: 'computed',
+      source: 'deterministic_calculation',
+      fields,
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      source: 'none',
+      reason: error instanceof Error ? error.message : 'Vimshottari Dasha calculation failed.',
+      fields: {},
+    }
   }
 }
