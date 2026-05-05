@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
+  buildProfileChartJsonFromMasterOutput,
   buildProfileExpandedSectionsFromMasterOutput,
   buildProfileExpandedSectionsFromStoredChartJson,
   formatProfileChartStatus,
@@ -740,5 +741,29 @@ describe('profile chart json adapter', () => {
     expect(expanded.navamsa_d9?.status).toBe('partial')
     expect(expanded.planetary_aspects?.status).toBe('partial')
     expect(expanded.life_area_signatures?.status).toBe('partial')
+  })
+
+  it('keeps canonical chart json v2 sections attached for UI compatibility', () => {
+    const chart = buildProfileChartJsonFromMasterOutput({
+      output: makeMasterOutput() as never,
+      userId: 'user-test',
+      profileId: 'profile-test',
+      calculationId: 'calc-test',
+      chartVersionId: 'chart-test',
+      chartVersion: 1,
+      inputHash: 'input-test',
+      settingsHash: 'settings-test',
+      settingsForHash: {
+        zodiac_type: 'sidereal',
+        ayanamsa: 'lahiri',
+        house_system: 'whole_sign',
+      } as never,
+      normalized: {} as never,
+      engineVersion: 'engine-test',
+      ephemerisVersion: 'ephemeris-test',
+      schemaVersion: 'schema-test',
+    })
+    expect(chart?.canonical_chart_json_v2?.schemaVersion).toBe('chart_json_v2')
+    expect(chart?.chart_json_v2?.schemaVersion).toBe('chart_json_v2')
   })
 })

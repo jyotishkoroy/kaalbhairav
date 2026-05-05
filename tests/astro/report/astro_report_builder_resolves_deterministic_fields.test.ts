@@ -56,4 +56,40 @@ describe('astro report builder resolves deterministic fields', () => {
     expect(fields.find((field) => field.fieldKey === 'weekday')).toMatchObject({ status: 'resolved', value: 'Monday' })
     expect(fields.find((field) => field.fieldKey === 'outer_planets')).toMatchObject({ status: 'unavailable' })
   })
+
+  it('keeps unavailable canonical sections unavailable instead of inventing resolved values', () => {
+    const report = buildAstroReportContract({
+      chartJson: {
+        canonical_chart_json_v2: {
+          schemaVersion: 'chart_json_v2',
+          metadata: {
+            profileId: 'profile-test',
+            inputHash: 'input-test',
+            settingsHash: 'settings-test',
+            engineVersion: 'engine-test',
+            ephemerisVersion: 'ephemeris-test',
+            ayanamsha: 'lahiri',
+            houseSystem: 'whole_sign',
+            runtimeClockIso: '2026-05-04T00:00:00.000Z',
+          },
+          sections: {
+            timeFacts: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            planetaryPositions: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            lagna: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            houses: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            panchang: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            d1Chart: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            d9Chart: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            vimshottari: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+            advanced: { status: 'unavailable', source: 'none', reason: 'insufficient_birth_data', fields: {} },
+          },
+        },
+      },
+      profileId: 'profile-test',
+      chartVersionId: 'chart-test',
+      now: new Date('2026-05-04T00:00:00.000Z'),
+      sourceMode: 'test_fixture',
+    })
+    expect(report.groups.flatMap((group) => group.fields).find((field) => field.fieldKey === 'lagna_sign')).toMatchObject({ status: 'unavailable' })
+  })
 })

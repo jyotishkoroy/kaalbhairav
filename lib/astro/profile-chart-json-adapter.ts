@@ -9,6 +9,11 @@ import type { MasterAstroCalculationOutput } from './schemas/master.ts'
 import type { DailyTransits, Panchang, CurrentTimingContext, DashaPeriod, TransitPlanet } from './engine/types.ts'
 import { extractCalculationSettingsMetadata } from './calculation-settings-metadata.ts'
 import { buildCanonicalChartJsonV2 } from './schemas/canonical-chart-json.ts'
+import {
+  buildCanonicalChartJsonV2FromCalculation,
+  hasCanonicalChartJsonV2Sections,
+} from './canonical-chart-json-adapter.ts'
+import type { CanonicalChartJsonV2 } from './chart-json-v2.ts'
 import { computedAstroSection, unavailableAstroSection } from './schemas/astro-section-contract.ts'
 import { engineModeToSectionSource } from './engine/engine-section-source.ts'
 
@@ -219,6 +224,37 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
     advanced: {
       outerPlanets: sectionUnavailable(engine, output, 'outer_planets_not_enabled_for_all_engine_modes'),
     },
+  }
+}
+
+function canonicalSectionFromLegacySection(section: unknown, fallbackReason: string) {
+  if (!isTruthyObject(section)) {
+    return {
+      status: 'unavailable',
+      source: 'none',
+      reason: fallbackReason,
+      fields: {},
+    }
+  }
+
+  const status = (section as Record<string, unknown>).status
+  const source = (section as Record<string, unknown>).source
+  const mappedSource = source === 'stored_current_chart_json' || source === 'none'
+    ? source
+    : 'deterministic_calculation'
+
+  if (status === 'computed' || status === 'partial' || status === 'unavailable' || status === 'error') {
+    return {
+      ...section,
+      source: mappedSource,
+    }
+  }
+
+  return {
+    status: 'unavailable',
+    source: 'none',
+    reason: fallbackReason,
+    fields: {},
   }
 }
 
@@ -1037,7 +1073,7 @@ export function buildProfileChartJsonFromMasterOutput(args: {
   engineVersion: string
   ephemerisVersion: string
   schemaVersion: string
-}): ChartJson {
+}): ChartJson & { chart_json_v2?: CanonicalChartJsonV2; chartJsonV2?: CanonicalChartJsonV2 } {
   const expanded_sections = buildProfileExpandedSectionsFromMasterOutput(args.output)
   const confidence = ((args.output as MaybeObject)?.confidence ?? { value: 0, label: 'not_enough_context', reasons: [] }) as ConfidenceScore
   const calculationSettings = extractCalculationSettingsMetadata({
@@ -1077,6 +1113,36 @@ export function buildProfileChartJsonFromMasterOutput(args: {
         : undefined,
     },
     sections: buildCanonicalSections(args.output, expanded_sections),
+  })
+  const chart_json_v2 = buildCanonicalChartJsonV2FromCalculation({
+    profileId: args.profileId,
+    calculationId: args.calculationId,
+    inputHash: args.inputHash,
+    settingsHash: args.settingsHash,
+    engineVersion: args.engineVersion,
+    ephemerisVersion: args.ephemerisVersion,
+    ayanamsha: (calculationSettings.ayanamsa ?? 'lahiri'),
+    houseSystem: (calculationSettings.houseSystem ?? 'whole_sign'),
+    runtimeClockIso: ((args.output as MaybeObject)?.runtime_clock as { current_utc: string; as_of_date?: string } | undefined)?.current_utc ?? nowISO(),
+    sections: (hasCanonicalChartJsonV2Sections(canonical_chart_json_v2)
+      ? {
+          timeFacts: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.timeFacts, 'time_facts_not_available'),
+          planetaryPositions: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.planetaryPositions, 'planetary_positions_not_available'),
+          lagna: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.lagna, 'lagna_not_available'),
+          houses: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.houses, 'houses_not_available'),
+          panchang: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.panchang, 'panchang_not_available'),
+          d1Chart: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.d1Chart, 'd1_chart_not_available'),
+          d9Chart: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.d9Chart, 'd9_chart_not_available'),
+          shodashvarga: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.shodashvarga, 'shodashvarga_not_available'),
+          shodashvargaBhav: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.shodashvargaBhav, 'shodashvarga_bhav_not_available'),
+          vimshottari: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.vimshottari, 'vimshottari_not_available'),
+          kp: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.kp, 'kp_not_available'),
+          dosha: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.dosha, 'dosha_not_available'),
+          ashtakavarga: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.ashtakavarga, 'ashtakavarga_not_available'),
+          transits: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.transits, 'transits_not_available'),
+          advanced: canonicalSectionFromLegacySection(canonical_chart_json_v2.sections.advanced, 'advanced_not_available'),
+        }
+      : ({} as never)) as never,
   })
 
   return {
@@ -1122,5 +1188,7 @@ export function buildProfileChartJsonFromMasterOutput(args: {
     life_area_signatures: toRecord((args.output as MaybeObject)?.life_area_signatures),
     timing_signatures: toRecord((args.output as MaybeObject)?.timing_signatures),
     canonical_chart_json_v2,
+    chart_json_v2,
+    chartJsonV2: chart_json_v2,
   }
 }
