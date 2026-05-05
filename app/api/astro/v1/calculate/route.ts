@@ -25,6 +25,15 @@ import { mergeAvailableJyotishSectionsIntoChartJson } from '@/lib/astro/chart-js
 import { DEFAULT_SETTINGS, hashSettings } from '@/lib/astro/settings'
 import { assertSameOriginRequest, checkRateLimit } from '@/lib/security/request-guards'
 import { normalizeRuntimeClock, type AstroRuntimeClock } from '@/lib/astro/calculations/runtime-clock'
+import {
+  ASTRO_CALC_INTEGRATION_ENABLED,
+  ASTRO_CALC_INTEGRATION_STRICT_MODE,
+} from '@/lib/astro/config/feature-flags'
+import {
+  calculateRouteV2ResponsePayload,
+  hasIgnoredClientContext,
+  sanitizeCalculateBodyForDeterministicInput,
+} from '@/lib/astro/calculate-route-v2'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -296,6 +305,58 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'invalid_input', issues: [{ message: 'Invalid JSON body.' }] }, { status: 400 })
+  }
+
+  if (ASTRO_CALC_INTEGRATION_ENABLED) {
+    const birthInput = sanitizeCalculateBodyForDeterministicInput(body as Record<string, unknown>)
+    if (!birthInput.date_local) {
+      return NextResponse.json({ ok: false, success: false, error: 'invalid_input', reason: 'date_local is required.' }, { status: 400 })
+    }
+
+    try {
+      const payload = await calculateRouteV2ResponsePayload({
+        birthInput,
+        ignoredClientContext: hasIgnoredClientContext(body as Record<string, unknown>),
+      })
+      return NextResponse.json(payload)
+    } catch (error) {
+      if (ASTRO_CALC_INTEGRATION_STRICT_MODE) {
+        return NextResponse.json(
+          {
+            ok: false,
+            success: false,
+            error: 'Deterministic calculation failed.',
+            reason: error instanceof Error ? error.message : 'unknown_error',
+            meta: {
+              calcIntegrationEnabled: true,
+              strictMode: true,
+              persisted: false,
+              currentChartPromoted: false,
+            },
+          },
+          { status: 422 },
+        )
+      }
+
+      return NextResponse.json(
+        {
+          ok: false,
+          success: false,
+          error: 'Deterministic calculation unavailable in non-strict compatibility mode.',
+          reason: error instanceof Error ? error.message : 'unknown_error',
+          meta: {
+            calcIntegrationEnabled: true,
+            strictMode: false,
+            persisted: false,
+            currentChartPromoted: false,
+          },
+        },
+        { status: 202 },
+      )
+    }
+  }
   const parsed = calculateRequestSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_input', issues: parsed.error.issues }, { status: 400 })

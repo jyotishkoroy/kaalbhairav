@@ -69,4 +69,13 @@ export const ASTRO_CALC_FIXTURE_VALIDATION_ENABLED =
 export const ASTRO_ALLOW_UNVERIFIED_ADVANCED_CALCS =
   process.env.ASTRO_ALLOW_UNVERIFIED_ADVANCED_CALCS === 'true'
 
-// These flags never permit LLM-generated exact facts.
+// These flags never allow LLM-generated exact chart facts. Exact facts must come from deterministic calculation or stored current chart JSON.
+
+export function getAstroCalcIntegrationFlags() {
+  return {
+    enabled: ASTRO_CALC_INTEGRATION_ENABLED,
+    strictMode: ASTRO_CALC_INTEGRATION_STRICT_MODE,
+    fixtureValidationEnabled: ASTRO_CALC_FIXTURE_VALIDATION_ENABLED,
+    allowUnverifiedAdvancedCalcs: ASTRO_ALLOW_UNVERIFIED_ADVANCED_CALCS,
+  }
+}
