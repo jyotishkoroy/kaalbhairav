@@ -257,6 +257,22 @@ export type AstroExpandedSections = {
     items?: unknown[]
     warnings?: unknown[]
   }
+  dosha?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
+  yoga?: {
+    status: 'available'
+    source?: string
+    data?: unknown
+    rows?: unknown[]
+    items?: unknown[]
+    warnings?: unknown[]
+  }
   avkahada_chakra?: {
     status: 'available'
     source?: string

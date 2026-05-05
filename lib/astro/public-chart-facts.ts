@@ -466,8 +466,16 @@ export function buildPublicChartFacts(input: {
   const kalsarpaYoga = bool(chartJson,
     ["public_facts","kalsarpa_yoga"], ["publicFacts","kalsarpaYoga"], ["public_facts","kalsarpa"], ["publicFacts","kalsarpa"], ["kalsarpaYoga"], ["kalsarpa"]
   ) ?? bool(predictionSummary, ["public_facts","kalsarpa_yoga"], ["publicFacts","kalsarpaYoga"], ["kalsarpaYoga"], ["kalsarpa"]);
+  const manglikSection = atPath(chartJson, ['sections', 'dosha', 'fields', 'manglik']);
+  const kalsarpaSection = atPath(chartJson, ['sections', 'dosha', 'fields', 'kalsarpa']);
 
   const placements = extractPlacements(chartJson, lagnaSign);
+  const manglikFromDeterministic = isRecord(manglikSection) && typeof (manglikSection as Record<string, unknown>).isManglik === 'boolean'
+    ? (manglikSection as Record<string, unknown>).isManglik as boolean
+    : undefined;
+  const kalsarpaFromDeterministic = isRecord(kalsarpaSection) && typeof (kalsarpaSection as Record<string, unknown>).isKalsarpa === 'boolean'
+    ? (kalsarpaSection as Record<string, unknown>).isKalsarpa as boolean
+    : undefined;
 
   // Check for conflicts
   if (!lagnaSign) warnings.push("lagna_sign_missing");
@@ -521,8 +529,8 @@ export function buildPublicChartFacts(input: {
     panchangLocalDate,
     panchangTimezone,
     panchangWeekday,
-    mangalDosha,
-    kalsarpaYoga,
+    mangalDosha: manglikFromDeterministic ?? mangalDosha,
+    kalsarpaYoga: kalsarpaFromDeterministic ?? kalsarpaYoga,
     placements,
   };
 }

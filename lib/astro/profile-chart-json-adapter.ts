@@ -183,6 +183,12 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
   const shodashvargaBhav = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).shodashvargaBhav
     : (output as MaybeObject)?.shodashvargaBhav
+  const dosha = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
+    ? toRecord((output as MaybeObject)?.sections).dosha
+    : (output as MaybeObject)?.dosha
+  const yoga = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
+    ? toRecord((output as MaybeObject)?.sections).yoga
+    : (output as MaybeObject)?.yoga
   const d9ChartCompat = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).d9Chart
     : (output as MaybeObject)?.d9Chart
@@ -205,6 +211,8 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
     d9Chart: isTruthyObject(d9ChartCompat ?? d9Chart) ? sectionComputed(engine, output, d9ChartCompat ?? d9Chart) : sectionUnavailable(engine, output, 'd9_chart_not_available'),
     shodashvarga: isTruthyObject(shodashvarga) ? sectionComputed(engine, output, shodashvarga) : sectionUnavailable(engine, output, 'shodashvarga_not_available'),
     shodashvargaBhav: isTruthyObject(shodashvargaBhav) ? sectionComputed(engine, output, shodashvargaBhav) : sectionUnavailable(engine, output, 'shodashvarga_bhav_not_available'),
+    dosha: isTruthyObject(dosha) ? sectionComputed(engine, output, dosha) : sectionUnavailable(engine, output, 'dosha_not_available'),
+    yoga: isTruthyObject(yoga) ? sectionComputed(engine, output, yoga) : sectionUnavailable(engine, output, 'yoga_not_available'),
     vimshottari: isTruthyObject(vimshottari) ? sectionComputed(engine, output, vimshottari) : sectionUnavailable(engine, output, 'vimshottari_not_available'),
     kp: isTruthyObject(kp) ? sectionComputed(engine, output, kp) : sectionUnavailable(engine, output, 'kp_not_available'),
     transits: isTruthyObject(transits) ? sectionComputed(engine, output, transits) : sectionUnavailable(engine, output, 'transits_not_available'),
@@ -947,6 +955,8 @@ export function buildProfileExpandedSectionsFromMasterOutput(output: MasterAstro
   const rawSadeSati = normalizeAvailableSection(record.sade_sati)
   const rawKalsarpaDosh = normalizeAvailableSection(record.kalsarpa_dosh)
   const rawManglikDosh = normalizeAvailableSection(record.manglik_dosha)
+  const rawDosha = normalizeAvailableSection(record.dosha)
+  const rawYoga = normalizeAvailableSection(record.yoga)
   const rawAvkahadaChakra = normalizeAvailableSection(record.avkahada_chakra)
   const rawFavourablePoints = normalizeAvailableSection(record.favourable_points)
   const rawGhatak = normalizeAvailableSection(record.ghatak)
@@ -969,6 +979,8 @@ export function buildProfileExpandedSectionsFromMasterOutput(output: MasterAstro
     sade_sati: rawSadeSati ?? undefined,
     kalsarpa_dosh: rawKalsarpaDosh ?? undefined,
     manglik_dosha: rawManglikDosh ?? undefined,
+    dosha: rawDosha ?? undefined,
+    yoga: rawYoga ?? undefined,
     avkahada_chakra: rawAvkahadaChakra ?? undefined,
     favourable_points: rawFavourablePoints ?? undefined,
     ghatak: rawGhatak ?? undefined,

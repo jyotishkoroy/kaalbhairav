@@ -57,3 +57,10 @@ export function calculateDoshas(
     evidence,
   }))
 }
+
+export {
+  buildDoshaSectionV2,
+  calculateKalsarpaBoundary,
+  calculateManglikDosha,
+  MANGLIK_HOUSES,
+} from './dosha-v2.ts'

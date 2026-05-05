@@ -65,3 +65,10 @@ export function calculateYogas(
     evidence,
   }))
 }
+
+export {
+  buildYogaSectionV2,
+  calculateBudhaAdityaYoga,
+  calculateChandraMangalYoga,
+  calculateGajakesariYoga,
+} from './yoga-v2.ts'

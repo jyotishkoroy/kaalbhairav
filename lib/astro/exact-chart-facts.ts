@@ -66,6 +66,7 @@ export function answerExactChartFactQuestion(input: { question: string; chartCon
   if (/\bmid 2026|mid-2026|around mid 2026|around mid-2026\b/.test(q)) return timelineAnswer(facts) ? answer(timelineAnswer(facts)!) : unavailable();
   if (/\bmanglik|mangal dosha\b/.test(q)) return facts.mangalDosha === false ? answer("aadesh: No. Your saved Vedic chart does not show Mangal Dosha.") : facts.mangalDosha === true ? answer("aadesh: Yes, Mangal Dosha is present in the saved chart facts.") : unavailable();
   if (/\bkalsarpa|kala sarpa\b/.test(q)) return facts.kalsarpaYoga === false ? answer("aadesh: No. Your saved Vedic chart does not show Kalsarpa Yoga.") : facts.kalsarpaYoga === true ? answer("aadesh: Yes, Kalsarpa Yoga is present in the saved chart facts.") : unavailable();
+  if (/\bgajakesari\b/.test(q)) return unavailableExact("the deterministic Gajakesari boundary is not stored in the current public facts");
   if (/\bmoon\b/.test(q) && /\bhouse\b/.test(q)) return facts.moonHouse !== undefined ? answer(`aadesh: Your Moon is in house ${facts.moonHouse}.`) : unavailable();
   if (/\bsun\b/.test(q) && /\bhouse\b/.test(q)) return facts.sunHouse !== undefined ? answer(`aadesh: Your Sun is in house ${facts.sunHouse}.`) : unavailable();
   if (/\bsun sign\b/.test(q)) return facts.sunSign ? answer(`aadesh: Your Sun sign is ${facts.sunSign}${facts.sunHouse ? ` in the ${facts.sunHouse}th house` : ""}.`) : unavailable();
