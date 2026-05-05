@@ -16,6 +16,8 @@ import {
 import type { CanonicalChartJsonV2 } from './chart-json-v2.ts'
 import { computedAstroSection, unavailableAstroSection } from './schemas/astro-section-contract.ts'
 import { engineModeToSectionSource } from './engine/engine-section-source.ts'
+import { buildD9ChartSectionFromShodashvarga, buildShodashvargaSection } from './calculations/shodashvarga.ts'
+import { buildShodashvargaBhavSection } from './calculations/varga-bhav.ts'
 
 type MaybeObject = Record<string, unknown> | null | undefined
 
@@ -274,22 +276,31 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
   const houses = (output as MaybeObject)?.houses
   const panchang = expanded_sections?.panchang ?? (output as MaybeObject)?.panchang
   const d1Chart = (output as MaybeObject)?.d1_chart ?? buildDeterministicD1ChartSection(output)
-  const d9Chart = expanded_sections?.navamsa_d9 ?? (output as MaybeObject)?.navamsa_d9
-  const shodashvarga = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
-    ? toRecord((output as MaybeObject)?.sections).shodashvarga
-    : (output as MaybeObject)?.shodashvarga
-  const shodashvargaBhav = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
-    ? toRecord((output as MaybeObject)?.sections).shodashvargaBhav
-    : (output as MaybeObject)?.shodashvargaBhav
+  const deterministicPlanetaryPositionsSection = isTruthyObject((output as MaybeObject)?.planetary_positions)
+    ? {
+        status: 'computed' as const,
+        source: 'deterministic_calculation' as const,
+        fields: { byBody: toRecord((output as MaybeObject)?.planetary_positions) },
+      }
+    : sectionUnavailable(engine, output, 'planetary_positions_not_available')
+  const deterministicLagnaSection = isTruthyObject((output as MaybeObject)?.lagna)
+    ? (output as MaybeObject)?.lagna as Record<string, unknown> as never
+    : sectionUnavailable(engine, output, 'lagna_not_available')
+  const deterministicShodashvarga = buildShodashvargaSection({
+    planetaryPositions: deterministicPlanetaryPositionsSection as never,
+    lagna: deterministicLagnaSection as never,
+  })
+  const deterministicShodashvargaBhav = buildShodashvargaBhavSection({ shodashvarga: deterministicShodashvarga })
+  const deterministicD9Chart = buildD9ChartSectionFromShodashvarga(deterministicShodashvarga)
+  const shodashvarga = deterministicShodashvarga
+  const shodashvargaBhav = deterministicShodashvargaBhav
   const dosha = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).dosha
     : (output as MaybeObject)?.dosha
   const yoga = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).yoga
     : (output as MaybeObject)?.yoga
-  const d9ChartCompat = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
-    ? toRecord((output as MaybeObject)?.sections).d9Chart
-    : (output as MaybeObject)?.d9Chart
+  const d9ChartCompat = deterministicD9Chart
   const kp = (output as MaybeObject)?.sections && isTruthyObject((output as MaybeObject)?.sections)
     ? toRecord((output as MaybeObject)?.sections).kp
     : (output as MaybeObject)?.kp
@@ -306,9 +317,9 @@ function buildCanonicalSections(output: MasterAstroCalculationOutput, expanded_s
       ? sectionComputed(engine, output, panchang)
       : sectionUnavailable(engine, output, 'panchang_not_available'),
     d1Chart: isTruthyObject(d1Chart) ? sectionComputed(engine, output, d1Chart) : sectionUnavailable(engine, output, 'd1_chart_not_available'),
-    d9Chart: isTruthyObject(d9ChartCompat ?? d9Chart) ? sectionComputed(engine, output, d9ChartCompat ?? d9Chart) : sectionUnavailable(engine, output, 'd9_chart_not_available'),
-    shodashvarga: isTruthyObject(shodashvarga) ? sectionComputed(engine, output, shodashvarga) : sectionUnavailable(engine, output, 'shodashvarga_not_available'),
-    shodashvargaBhav: isTruthyObject(shodashvargaBhav) ? sectionComputed(engine, output, shodashvargaBhav) : sectionUnavailable(engine, output, 'shodashvarga_bhav_not_available'),
+    d9Chart: d9ChartCompat,
+    shodashvarga,
+    shodashvargaBhav,
     dosha: isTruthyObject(dosha) ? sectionComputed(engine, output, dosha) : sectionUnavailable(engine, output, 'dosha_not_available'),
     yoga: isTruthyObject(yoga) ? sectionComputed(engine, output, yoga) : sectionUnavailable(engine, output, 'yoga_not_available'),
     vimshottari: isTruthyObject(vimshottari) ? sectionComputed(engine, output, vimshottari) : sectionUnavailable(engine, output, 'vimshottari_not_available'),
@@ -1205,7 +1216,7 @@ export function buildProfileChartJsonFromMasterOutput(args: {
           }
         : undefined,
     },
-    sections: buildCanonicalSections(args.output, expanded_sections),
+    sections: buildCanonicalSections(args.output, expanded_sections) as never,
   })
   const chart_json_v2 = buildCanonicalChartJsonV2FromCalculation({
     profileId: args.profileId,
